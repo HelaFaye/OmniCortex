@@ -4,7 +4,7 @@ Score cards: share TestQA results with a scoreboard, opt-in, and only what is
 listed below.
 
 Nothing is sent unless you turn sharing on and give a scoreboard address
-(Studio → Settings → Sharing results, or --endpoint here). NeuronScope
+(Studio → Settings → Sharing results, or --endpoint here). OmniCortex
 does not run a public scoreboard itself. scripts/scoreboard_server.py is
 a reference server that anyone can host.
 
@@ -126,7 +126,7 @@ def _short_hash(path) -> str | None:
 
 
 def lineage(model_path: str) -> list[dict]:
-    """Records NeuronScope writes next to models it produced: fine-tunes, exports, concept edits."""
+    """Records OmniCortex writes next to models it produced: fine-tunes, exports, concept edits."""
     out = []
     d = Path(model_path).parent
     for name in ("neuronscope-export.json", "neuronscope-finetune.json", "edit.json", "sage.json"):

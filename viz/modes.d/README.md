@@ -1,6 +1,6 @@
 # Mode packages
 
-A mode package adds a tab to NeuronScope's interfaces. Drop a directory here
+A mode package adds a tab to OmniCortex's interfaces. Drop a directory here
 (`ns-eval/` is an example of the layout; it ships without `ENABLED` because it
 has no implementation behind its route):
 

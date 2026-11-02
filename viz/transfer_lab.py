@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NeuronScope Model Transfer GUI/server launcher."""
+"""OmniCortex Model Transfer GUI/server launcher."""
 from __future__ import annotations
 
 import sys

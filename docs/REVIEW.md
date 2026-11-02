@@ -2,7 +2,7 @@
 
 The 3D trace view shows one reply, token by token. The **Review** page
 (`/review` in Studio) shows the opposite slice: every reply a model has
-written that NeuronScope has looked at (tests, benchmarks, chat), and for
+written that OmniCortex has looked at (tests, benchmarks, chat), and for
 each MLP neuron, how its activity relates to whether the model was right.
 Filter by where the data came from and what it was about, and play it over
 time.

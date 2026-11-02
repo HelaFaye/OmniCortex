@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Start NeuronScope Studio (if it is not running) and open it in the browser.
-# Same as the "NeuronScope" entry install.sh adds to the app menu.
+# Start OmniCortex Studio (if it is not running) and open it in the browser.
+# Same as the "OmniCortex" entry install.sh adds to the app menu.
 #   ./neuronscope cli …     the terminal client (scripts/ns.py)
 #   ./neuronscope godot     the Godot client (connects to a Studio, here or on another machine)
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

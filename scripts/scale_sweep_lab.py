@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""NeuronScope Scale Sweep Lab core.
+"""OmniCortex Scale Sweep Lab core.
 
-Builds static GGUF scale variants from an existing NeuronScope H-Neuron profile.
+Builds static GGUF scale variants from an existing OmniCortex H-Neuron profile.
 It delegates actual GGUF editing to scripts/suppress_gguf.py and adds:
 
 - deterministic scale-grid generation (suppression and amplification)
@@ -229,7 +229,7 @@ def activation_profile_data(profile_path: str) -> dict[str, Any]:
     with open(profile_path, encoding="utf-8") as f:
         d = json.load(f)
     if "by_layer" not in d:
-        raise SweepError(f"not a NeuronScope H-Neuron profile: {profile_path}")
+        raise SweepError(f"not a OmniCortex H-Neuron profile: {profile_path}")
     n = int(d.get("n_neurons", 0))
     layers = int(d.get("n_layers", 0))
     by = {str(k): sorted(int(x) for x in v) for k, v in (d.get("by_layer") or {}).items()}
@@ -389,7 +389,7 @@ class SweepEngine:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Build and evaluate NeuronScope GGUF scale sweeps")
+    p = argparse.ArgumentParser(description="Build and evaluate OmniCortex GGUF scale sweeps")
     sub = p.add_subparsers(dest="command", required=True)
     s = sub.add_parser("sweep")
     s.add_argument("--model", required=True)

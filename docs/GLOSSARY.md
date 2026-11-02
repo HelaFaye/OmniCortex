@@ -1,13 +1,13 @@
 # Glossary
 
-The terms NeuronScope's docs and UI use, in plain language, with why each one
+The terms OmniCortex's docs and UI use, in plain language, with why each one
 matters here. Ordered so that each entry only leans on the ones above it.
 
 ## Models and files
 
 **GGUF.** The single-file model format llama.cpp, LM Studio and Ollama load.
 It holds the weights (usually quantized) plus the tokenizer and chat template.
-Most of NeuronScope reads and writes GGUFs directly, so it works with the
+Most of OmniCortex reads and writes GGUFs directly, so it works with the
 models you already have.
 
 **Quantization (Q4_K_M, Q6_K, Q8_0, F16).** Storing weights in fewer bits to
@@ -26,7 +26,7 @@ and costs memory (the KV cache grows with it). Studio's director skips models
 whose context is too short for a task.
 
 **llama.cpp / llama-server.** The C++ engine that runs GGUFs on CPUs and GPUs,
-and its HTTP server. Studio starts `llama-server` for you; NeuronScope adds two
+and its HTTP server. Studio starts `llama-server` for you; OmniCortex adds two
 tools to it (`cett-dump`, and an optional live `/activations` stream).
 
 **`-ngl` (GPU layers).** How many of the model's layers llama.cpp puts on the
@@ -41,7 +41,7 @@ and CUDA are usually faster on the cards they support. See
 
 **APU / unified memory / GTT.** An APU is a CPU with a built-in GPU (e.g. AMD
 Ryzen laptops). It has no memory of its own: a small "VRAM" carve-out plus GTT,
-system RAM the GPU can map. NeuronScope counts both, and remembers that the CPU
+system RAM the GPU can map. OmniCortex counts both, and remembers that the CPU
 uses the same RAM.
 
 **OpenAI-compatible API (`/v1`).** The HTTP interface most tools speak
@@ -54,14 +54,14 @@ it ("just in time") and can unload it after a period without requests, as LM
 Studio does.
 
 **MoE (mixture of experts).** A model whose feed-forward layer is many small
-"experts", of which only a few run per token. NeuronScope handles their neurons
+"experts", of which only a few run per token. OmniCortex handles their neurons
 per expert, and Studio can change how many experts run.
 
 **MCP (Model Context Protocol).** A standard for giving a model tools: an MCP
 *server* offers tools (read files, search, run a job), an MCP *client* (Studio's
 chat, Cline, Claude Desktop) lets the model call them, with your approval.
 
-## What NeuronScope measures
+## What OmniCortex measures
 
 **Hallucination (as used here).** A confident answer that is wrong. The method
 targets the *confident* part: it cannot add missing knowledge, only make a model
@@ -84,7 +84,7 @@ built on its labels.
 transformer layer that stores most facts. An 8B model has about 14,000 per layer
 and 32 layers.
 
-**CETT.** The quantity NeuronScope measures for each neuron: how much it
+**CETT.** The quantity OmniCortex measures for each neuron: how much it
 contributes to its layer's output on the answer tokens: its activation times
 the size of its outgoing weights, relative to the layer's whole output,
 `|a| × ‖W_down[:, neuron]‖ / ‖layer output‖`. It is what the H-Neurons paper
@@ -100,7 +100,7 @@ use as few neurons as possible, so the neurons it keeps are the ones that matter
 Its weights are the H-Neuron list (`h_neurons.json`).
 
 **AUROC.** How well a score separates two groups: 1.0 perfect, 0.5 a coin toss.
-NeuronScope's classifier is around 0.7 on whole replies: a useful signal, not a
+OmniCortex's classifier is around 0.7 on whole replies: a useful signal, not a
 verdict, which is why the UI says "risk" rather than "wrong".
 
 **Suppression scale (alpha).** The factor the H-Neurons' outputs are multiplied
@@ -116,7 +116,7 @@ problem is the setup (template, endpoint), not the model.
 
 ## Training and testing
 
-**TestQA.** NeuronScope's graded question bank (210 items over seven subjects)
+**TestQA.** OmniCortex's graded question bank (210 items over seven subjects)
 for any OpenAI-compatible endpoint. Its results become the per-subject stats
 that `model: "auto"` and the director use to pick models.
 

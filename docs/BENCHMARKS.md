@@ -26,7 +26,7 @@ python scripts/clip_bench.py eval --model openai/clip-vit-base-patch32 \
   `run_classification` with its class names and templates. Top-1 and top-5 are
   therefore comparable with its published numbers for the same checkpoint.
 - With `--h_neurons`, every dataset is evaluated at each `--scale`, and the
-  report adds NeuronScope's selective metrics from the same logits: coverage,
+  report adds OmniCortex's selective metrics from the same logits: coverage,
   confident error rate, selective accuracy. That shows whether suppression
   helps *out of distribution* (Sketch, ImageNet-R/A, VTAB), which is the real
   test of a profile found on one image set.

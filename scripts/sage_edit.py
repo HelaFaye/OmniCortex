@@ -7,7 +7,7 @@ Adapt a frozen model to a task with small, gated activation edits, while
 keeping a *protected* subspace of its representations untouched.
 
 The paper protects refusal so that task fine-tuning cannot erode safety.
-In NeuronScope the same method can protect, for example:
+In OmniCortex the same method can protect, for example:
 - the "I don't know" direction, so retraining on deficits does not make the
   model guess more;
 - any concept found with concept_edit.py.

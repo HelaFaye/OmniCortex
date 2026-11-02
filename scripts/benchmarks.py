@@ -62,7 +62,7 @@ import testqa as tq  # noqa: E402
 LIVEBENCH_SUBJECT = {"coding": "code", "agentic_coding": "code", "agentic_coding_v2": "code", "math": "math",
                      "data_analysis": "math", "reasoning": "logic", "language": "writing",
                      "instruction_following": "writing"}
-# Common leaderboard benchmark names -> NeuronScope subjects (case-insensitive substring match).
+# Common leaderboard benchmark names -> OmniCortex subjects (case-insensitive substring match).
 BENCHMARK_SUBJECT = [
     ("swe-bench", "code"), ("swebench", "code"), ("humaneval", "code"), ("mbpp", "code"), ("livecodebench", "code"),
     ("terminal-bench", "code"), ("aider", "code"), ("codeforces", "code"),

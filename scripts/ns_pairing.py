@@ -324,7 +324,7 @@ def main(argv=None) -> int:
                       "temporary, until " + time.strftime("%Y-%m-%d %H:%M", time.localtime(r["expires"]))},
                      indent=1))
     print("use it as: Authorization: Bearer $(cat token_file); pin the fingerprint, or pass the cert "
-          "with --cafile in NeuronScope clients", file=sys.stderr)
+          "with --cafile in OmniCortex clients", file=sys.stderr)
     return 0
 
 

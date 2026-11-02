@@ -1,6 +1,6 @@
 # Sharing results with a scoreboard
 
-**Off unless you turn it on.** NeuronScope can send TestQA results to a
+**Off unless you turn it on.** OmniCortex can send TestQA results to a
 scoreboard, so models can be compared across machines and setups. It does
 not run a scoreboard of its own: `scripts/scoreboard_server.py` is a
 reference server that anyone can host. Nothing is sent until you turn
@@ -117,7 +117,7 @@ A submission is an issue:
 Only the board's workflow can open the log: it holds the private key.
 
 **Accepting.** The workflow runs `github_board.py action` with the
-NeuronScope checkout named at `init`, which supplies the TestQA bank and the
+OmniCortex checkout named at `init`, which supplies the TestQA bank and the
 graders. It regrades every reply, as the reference server does:
 - **A verified card** is committed to
   `cards/<sha[:2]>/<sha>/<variant>/<issue>.json`, and `board.json` is

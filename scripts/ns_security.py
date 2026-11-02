@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared security helpers for NeuronScope network services.
+"""Shared security helpers for OmniCortex network services.
 
 Every service that listens on a socket (the resumable transfer receiver, the
 remote tuning worker, the WebRTC signaling server) goes through this module so
@@ -287,7 +287,7 @@ def add_client_security_args(p) -> None:
 
 def main(argv=None) -> int:
     import argparse
-    p = argparse.ArgumentParser(description="NeuronScope security utilities")
+    p = argparse.ArgumentParser(description="OmniCortex security utilities")
     sub = p.add_subparsers(dest="cmd", required=True)
     t = sub.add_parser("token", help="generate a 256-bit bearer token")
     t.add_argument("--out", default="", help="write to this file with 0600 permissions instead of stdout")

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Connect coding agents and chat apps to NeuronScope: Cline, Claude Desktop, and
+Connect coding agents and chat apps to OmniCortex: Cline, Claude Desktop, and
 any OpenAI-compatible client.
 
 Two connections, set up separately in most apps:
 
   * the model provider: Studio's OpenAI-compatible API, so the app's chat runs
     on your local models (Cline: API Provider "OpenAI Compatible");
-  * the MCP server: NeuronScope's harness and lab as tools (list and route
+  * the MCP server: OmniCortex's harness and lab as tools (list and route
     models, check replies for hallucination risk, run TestQA and retraining
     jobs, plan and review projects). See scripts/ns_mcp.py.
 
     python scripts/ns_connect.py show                  # every snippet, for this Studio
-    python scripts/ns_connect.py cline --write         # add NeuronScope to Cline's MCP settings
+    python scripts/ns_connect.py cline --write         # add OmniCortex to Cline's MCP settings
     python scripts/ns_connect.py cline --write --editor cursor --transport stdio
     python scripts/ns_connect.py claude-desktop --write
 

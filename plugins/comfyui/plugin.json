@@ -1,9 +1,9 @@
 {
   "name": "comfyui",
   "version": "1.0",
-  "author": "NeuronScope",
+  "author": "OmniCortex",
   "homepage": "https://github.com/comfy-org/ComfyUI",
-  "description": "ComfyUI inside Studio: installs it in its own Python environment with the PyTorch build for your GPU, runs it, and shows it as a tab. Optionally adds ComfyUI-Manager, LLM node packs, and NeuronScope nodes (chat through Studio, hallucination checks, graphs).",
+  "description": "ComfyUI inside Studio: installs it in its own Python environment with the PyTorch build for your GPU, runs it, and shows it as a tab. Optionally adds ComfyUI-Manager, LLM node packs, and OmniCortex nodes (chat through Studio, hallucination checks, graphs).",
   "tab": {
     "label": "ComfyUI",
     "tip": "Node-based image, video and LLM workflows (ComfyUI)"
@@ -45,7 +45,7 @@
           "name": "neuronscope_nodes",
           "kind": "bool",
           "default": true,
-          "help": "add NeuronScope's nodes: chat through Studio, hallucination check, run a graph"
+          "help": "add OmniCortex's nodes: chat through Studio, hallucination check, run a graph"
         },
         {
           "name": "llm_nodes",

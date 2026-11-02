@@ -104,7 +104,7 @@ solely through WireGuard/Tailscale or a TLS reverse proxy.
 
 ## 3. Adaptive tuning worker
 
-When the remote host can run NeuronScope itself, ship the source model once
+When the remote host can run OmniCortex itself, ship the source model once
 and let it generate and evaluate candidates locally. Only small JSON job
 messages cross the network:
 
@@ -181,7 +181,7 @@ python scripts/ns_transfer_mcp.py --http --token-file ~/.config/neuronscope/secr
 - **Health**: `GET /health` answers without the token, for monitors.
 
 **Windows with Tailscale** (a ready HTTPS name, no certificates to manage).
-Run these in the NeuronScope folder, the one that contains `scripts\`. The
+Run these in the OmniCortex folder, the one that contains `scripts\`. The
 token goes to `%USERPROFILE%\.config\neuronscope\secrets\transfer-mcp-http.token`,
 where `--http` finds it without being told.
 

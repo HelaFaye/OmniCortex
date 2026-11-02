@@ -82,7 +82,7 @@ dialog.dlg::backdrop{background:rgba(0,0,0,.5)}dialog.dlg form{padding:1rem 1.1r
 <div class="note" id="subjnote" style="margin-top:.4rem"></div></section>
 
 <section class="card" id="connectors"><h2>Connectors</h2>
-<div class="note">MCP servers that give your models tools in chat (tick <b>tools</b> under the chat). Here Studio is the <i>client</i>: a tool runs wherever its server runs. Every call asks first unless <a href="#tools">Tool approval</a> says otherwise. To use NeuronScope's own tools from Claude, Cline or another app, see <a href="/connect#claude">Connect → Claude</a>.</div>
+<div class="note">MCP servers that give your models tools in chat (tick <b>tools</b> under the chat). Here Studio is the <i>client</i>: a tool runs wherever its server runs. Every call asks first unless <a href="#tools">Tool approval</a> says otherwise. To use OmniCortex's own tools from Claude, Cline or another app, see <a href="/connect#claude">Connect → Claude</a>.</div>
 <div class="row" style="margin:.5rem 0"><input id="cnq" placeholder="Search connectors" style="width:16rem"><span class="grow"></span><button class="pri" id="cnadd">+ Add connector</button></div>
 <div id="cnlist"></div><div id="cnmsg" class="note"></div><div id="cnpath" class="note"></div>
 <dialog class="dlg" id="cndlg" aria-labelledby="cntitle"><form method="dialog" id="cnform">
@@ -142,7 +142,7 @@ dialog.dlg::backdrop{background:rgba(0,0,0,.5)}dialog.dlg form{padding:1rem 1.1r
 <div id="plDirs" class="note"></div><div style="overflow-x:auto"><table id="plList"></table></div><div id="plMsg" class="note"></div></section>
 
 <section class="card" id="sharing"><h2>Sharing results</h2>
-<div class="note"><b>Off unless you turn it on.</b> When on, TestQA results can be sent to a scoreboard you name, so models can be compared across machines and setups. NeuronScope runs no scoreboard of its own; anyone can host <code>scripts/scoreboard_server.py</code>, or keep one in a GitHub repository (<code>scripts/github_board.py init</code>).</div>
+<div class="note"><b>Off unless you turn it on.</b> When on, TestQA results can be sent to a scoreboard you name, so models can be compared across machines and setups. OmniCortex runs no scoreboard of its own; anyone can host <code>scripts/scoreboard_server.py</code>, or keep one in a GitHub repository (<code>scripts/github_board.py init</code>).</div>
 <details open style="margin:.5rem 0"><summary><b>What is sent, and what it is for</b></summary>
 <ul class="note">
 <li><b>A card, which may be public</b>:

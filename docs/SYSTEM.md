@@ -8,7 +8,7 @@ Each part Studio runs on this computer, with its state and a button:
 Studio itself (**Restart**), the chat model server (**Reload**, **Stop**),
 worker models, the embedding server for documents, MCP connectors
 (**Reconnect**), labs, jobs, and each remote host's agent (**Restart**, if
-that host's owner allows it). When NeuronScope's files change after Studio
+that host's owner allows it). When OmniCortex's files change after Studio
 started, every page offers a restart, because pages and fixes added since
 then are missing until it restarts.
 

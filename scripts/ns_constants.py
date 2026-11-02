@@ -1,4 +1,4 @@
-"""Lightweight shared constants/helpers for NeuronScope.
+"""Lightweight shared constants/helpers for OmniCortex.
 
 This module intentionally has no PyTorch/Transformers dependency.  The GGUF
 activation path needs only token-string normalization and the decoder-layer

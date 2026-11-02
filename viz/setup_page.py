@@ -49,7 +49,7 @@ details.feat{border-bottom:1px solid var(--line);padding:.35rem 0}details.feat s
 </section>
 
 <section class="card" id="build"><h2>Build llama.cpp</h2>
-<div class="note">Studio runs models with llama.cpp's <code>llama-server</code>; the H-Neuron tools also need NeuronScope's <code>cett-dump</code>. This clones llama.cpp, adds cett-dump and builds both (about 5 minutes on a laptop CPU). Vulkan runs on AMD (APUs included), Intel and NVIDIA.</div>
+<div class="note">Studio runs models with llama.cpp's <code>llama-server</code>; the H-Neuron tools also need OmniCortex's <code>cett-dump</code>. This clones llama.cpp, adds cett-dump and builds both (about 5 minutes on a laptop CPU). Vulkan runs on AMD (APUs included), Intel and NVIDIA.</div>
 <div class="row" style="margin-top:.5rem"><select id="backend" style="width:auto"><option>vulkan</option><option>cpu</option><option>hip</option><option>cuda</option><option>metal</option></select>
 <label style="margin:0"><input type="checkbox" id="portable">portable (runs on other CPUs)</label>
 <button class="pri" id="build">Build</button><span id="buildst" class="note"></span></div>

@@ -1,8 +1,8 @@
-# Remote hosts: models on computers that don't run NeuronScope
+# Remote hosts: models on computers that don't run OmniCortex
 
 Use the LLMs on another computer from Studio. That computer doesn't need
-NeuronScope: a Windows PC with LM Studio, a server with Ollama, or a box
-running llama-server is enough. It runs a small agent, **NeuronScope
+OmniCortex: a Windows PC with LM Studio, a server with Ollama, or a box
+running llama-server is enough. It runs a small agent, **OmniCortex
 Remote** (`remote/`, distributed on its own), and Studio controls it over
 MCP.
 
@@ -22,8 +22,8 @@ Which page to use:
 
 | the other computer runs | use |
 |---|---|
-| an LLM server (LM Studio, Ollama, llama.cpp…) but not NeuronScope | **Remote** (this page) |
-| NeuronScope Studio | **Link** (Studio to Studio pairing, [SECURITY.md](SECURITY.md)) |
+| an LLM server (LM Studio, Ollama, llama.cpp…) but not OmniCortex | **Remote** (this page) |
+| OmniCortex Studio | **Link** (Studio to Studio pairing, [SECURITY.md](SECURITY.md)) |
 | nothing yet; you want to copy GGUFs to it as they are made | the transfer watcher (`scripts/ns_transfer.py`), or Remote's *Send model* once the agent runs there |
 
 Which computer controls and which does the work, for every connection and port: [ROLES.md](ROLES.md).
@@ -32,9 +32,9 @@ Which computer controls and which does the work, for every connection and port: 
 
 Open Studio → **Remote** (*Remote* in the sidebar) → **Add a host**.
 
-1. **Put the agent on the host.** Click **Download NeuronScope Remote**,
+1. **Put the agent on the host.** Click **Download OmniCortex Remote**,
    copy the zip to the host, and start it:
-   - Windows: double-click `NeuronScope Remote.bat`;
+   - Windows: double-click `OmniCortex Remote.bat`;
    - macOS and Linux: `./neuronscope-remote.sh`.
 
    It needs Python 3.9+ and nothing else. Its console opens in the host's
@@ -129,7 +129,7 @@ The host's tools are:
 - `telemetry`: GPU temperatures (edge, junction, memory), VRAM, load and
   power, and whether the thermal guard has paused the host
 - `model_file`: where a model's GGUF is on the host, its size and SHA-256
-- `trace_reply`: run a reply through NeuronScope's tracer on the host
+- `trace_reply`: run a reply through OmniCortex's tracer on the host
 
 ## Running Studio's jobs on a host
 
@@ -137,13 +137,13 @@ Any job on the Jobs page (TestQA, benchmarks, SWE-bench, retraining, the
 H-Neuron pipeline…) can run on a host instead: pick the host under **Run on**.
 That needs two things on the host:
 
-1. **A NeuronScope folder** with its requirements installed. Starting the
+1. **A OmniCortex folder** with its requirements installed. Starting the
    agent from inside one is enough (`remote/` is part of it). Otherwise set
    the folder in the agent's console under *What controllers may do*.
-2. **Its owner's permission:** tick *run NeuronScope jobs* in the console.
+2. **Its owner's permission:** tick *run OmniCortex jobs* in the console.
    It is off by default, because jobs run Python code on that computer.
 
-The host builds the command with its own copy of NeuronScope, so only the
+The host builds the command with its own copy of OmniCortex, so only the
 job kinds and fields it knows can run, never an arbitrary command. Paths in
 the form are paths on the host. Remote jobs appear in the same list with
 their progress, log and failure reason, and Cancel stops them on the host.
@@ -178,14 +178,14 @@ picks the place:
    matches. The local copy's classifier is used, and the host does nothing
    but report the hash.
 2. **On the host, otherwise.** Studio sends the reply and the classifier;
-   the host runs NeuronScope's tracer and sends back the per-token trace
+   the host runs OmniCortex's tracer and sends back the per-token trace
    (a few MB). The host needs:
-   - NeuronScope installed (the agent finds it when it runs from a
-     NeuronScope folder; otherwise set `tracer.neuronscope` in the agent's
+   - OmniCortex installed (the agent finds it when it runs from a
+     OmniCortex folder; otherwise set `tracer.neuronscope` in the agent's
      `config.json`);
    - `llama-cett-dump` built there (Setup → Build llama.cpp on that machine,
      then set `tracer.cett`, or put it on `PATH`, or set `NS_CETT`);
-   - *check replies with NeuronScope's tracer* allowed in the host's
+   - *check replies with OmniCortex's tracer* allowed in the host's
      console (on by default).
 
    *Host info* says whether the host's tracer is ready.
@@ -257,7 +257,7 @@ on that machine, there are two ways:
 
 ## When something does not work
 
-- **"no NeuronScope Remote host answered":** the agent is not running, or
+- **"no OmniCortex Remote host answered":** the agent is not running, or
   the link differs. Compare the address with *Listening at* in the host's
   console. On Windows, allow Python through the firewall on private
   networks.

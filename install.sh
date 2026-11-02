@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installer for NeuronScope: creates ./venv with a PyTorch build that matches
+# Installer for OmniCortex: creates ./venv with a PyTorch build that matches
 # this machine, installs requirements, and smoke-tests the GPU.
 #
 #   NVIDIA (nvidia-smi present)  -> a CUDA wheel for the GPU's architecture:
@@ -181,13 +181,13 @@ install_launcher() {
     cat > "$apps/neuronscope.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
-Name=NeuronScope
+Name=OmniCortex
 Comment=Run, test and look inside local models
 Exec=$here/neuronscope
 Terminal=false
 Categories=Development;Science;
 DESKTOP
-    info "added NeuronScope to the app menu ($apps/neuronscope.desktop)"
+    info "added OmniCortex to the app menu ($apps/neuronscope.desktop)"
   fi
 }
 
@@ -205,7 +205,7 @@ if [[ "$MODE" == "none" ]]; then
 
 Done, without PyTorch.
 
-Start it from the app menu (NeuronScope), or:  ./neuronscope
+Start it from the app menu (OmniCortex), or:  ./neuronscope
 It opens Studio in your browser; the Setup page there takes care of the rest.
 Command line: source $VENV/bin/activate
 
@@ -356,7 +356,7 @@ cat <<EOF
 
 Done.
 
-Start it from the app menu (NeuronScope), or:  ./neuronscope
+Start it from the app menu (OmniCortex), or:  ./neuronscope
 It opens Studio in your browser; the Setup page there takes care of the rest.
 Command line: source $VENV/bin/activate
 

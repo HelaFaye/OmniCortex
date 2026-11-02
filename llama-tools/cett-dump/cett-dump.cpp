@@ -1,6 +1,6 @@
 // cett-dump: capture ffn_down inputs and outputs from a llama.cpp forward pass.
 //
-// This is the piece that lets NeuronScope do activation extraction without PyTorch,
+// This is the piece that lets OmniCortex do activation extraction without PyTorch,
 // without ROCm, and from a quantized GGUF. On a 16GB card a Q6_K 9B model plus
 // this callback fits comfortably, where bf16 in PyTorch does not.
 //

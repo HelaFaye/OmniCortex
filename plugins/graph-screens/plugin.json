@@ -1,7 +1,7 @@
 {
   "name": "graph-screens",
   "version": "1.0",
-  "author": "NeuronScope",
+  "author": "OmniCortex",
   "default": true,
   "description": "More screening nodes for graphs: risky code in a reply (shell injection, eval, disabled TLS checks, hard-coded secrets, destructive commands) and prompt-injection attempts in text a model is about to read.",
   "nodes": [

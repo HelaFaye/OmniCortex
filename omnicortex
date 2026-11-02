@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# OmniCortex's launcher: the same as ./neuronscope (kept under its old name, so scripts and menu entries that
+# call it keep working). ./omnicortex, ./omnicortex cli …, ./omnicortex godot
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/neuronscope" "$@"

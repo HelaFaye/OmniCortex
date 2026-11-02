@@ -216,7 +216,7 @@ def main(argv=None):
     sec.loopback_only(a.host, "the Adaptive Tuning lab", a.allow_unauthenticated)
     threading.Thread(target=live_state, daemon=True).start()
     s = ThreadingHTTPServer((a.host, a.port), H)
-    print(f"NeuronScope Adaptive Tuning: http://{a.host}:{a.port}/")
+    print(f"OmniCortex Adaptive Tuning: http://{a.host}:{a.port}/")
     s.serve_forever()
 
 

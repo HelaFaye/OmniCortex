@@ -1,4 +1,4 @@
-"""/help/<page>: NeuronScope's docs (docs/*.md) rendered inside Studio, so links in the
+"""/help/<page>: OmniCortex's docs (docs/*.md) rendered inside Studio, so links in the
 UI can point at them. A small Markdown subset: headings, paragraphs, lists, tables,
 code blocks, inline code, bold, italics and links. Everything else is escaped."""
 from __future__ import annotations
@@ -107,7 +107,7 @@ def page(name: str) -> str | None:
     index = "".join(f'<a href="/help/{p.stem}">{p.stem.replace("_", " ").title()}</a> '
                     for p in sorted(DOCS.glob("*.md")) if NAME.match(p.stem))
     return f"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope help: {html.escape(name.replace('_', ' ').title())}</title>
+<title>OmniCortex help: {html.escape(name.replace('_', ' ').title())}</title>
 <script>try{{const d=document.documentElement,t=localStorage.getItem('ns-theme')||'dark';d.dataset.theme=localStorage.getItem('ns-theme-base')||(t==='light'?'light':'dark');const v=JSON.parse(localStorage.getItem('ns-theme-vars')||'{{}}');for(const k in v)d.style.setProperty('--'+k,v[k])}}catch{{}}</script>
 <style>
 :root{{--bg:#fafaf9;--panel:#fff;--fg:#1c1c1a;--mut:#6b6b66;--line:#e4e4df;--acc:#2d5bd7;--code:#f3f3f0}}

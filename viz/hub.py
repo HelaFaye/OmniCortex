@@ -445,7 +445,7 @@ def css_vars():
 
 LOGIN = """<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope</title><style>body{font:16px system-ui;background:#07070b;
+<title>OmniCortex</title><style>body{font:16px system-ui;background:#07070b;
 color:#d6d6e0;display:flex;align-items:center;justify-content:center;
 height:100vh;margin:0}input,button{width:280px;padding:.8rem;font-size:16px;
 border-radius:8px;border:1px solid #22222e;background:#101018;color:#fff}
@@ -467,7 +467,7 @@ def page():
 
 PAGE = r"""<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>NeuronScope</title>
+<title>OmniCortex</title>
 <style>
 :root{
 <!--VARS-->
@@ -511,7 +511,7 @@ width:100%}
 label{display:block;font-size:12px;color:var(--fg-dim);margin:8px 0 3px}
 </style>
 <!--TABS-->
-<h1>NeuronScope</h1>
+<h1>OmniCortex</h1>
 
 <div class="card">
   <div class="mut" style="margin-bottom:6px">services</div>
@@ -657,7 +657,7 @@ def main():
                   "idle_after": a.idle_after})
     SERVICES.update(declare(STATE["root"], sys.executable))
 
-    print(f"NeuronScope hub on http://{a.host}:{a.port}")
+    print(f"OmniCortex hub on http://{a.host}:{a.port}")
     print(f"root: {STATE['root']}")
     for n, s in SERVICES.items():
         ok = os.path.exists(os.path.join(STATE["root"], s["script"]))

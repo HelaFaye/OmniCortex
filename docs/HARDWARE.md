@@ -1,6 +1,6 @@
 # Hardware notes
 
-NeuronScope does two very different kinds of work, and they want different
+OmniCortex does two very different kinds of work, and they want different
 hardware:
 
 | Work | Bound by | Runs well on |

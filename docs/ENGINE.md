@@ -5,7 +5,7 @@ panel (**Engine**):
 
 | engine | serves | best for |
 |---|---|---|
-| **llama.cpp** (`llama-server`) | GGUF files | one machine, CPU + any GPU (Vulkan, CUDA, ROCm, Metal), mixed vendors, small memory; the only engine NeuronScope's activation tools read (cett-dump) |
+| **llama.cpp** (`llama-server`) | GGUF files | one machine, CPU + any GPU (Vulkan, CUDA, ROCm, Metal), mixed vendors, small memory; the only engine OmniCortex's activation tools read (cett-dump) |
 | **vLLM** (`vllm serve`) | Hugging Face checkpoint folders (also AWQ / GPTQ / fp8), GGUF experimentally | many parallel requests on NVIDIA or AMD Instinct/RDNA GPUs; prefix caching, chunked prefill, tensor and pipeline parallelism |
 
 Hugging Face folders under your models folders (a `config.json` with
@@ -254,5 +254,5 @@ change, or they come with the engine already:
   models:** these are model choices. llama.cpp loads the architectures it
   supports (Mamba, Mamba-2, Jamba, several hybrids, and BitNet through its
   TQ1/TQ2 types). Load such a GGUF like any other. TestQA and the gate tell
-  you whether it is better for your work, and NeuronScope's neuron tools
+  you whether it is better for your work, and OmniCortex's neuron tools
   read activations the same way.

@@ -184,7 +184,7 @@ def _hf_has(repo: str, sha: str) -> bool:
 
 
 PAGE = """<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope scoreboard</title><style>body{font:14px system-ui;margin:0;padding:1rem;background:#0f1115;color:#e6e8eb}
+<title>OmniCortex scoreboard</title><style>body{font:14px system-ui;margin:0;padding:1rem;background:#0f1115;color:#e6e8eb}
 table{border-collapse:collapse;width:100%}td,th{padding:.35rem .4rem;border-bottom:1px solid #2a2f37;text-align:left;font-size:13px}
 .n{color:#9aa1ab;font-size:12px}code{font-size:11px}</style><h1>Scoreboard</h1>
 <p class="n">Verified public results only. Each row is one model file in one setup (H-Neuron set, suppression, LoRA, lineage,

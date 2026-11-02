@@ -15,7 +15,7 @@ to the open_clip interface CLIP_benchmark expects. Class names and prompt
 templates come from CLIP_benchmark, and classification runs through its own
 `zero_shot_classifier` / `run_classification`, so top-1/top-5 are comparable
 with its published numbers for the same checkpoint. Each scale additionally
-reports the selective metrics NeuronScope cares about (coverage, confident
+reports the selective metrics OmniCortex cares about (coverage, confident
 error rate, selective accuracy) from the same logits.
 
 Datasets: CLIP_benchmark downloads most automatically into --dataset-root.

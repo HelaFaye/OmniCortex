@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuronScope Studio: model manager, server supervisor and chat, over llama-server.
+OmniCortex Studio: model manager, server supervisor and chat, over llama-server.
 
 Scope, deliberately narrow. This does not implement inference, tokenization,
 sampling or GGUF loading -- llama.cpp does all of that, better than a
@@ -880,7 +880,7 @@ REMOTE: dict = {"obj": None}
 
 
 def remote():
-    """Remote hosts: computers that run models and the NeuronScope Remote agent, not Studio."""
+    """Remote hosts: computers that run models and the OmniCortex Remote agent, not Studio."""
     if REMOTE["obj"] is None:
         import remote_hosts
         REMOTE["obj"] = remote_hosts.Remote(load_links, save_links)
@@ -1282,7 +1282,7 @@ def job_targets() -> list[dict]:
         ok = bool(info and info.get("allowed") and info.get("neuronscope_dir"))
         why = err and ("unreachable: " + err) or (None if ok else "its owner has not allowed jobs (agent console → "
                                                   "What controllers may do)" if info and not info.get("allowed")
-                                                  else "no NeuronScope folder on that host")
+                                                  else "no OmniCortex folder on that host")
         out.append({"id": "host:" + name, "label": f"{name} (remote host)", "ok": ok, "why": why,
                     "kinds": (info or {}).get("kinds")})
     return out
@@ -1386,7 +1386,7 @@ def fs_places():
     for label, p in (("LM Studio models", os.path.join(home, ".lmstudio", "models")),
                      ("LM Studio models (old)", os.path.join(home, ".cache", "lm-studio", "models")),
                      ("Hugging Face cache", os.path.join(home, ".cache", "huggingface", "hub")),
-                     ("NeuronScope", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ("Studio's settings", os.path.dirname(
+                     ("OmniCortex", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ("Studio's settings", os.path.dirname(
                          os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json")))):
         if os.path.isdir(p):
             out.append({"label": label, "path": p})
@@ -2263,7 +2263,7 @@ def _remote_classifier(host_model_id, twin, file_name):
 
 def trace_remote(model_id, messages, text, threshold=0.5):
     """Check a reply from a remote host's model. With the same file here, Studio traces it
-    itself; otherwise the host runs NeuronScope's tracer and sends the trace back."""
+    itself; otherwise the host runs OmniCortex's tracer and sends the trace back."""
     host, _, rid = model_id.partition(LINK_SEP)
     rec = remote().get(host)
     info = remote().call(host, "model_file", {"model": rid}, timeout=1800)
@@ -2692,7 +2692,7 @@ def all_workers():
         ht = tel["hosts"].get(host) or {}
         th = (ht.get("thermal") or {}) if isinstance(ht, dict) else {}
         rows.append({"id": m["id"], "kind": "remote", "name": m.get("remote_id"), "host": host,
-                     "where": f"{host} ({'NeuronScope Remote' if m.get('owned_by', '').startswith('remote:') else 'linked Studio'})",
+                     "where": f"{host} ({'OmniCortex Remote' if m.get('owned_by', '').startswith('remote:') else 'linked Studio'})",
                      "status": "too hot" if th.get("tripped") else ("loaded" if m.get("loaded") else "available"),
                      "backend": m.get("backend")})
     for r in rows:
@@ -4736,7 +4736,7 @@ class Handler(BaseHTTPRequestHandler):
         import remote_hosts
         r = remote()
         req = self._read()
-        controller = f"NeuronScope Studio ({socket.gethostname()})"
+        controller = f"OmniCortex Studio ({socket.gethostname()})"
         try:
             if self.path == "/api/remote/discover":
                 return self._json(200, {"hosts": remote_hosts.discover(float(req.get("seconds") or 3))})
@@ -5523,7 +5523,7 @@ class Handler(BaseHTTPRequestHandler):
 main{{max-width:620px;margin:12vh auto;padding:0 16px}}a{{color:#6f93ff}}button{{font:600 14px ui-sans-serif,system-ui;padding:.45rem 1rem;
 border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;cursor:pointer}}code{{background:#262624;padding:0 .3rem;border-radius:4px}}</style>
 <main><h1>This page is not in the running Studio</h1>
-<p><code>{_h.escape(self.path[:200])}</code> {"exists in NeuronScope's files, which changed after this Studio started. Restart it to load the new version." if stale else "is not a Studio page. If you updated NeuronScope recently, restarting Studio loads the new pages."}</p>
+<p><code>{_h.escape(self.path[:200])}</code> {"exists in OmniCortex's files, which changed after this Studio started. Restart it to load the new version." if stale else "is not a Studio page. If you updated OmniCortex recently, restarting Studio loads the new pages."}</p>
 <p><button onclick="nsRestart()">Restart Studio</button> &nbsp; <a href="/">Back to Studio</a> · <a href="/system">System</a></p></main>
 <script>{_ui_js()}</script>"""
         return self._html(page, 404)
@@ -6103,7 +6103,7 @@ label{display:block;font-size:12px;color:var(--mut);margin:.3rem 0 .1rem}
 
 PAIR_PAGE = r"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pair device</title>""" + _PAIR_STYLE + r"""
-<header><h1>NeuronScope Studio · Pair this device</h1></header>
+<header><h1>OmniCortex Studio · Pair this device</h1></header>
 <main><div class="card"><h2>Pair</h2><div id="msg" class="note">Reading the pairing code…</div>
 <div id="form" style="display:none"><label>Name for this device</label><input id="name">
 <button class="pri" id="go" style="margin-top:.6rem">Pair and open Studio</button></div></div></main>
@@ -6177,7 +6177,7 @@ load();
 
 PAGE = r"""<!DOCTYPE html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope Studio</title><link rel="icon" href="data:,"><script>try{const d=document.documentElement,t=localStorage.getItem('ns-theme')||'dark';d.dataset.theme=localStorage.getItem('ns-theme-base')||(t==='light'?'light':'dark');const v=JSON.parse(localStorage.getItem('ns-theme-vars')||'{}');for(const k in v)d.style.setProperty('--'+k,v[k])}catch{document.documentElement.dataset.theme='dark'}</script>
+<title>OmniCortex Studio</title><link rel="icon" href="data:,"><script>try{const d=document.documentElement,t=localStorage.getItem('ns-theme')||'dark';d.dataset.theme=localStorage.getItem('ns-theme-base')||(t==='light'?'light':'dark');const v=JSON.parse(localStorage.getItem('ns-theme-vars')||'{}');for(const k in v)d.style.setProperty('--'+k,v[k])}catch{document.documentElement.dataset.theme='dark'}</script>
 <style>
 :root{--bg:#f7f7f5;--panel:#fff;--fg:#1c1c1a;--mut:#6b6b64;--line:#e3e2dd;--ok:#2f7d4f;--no:#b23c2e;--warn:#a8701c;
   --acc:#2c5f8a;--accfg:#fff;--soft:#f0f5fa;--code:#f3f2ee;color-scheme:light}
@@ -6283,7 +6283,7 @@ section.chat{position:relative}
 .outs a:hover{background:var(--soft)}.outs .k{color:var(--mut);font-size:11px;margin-left:auto;white-space:nowrap}
 </style>
 <header>
-  <h1>NeuronScope Studio</h1>
+  <h1>OmniCortex Studio</h1>
   <div class="status"><span id="dot" class="dot"></span><span id="st">no model loaded</span></div>
   <span class="chip" id="api" title="OpenAI-compatible endpoint; click to copy"></span>
   <span style="margin-left:auto"></span>
@@ -7103,7 +7103,7 @@ LINK_PAGE = _inject_links(LINK_PAGE)
 
 
 LOGIN = """<!DOCTYPE html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope Studio</title>
+<title>OmniCortex Studio</title>
 <style>:root{color-scheme:dark}body{font:14px ui-sans-serif,system-ui,sans-serif;background:#111316;color:#e6e8eb;
 display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
 form{background:#181b20;border:1px solid #2a2f37;border-radius:10px;padding:1.6rem;width:320px}
@@ -7112,7 +7112,7 @@ border-radius:6px;font:13px ui-monospace,monospace}
 button{width:100%;margin-top:.7rem;padding:.5rem;border:1px solid #6ea8e0;background:#6ea8e0;
 color:#0d1117;border-radius:6px;cursor:pointer;font:500 13px ui-sans-serif,system-ui}
 .e{color:#ff8b7e;font-size:13px;margin-top:.5rem;min-height:1em}</style>
-<form id="f"><h1>NeuronScope Studio</h1>
+<form id="f"><h1>OmniCortex Studio</h1>
 <input id="t" type="password" placeholder="access token" autofocus>
 <button>Unlock</button><div class="e" id="e"></div></form>
 <script>document.getElementById('f').onsubmit=async e=>{e.preventDefault();
@@ -7122,7 +7122,7 @@ if(r.ok) location.reload(); else document.getElementById('e').textContent='Incor
 </script>"""
 
 def build_parser():
-    p = argparse.ArgumentParser(description="NeuronScope Studio: model manager, chat and OpenAI-compatible server")
+    p = argparse.ArgumentParser(description="OmniCortex Studio: model manager, chat and OpenAI-compatible server")
     p.add_argument("--models-dir", action="append", default=[],
                    help="repeatable; searched recursively for .gguf")
     p.add_argument("--server", help="path to llama-server (or $NS_LLAMA_SERVER)")
@@ -7302,7 +7302,7 @@ def main(argv=None):
         STATE["jobs"].on_finish = job_finished
 
     scheme = "https" if tls else "http"
-    print(f"NeuronScope Studio on {scheme}://{a.host}:{a.port}")
+    print(f"OmniCortex Studio on {scheme}://{a.host}:{a.port}")
     notes = ["JIT " + ("on" if STATE["jit"] else "off")]
     if STATE["idle_ttl"]:
         notes.append(f"idle TTL {STATE['idle_ttl']}s")

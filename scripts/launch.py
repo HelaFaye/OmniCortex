@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Start NeuronScope Studio and open it in the browser: the one thing to run
-after install (the app-menu entry, `./neuronscope` and NeuronScope.bat all
+Start OmniCortex Studio and open it in the browser: the one thing to run
+after install (the app-menu entry, `./neuronscope` and OmniCortex.bat all
 call this).
 
 If Studio is already running it just opens it. Otherwise it starts Studio in
@@ -84,7 +84,7 @@ def main(argv=None) -> int:
 
     if not running(base):
         proc = start(a.port, a.workspace)
-        print(f"starting NeuronScope Studio on {base} (log: {LOG})")
+        print(f"starting OmniCortex Studio on {base} (log: {LOG})")
         end = time.time() + 60
         while time.time() < end and not running(base):
             if proc.poll() is not None:

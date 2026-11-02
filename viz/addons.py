@@ -15,7 +15,7 @@ Two kinds:
 
 A repository is an index.json at an https URL (or a local path):
 
-    {"name": "NeuronScope add-ons", "addons": [
+    {"name": "OmniCortex add-ons", "addons": [
       {"name": "comfyui", "version": "1.0", "description": "...", "url": "comfyui-1.0.zip",
        "sha256": "…", "size": 12345, "homepage": "https://…"}]}
 
@@ -190,7 +190,7 @@ def _fetch(url: str, limit: int = MAX_PACKAGE) -> bytes:
     if re.match(r"^https?://", url):
         if url.startswith("http://") and not re.match(r"^http://(127\.0\.0\.1|localhost)[:/]", url):
             raise AddonError("add-on repositories must use https (or be on this computer)")
-        req = urllib.request.Request(url, headers={"User-Agent": "NeuronScope-addons"})
+        req = urllib.request.Request(url, headers={"User-Agent": "OmniCortex-addons"})
         with urllib.request.urlopen(req, timeout=60) as r:
             data = r.read(limit + 1)
     else:
@@ -326,7 +326,7 @@ class Packages:
             raise AddonError(f"no add-on {name!r}")
         folder = Path(p["folder"]).resolve()
         if self.dir.resolve() not in folder.parents:
-            raise AddonError(f"{name} came with NeuronScope ({folder.parent}); turn it off instead, or remove that folder")
+            raise AddonError(f"{name} came with OmniCortex ({folder.parent}); turn it off instead, or remove that folder")
         self.pm.set_enabled(name, False)
         shutil.rmtree(folder)
 
@@ -346,7 +346,7 @@ def pack(folder: str | Path, out_dir: str | Path) -> Path:
     return out
 
 
-def index(dist: str | Path, name: str = "NeuronScope add-ons") -> Path:
+def index(dist: str | Path, name: str = "OmniCortex add-ons") -> Path:
     dist = Path(dist)
     rows = []
     for z in sorted(dist.glob("*.zip")):
@@ -370,7 +370,7 @@ def main(argv=None) -> int:
     a.add_argument("-o", "--out", default="dist")
     b = sub.add_parser("index", help="index.json for a folder of packages")
     b.add_argument("dist")
-    b.add_argument("--name", default="NeuronScope add-ons")
+    b.add_argument("--name", default="OmniCortex add-ons")
     x = p.parse_args(argv)
     if x.cmd == "pack":
         print(pack(x.folder, x.out))

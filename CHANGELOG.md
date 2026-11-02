@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Changed (the name)
+
+- NeuronScope is now **OmniCortex**, because [RudrenduPaul/NeuronScope](https://github.com/RudrenduPaul/NeuronScope)
+  already uses the name. The installers are `Install OmniCortex.bat` / `.command`, the Windows launcher is
+  `OmniCortex.bat`, and `./omnicortex` joins `./neuronscope`. Data folders (`~/.neuronscope`), `NS_*` variables,
+  HTTP headers and ComfyUI node ids are unchanged, so existing installs and saved workflows keep working.
+
+### Added (binaries)
+
+- `.github/workflows/binaries.yml`: llama.cpp tools and the remote agent as one executable for Windows (x64,
+  x86, ARM64), macOS (Apple silicon, Intel) and Linux (x64, ARM64, x86, ARMv7), attached to releases
+  ([docs/BINARIES.md](docs/BINARIES.md)).
+
 ### Added (MCP over the network)
 - `ns_transfer_mcp.py --http`: the transfer MCP server over streamable HTTP
   for controllers on other computers.
@@ -37,8 +50,8 @@
 
 ### Added (installing)
 - A cross-platform installer wizard (`scripts/installer.py`, standard
-  library only), opened by double-clicking `Install NeuronScope.bat`
-  (Windows), `Install NeuronScope.command` (macOS) or `install-gui.sh`
+  library only), opened by double-clicking `Install OmniCortex.bat`
+  (Windows), `Install OmniCortex.command` (macOS) or `install-gui.sh`
   (Linux).
   - It finds a suitable Python first, and offers or explains how to get
     one.
@@ -58,7 +71,7 @@
 - The Connect page shows who controls whom.
 - Studio's MCP instructions and `studio_status` name the computer the tools
   act on.
-- `/help/<page>` renders NeuronScope's docs inside Studio.
+- `/help/<page>` renders OmniCortex's docs inside Studio.
 
 ### Added (work distribution)
 - Workers page (`/workers`): monitor and control where project tasks run.
@@ -75,7 +88,7 @@
   - The director dispatches to all three kinds of worker. An endpoint that
     stops answering is marked down at once, so its tasks wait instead of
     failing. docs/WORKERS.md.
-- NeuronScope Remote: GPU telemetry (nvidia-smi, rocm-smi, or Linux amdgpu
+- OmniCortex Remote: GPU telemetry (nvidia-smi, rocm-smi, or Linux amdgpu
   sensors, without guessing) as the `telemetry` tool, and a thermal guard.
   Off until the host's owner turns it on; above a chosen limit the host
   takes no new work and unloads what it can, and it resumes once cooler.
@@ -133,7 +146,7 @@
   it straight to the chat. Closing the chat stops generation on the host.
   Older agents still answer in one piece.
 - 3D checks of a host's models. Studio traces the reply itself when it has
-  the identical GGUF (matched by SHA-256), else the host runs NeuronScope's
+  the identical GGUF (matched by SHA-256), else the host runs OmniCortex's
   tracer with the classifier Studio sends and returns the trace. New agent
   tools `model_file` and `trace_reply` (the host can switch the latter
   off); `hscore.py --trace-out` saves a trace as .npz.
@@ -285,8 +298,8 @@
     tell, and a memorisation warning.
 
 ### Added (remote hosts)
-- NeuronScope Remote (`remote/`): an agent for computers that run LLMs but
-  not NeuronScope. It is distributed on its own: a pip package, a zip from
+- OmniCortex Remote (`remote/`): an agent for computers that run LLMs but
+  not OmniCortex. It is distributed on its own: a pip package, a zip from
   Studio, and launchers for Windows and macOS/Linux. It uses only the
   standard library.
   - Its MCP server is the host's one control surface. Tools: host info,
@@ -386,7 +399,7 @@
 
 ### Added (per-project requirements)
 - Each project has its own requirement list (tools, libraries, Python
-  packages, hardware, NeuronScope features, notes), inferred from its
+  packages, hardware, OmniCortex features, notes), inferred from its
   checkout's build files when created or re-scanned (CMake, Meson, xmake,
   premake, autotools, Cargo, Go, Node, Python, Docker, Gradle, Maven, Zig,
   Godot, Nix, vcpkg, Conan, just, .NET), editable on the project page, and
@@ -399,7 +412,7 @@
 
 ### Added (neuron review)
 - Review page (`/review`) and `scripts/neuron_review.py`: every reply
-  NeuronScope looks at is stored as an activation profile with its source
+  OmniCortex looks at is stored as an activation profile with its source
   (TestQA, other benchmarks, chat checks, project work, live scoring), kind,
   subjects, verdict, risk and time. Per neuron: Cohen's d between wrong and
   right answers, correlation with the classifier's risk, or firing rate,
@@ -426,7 +439,7 @@
 
 ### Added (everything from the browser)
 - After `./install.sh`, no terminal is needed: an app-menu entry (Linux),
-  `./neuronscope` and `NeuronScope.bat` start Studio (`scripts/launch.py`)
+  `./neuronscope` and `OmniCortex.bat` start Studio (`scripts/launch.py`)
   and open it, on Setup until llama-server and models are found. Studio's
   main page points at Setup while they are missing.
 - Setup page (`/setup`): models folders, llama-server, cett-dump, unloading,
@@ -448,7 +461,7 @@
 - Fixed: the timeline's theme list offered `_ui`, which is not a theme.
 
 ### Added (connect)
-- NeuronScope as an MCP server (`scripts/ns_mcp.py`, dependency-free): 26
+- OmniCortex as an MCP server (`scripts/ns_mcp.py`, dependency-free): 26
   tools over Studio's API (models, chat, reply checks, routing, stats,
   devices, doctor, jobs, projects, traces), with read-only and destructive
   hints. Served by Studio at `/mcp` (streamable HTTP; refuses other web

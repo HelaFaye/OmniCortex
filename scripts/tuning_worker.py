@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NeuronScope remote tuning worker.
+"""OmniCortex remote tuning worker.
 
 Keeps source GGUFs and generated candidates on the remote machine. The API is
 metadata-only and enforces atomic output, checksums, bounded concurrency,
@@ -271,7 +271,7 @@ def main(argv=None):
     if tls:
         srv.socket = sec.server_ssl_context(a.tls_cert, a.tls_key).wrap_socket(
             srv.socket, server_side=True, do_handshake_on_connect=False)
-    print(f"NeuronScope tuning worker: {'https' if tls else 'http'}://{a.host}:{a.port}/health")
+    print(f"OmniCortex tuning worker: {'https' if tls else 'http'}://{a.host}:{a.port}/health")
     srv.serve_forever()
     return 0
 

@@ -326,7 +326,7 @@ def main(argv=None) -> int:
     p.add_argument("--min-same-top", type=float, default=85.0, help="per cent; fidelity bar with llama-perplexity")
     p.add_argument("--min-agreement", type=float, default=0.6, help="fidelity bar without it (0..1)")
     p.add_argument("--fidelity", choices=["auto", "kld", "agreement"], default="auto")
-    p.add_argument("--text", help="text for the KL divergence (default: NeuronScope's docs)")
+    p.add_argument("--text", help="text for the KL divergence (default: OmniCortex's docs)")
     p.add_argument("--chunks", type=int, default=40)
     p.add_argument("--ngl", type=int, default=99)
     p.add_argument("--ctx", type=int, default=4096)

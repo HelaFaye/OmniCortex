@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Single entry point showing all NeuronScope transfer modes."""
+"""Single entry point showing all OmniCortex transfer modes."""
 import argparse
 import sys
 import subprocess

@@ -1,6 +1,6 @@
 # Concept editing: finding, removing and protecting directions
 
-NeuronScope's H-Neuron suppression scales a few dozen individual neurons.
+OmniCortex's H-Neuron suppression scales a few dozen individual neurons.
 Two tools here work on *directions*, the combinations of many neurons that
 models use for a concept:
 
@@ -22,7 +22,7 @@ will find "history vs cooking". Make them matched:
 - only the concept differs;
 - a few hundred of each is better than a few dozen.
 
-Useful pairs for NeuronScope's goals:
+Useful pairs for OmniCortex's goals:
 
 | concept | A | B |
 |---|---|---|
@@ -93,7 +93,7 @@ the law where you use it.
 Nonta & Rambhatla (ICLR 2026 TTU workshop), *Refusal-Orthogonal Gated
 Editing for Safer Localized LLM Adaptation*. The paper protects refusal
 while adapting a model to a task. Here any subspace can be protected. The
-one most useful to NeuronScope is the decline direction, so that retraining
+one most useful to OmniCortex is the decline direction, so that retraining
 on deficits does not erode the model's willingness to say it does not know.
 
 ```bash
@@ -143,5 +143,5 @@ index; see a Heretic run's saved `parameters`). The differences:
 - it works for any concept pair, not refusal only;
 - it reports remaining separation when there is no behaviour regex.
 
-Heretic itself is a separate project. Models it produces load in NeuronScope
+Heretic itself is a separate project. Models it produces load in OmniCortex
 like any other, and can be checked the same way.

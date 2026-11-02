@@ -37,13 +37,13 @@ ol{margin:.3rem 0 .3rem 1.2rem;padding:0}
 <div class="role me"><b>This Studio (<span id="me"></span>): does the work</b><div class="note">The tools run here and the models answer from here. Studio is the MCP <i>server</i> for your app, on port <span class="port"></span>: <code>/mcp</code> for tools, <code>/v1</code> for chat.</div></div>
 <div class="arrow">→</div>
 <div class="role"><b>Optional: workers and hosts</b><div class="note">Studio can pass project tasks on to models on other computers (<a href="/workers">Workers</a>, <a href="/remote">Remote</a>). For those, Studio is the controller.</div></div></div>
-<div class="note" style="margin-top:.4rem">An LLM server's port (llama-server 8080, LM Studio 1234, Ollama 11434) is a chat API, not MCP. MCP lives at Studio's <code>/mcp</code> and on NeuronScope Remote hosts. <a href="/help/ROLES">Roles and ports</a>.</div></section>
+<div class="note" style="margin-top:.4rem">An LLM server's port (llama-server 8080, LM Studio 1234, Ollama 11434) is a chat API, not MCP. MCP lives at Studio's <code>/mcp</code> and on OmniCortex Remote hosts. <a href="/help/ROLES">Roles and ports</a>.</div></section>
 
 <section class="card"><h2>What Studio offers your app</h2>
 <div class="note">Set up either or both:</div>
 <ol>
 <li><b>Your local models as the app's AI</b>, through Studio's OpenAI-compatible API. In Cline this is the <i>API Provider</i>.</li>
-<li><b>NeuronScope's harness and lab as tools</b>, through MCP: the agent can list and route models, check a reply for hallucination risk, run TestQA and retraining jobs, and plan and review projects. Tools that only read are pre-approved; anything that starts work asks first.</li>
+<li><b>OmniCortex's harness and lab as tools</b>, through MCP: the agent can list and route models, check a reply for hallucination risk, run TestQA and retraining jobs, and plan and review projects. Tools that only read are pre-approved; anything that starts work asks first.</li>
 </ol><div id="auth" class="note"></div></section>
 
 <section class="card"><h2>Cline (VS Code, Cursor, VSCodium)</h2>
@@ -51,17 +51,17 @@ ol{margin:.3rem 0 .3rem 1.2rem;padding:0}
 <h3>2 · Tools: Cline → MCP Servers → Configure (opens cline_mcp_settings.json), paste inside "mcpServers"</h3>
 <div class="note">Studio serves MCP itself; Studio must be running.</div><pre id="mcphttp"></pre>
 <details><summary class="note">If your Cline cannot reach Studio over HTTP: let Cline start a local process instead (stdio)</summary><pre id="mcpstdio"></pre></details>
-<div class="note">Or have NeuronScope write it for you: <code>python scripts/ns_connect.py cline --write</code> (add <code>--editor cursor</code>, <code>codium</code>…). It keeps a backup and touches only the neuronscope entry.</div>
+<div class="note">Or have OmniCortex write it for you: <code>python scripts/ns_connect.py cline --write</code> (add <code>--editor cursor</code>, <code>codium</code>…). It keeps a backup and touches only the neuronscope entry.</div>
 </section>
 
 <section class="card" id="claude"><h2>Claude</h2>
-<div class="note">Give Claude NeuronScope's tools. Claude is the controller; the tools run on this Studio. Which Claude you use decides how:</div>
+<div class="note">Give Claude OmniCortex's tools. Claude is the controller; the tools run on this Studio. Which Claude you use decides how:</div>
 <div class="ctabs" role="tablist"><button role="tab" data-ct="desktop" class="on">Claude Desktop</button><button role="tab" data-ct="code">Claude Code</button><button role="tab" data-ct="web">claude.ai (web, mobile)</button></div>
 <div data-cp="desktop">
 <ol class="steps"><li>In Claude Desktop open <b>Settings → Developer → Edit Config</b>. That opens <code>claude_desktop_config.json</code>.</li>
-<li>Paste this inside <code>"mcpServers"</code> (or have NeuronScope write it: <code>python scripts/ns_connect.py claude-desktop --write</code>, which keeps a backup).</li></ol>
+<li>Paste this inside <code>"mcpServers"</code> (or have OmniCortex write it: <code>python scripts/ns_connect.py claude-desktop --write</code>, which keeps a backup).</li></ol>
 <pre id="claudeDesk"></pre>
-<ol class="steps" start="3"><li>Quit Claude Desktop completely and start it again. NeuronScope's tools appear under the tools (slider) button in a chat.</li>
+<ol class="steps" start="3"><li>Quit Claude Desktop completely and start it again. OmniCortex's tools appear under the tools (slider) button in a chat.</li>
 <li>Claude asks before it uses a tool; Studio's own <a href="/settings#tools">Tool approval</a> applies on top.</li></ol>
 <div class="note" id="deskTok"></div></div>
 <div data-cp="code" hidden>
@@ -70,7 +70,7 @@ ol{margin:.3rem 0 .3rem 1.2rem;padding:0}
 <h3>Or let Claude Code start the bridge itself</h3><pre id="ccStdio"></pre></div>
 <div data-cp="web" hidden>
 <div class="note"><b>Not with this Studio as it is, and that is deliberate.</b> claude.ai custom connectors (Settings → Connectors → <i>Add custom connector</i>) are reached from Anthropic's servers, not from your computer. So the address must be a public HTTPS URL that anyone on the internet can reach, and sign-in has to work through OAuth. Studio signs apps in with its own token, which that dialog has no place for. Putting Studio on the public internet without a sign-in would hand your models and tools to anyone who finds the address.</div>
-<div class="note">Use Claude Desktop or Claude Code on a computer that can reach this Studio (this one, or one on your LAN or VPN). Claude Desktop's own connectors list then shows NeuronScope too.</div></div>
+<div class="note">Use Claude Desktop or Claude Code on a computer that can reach this Studio (this one, or one on your LAN or VPN). Claude Desktop's own connectors list then shows OmniCortex too.</div></div>
 </section>
 
 <section class="card"><h2>Any OpenAI-compatible app</h2><table id="oa"></table>

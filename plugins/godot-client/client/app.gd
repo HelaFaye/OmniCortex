@@ -1,5 +1,5 @@
 extends Control
-## NeuronScope's Godot client: all of Studio, plus a native 3D view.
+## OmniCortex's Godot client: all of Studio, plus a native 3D view.
 ##
 ## Client-server by default. Studio runs on the machine with the GPU and the
 ## models; this runs anywhere else on the network (or on the same machine if
@@ -279,7 +279,7 @@ func _header() -> Control:
 	sb.content_margin_bottom = 6
 	p.add_theme_stylebox_override("panel", sb)
 	var h := _row()
-	var t := _h("NeuronScope", 16)
+	var t := _h("OmniCortex", 16)
 	h.add_child(t)
 	conn_label = _note("not connected")
 	h.add_child(conn_label)
@@ -374,7 +374,7 @@ func _do_connect() -> void:
 
 func _do_pair() -> void:
 	ui.connmsg.text = "pairing…"
-	studio.pair(ui.url.text, ui.paircode.text, "NeuronScope Godot on " + OS.get_name(), func(ok, msg):
+	studio.pair(ui.url.text, ui.paircode.text, "OmniCortex Godot on " + OS.get_name(), func(ok, msg):
 		if ok:
 			ui.token.text = studio.token
 			_do_connect()

@@ -1,5 +1,5 @@
 @echo off
-rem Double-click to install NeuronScope on Windows. Finds Python 3.10 or newer (and
+rem Double-click to install OmniCortex on Windows. Finds Python 3.10 or newer (and
 rem offers to install it), then opens the installer in your browser.
 setlocal
 cd /d "%~dp0"
@@ -19,14 +19,14 @@ for /f "delims=" %%p in ('where python 2^>nul') do call :check "%%p"
 if defined PYEXE goto run
 
 echo.
-echo NeuronScope needs Python 3.10 or newer, and none was found.
+echo OmniCortex needs Python 3.10 or newer, and none was found.
 where winget >nul 2>nul
 if errorlevel 1 goto manual
 choice /m "Install Python 3.12 now with winget"
 if errorlevel 2 goto manual
 winget install -e --id Python.Python.3.12 --accept-package-agreements --accept-source-agreements
 echo.
-echo Python is installed. Double-click "Install NeuronScope" again to continue.
+echo Python is installed. Double-click "Install OmniCortex" again to continue.
 pause
 exit /b 0
 
@@ -45,6 +45,6 @@ if not errorlevel 1 set "PYEXE=%~1"
 goto :eof
 
 :run
-echo Starting the NeuronScope installer in your browser (keep this window open)...
+echo Starting the OmniCortex installer in your browser (keep this window open)...
 "%PYEXE%" %PYARG% scripts\installer.py %*
 if errorlevel 1 pause

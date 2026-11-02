@@ -19,7 +19,7 @@ affects your work:
 | workspaces, models per subject, tool approval | ✓ (edit everything) | ✓ switch, pick, quick settings | ✓ switch, pick, quick settings |
 | setup: health check, requirements, build llama.cpp, restart | ✓ | ✓ `doctor`, `requirements`, `start-job --kind build_llama`, `restart` | ✓ |
 | labs | ✓ | `python viz/hub.py` | start, stop, open |
-| remote hosts (LM Studio, Ollama… without NeuronScope) | ✓ add, pair, send models | ✓ `remote-hosts`, `remote-call` | their models in the model list |
+| remote hosts (LM Studio, Ollama… without OmniCortex) | ✓ add, pair, send models | ✓ `remote-hosts`, `remote-call` | their models in the model list |
 
 Edited only on the web pages (or their own command-line tools): workspace
 folders, ordered tool rules with argument regexes (`scripts/tool_rules.py`),

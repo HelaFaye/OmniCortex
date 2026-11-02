@@ -4,13 +4,13 @@ Three GUIs plus CLIs for turning an H-Neuron profile into shipped GGUFs. None of
 
 ## Quantization Lab
 
-A **capability-preserving quantization layer** without changing NeuronScope's H-Neuron intervention semantics and without adding an SFT/training system.
+A **capability-preserving quantization layer** without changing OmniCortex's H-Neuron intervention semantics and without adding an SFT/training system.
 
 ### What it does
 
 1. Builds a deterministic calibration corpus from one or more weighted text sets.
 2. Computes a llama.cpp importance matrix (`llama-imatrix`).
-3. Reads NeuronScope H-Neuron profiles and converts their layer-level concentration into protection scores.
+3. Reads OmniCortex H-Neuron profiles and converts their layer-level concentration into protection scores.
 4. Selects the highest-scoring decoder layers under a protection budget.
 5. Uses `llama-quantize --imatrix` plus `--tensor-type` to quantize normal tensors at the base level and selected FFN down-projection tensors at a higher precision.
 6. Builds in RAM (`/dev/shm`) when enough tmpfs space exists, otherwise falls back to disk scratch unless RAM-only mode was requested.
@@ -65,7 +65,7 @@ The GUI exposes source/target quants, weighted capability profiles, weighted cal
 
 ## Scale Sweep Lab
 
-The Scale Sweep Lab builds static GGUF variants from a NeuronScope H-Neuron profile.
+The Scale Sweep Lab builds static GGUF variants from a OmniCortex H-Neuron profile.
 It treats the same scale operation as a symmetric control:
 
 - `0 < scale < 1`: suppression

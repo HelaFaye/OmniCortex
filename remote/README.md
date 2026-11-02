@@ -1,6 +1,6 @@
-# NeuronScope Remote
+# OmniCortex Remote
 
-Let another computer use the LLMs on this one. You don't need NeuronScope
+Let another computer use the LLMs on this one. You don't need OmniCortex
 on this computer. The agent works with LM Studio, Ollama, llama.cpp's
 `llama-server`, or any OpenAI-compatible server.
 
@@ -8,7 +8,7 @@ on this computer. The agent works with LM Studio, Ollama, llama.cpp's
 
 | | **Host** | **Controller** |
 |---|---|---|
-| what it is | the computer with the models and this agent | NeuronScope Studio, or any MCP client (Claude Desktop, Cline, Cursor…) |
+| what it is | the computer with the models and this agent | OmniCortex Studio, or any MCP client (Claude Desktop, Cline, Cursor…) |
 | what it does | runs the models and does what paired controllers ask, within what you allow | decides what to run and sends the instructions |
 | what it shows | the console: pairing code, controllers, permissions, activity | its list of hosts and their models |
 
@@ -29,7 +29,7 @@ off at once.
 The host needs Python 3.9 or newer. No other packages are needed.
 
 - **Windows:** unzip the download from Studio (Remote → *Download*) and
-  double-click `NeuronScope Remote.bat`. If you don't have Python, get it
+  double-click `OmniCortex Remote.bat`. If you don't have Python, get it
   from python.org or the Microsoft Store.
 - **macOS, Linux:** run `./neuronscope-remote.sh`.
 - **pip:** run `pip install ./neuronscope-remote` (or `pipx install …`), then
@@ -57,7 +57,7 @@ their usual ports, or you can add an address in the console.
 | **This computer calls the controller** | behind a router or firewall you cannot change | listens on nothing; connects out to the controller and waits for instructions |
 
 **2. Pair.** Click **Show a pairing code** in the console. On the
-controller, open NeuronScope Studio → **Remote** → **Add a host**, and
+controller, open OmniCortex Studio → **Remote** → **Add a host**, and
 either type the code or paste the pairing link. With *Same network*,
 Studio lists this host on its own. Each code:
 - is valid for 10 minutes;

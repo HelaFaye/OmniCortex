@@ -1,6 +1,6 @@
 # Security
 
-NeuronScope runs several network services: the Studio UI and API, the WebRTC
+OmniCortex runs several network services: the Studio UI and API, the WebRTC
 signaling server, the resumable transfer receiver, and the tuning worker.
 They share one policy, implemented once in `scripts/ns_security.py` and
 covered by `tests/test_security.py`.

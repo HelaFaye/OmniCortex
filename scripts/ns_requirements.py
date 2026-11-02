@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-What each NeuronScope feature needs (Python packages, programs, llama.cpp
+What each OmniCortex feature needs (Python packages, programs, llama.cpp
 builds, drivers, device access and hardware), what this machine has, and the
 command that fixes each gap on this OS. Also snapshots of the environment, so
 "it worked last week" can be answered with a diff.
@@ -58,7 +58,7 @@ PACKAGES = {
     "accelerate": ("accelerate", "loading models in PyTorch for extraction and fine-tuning"),
     "torch": ("torch", "the PyTorch path: extraction, CLIP neurons, fine-tuning, merging"),
     "aiohttp": ("aiohttp", "the transfer GUI's signalling server"),
-    "mcp": ("mcp", "MCP client library (NeuronScope's own MCP server needs nothing)"),
+    "mcp": ("mcp", "MCP client library (OmniCortex's own MCP server needs nothing)"),
     "keyring": ("keyring", "keeping MCP target tokens in the OS credential store"),
     "cryptography": ("cryptography", "self-signed TLS certificates for LAN Studio"),
     "fastplotlib": ("fastplotlib", "the desktop 2D/3D explorer"),
@@ -527,8 +527,8 @@ def diff(a: dict, b: dict) -> dict:
 
 
 def freeze() -> str:
-    lines = [f"# NeuronScope environment, {time.strftime('%Y-%m-%d')}, Python {platform.python_version()}",
-             "# Exact versions of the packages NeuronScope uses; pip install -r this file to reproduce."]
+    lines = [f"# OmniCortex environment, {time.strftime('%Y-%m-%d')}, Python {platform.python_version()}",
+             "# Exact versions of the packages OmniCortex uses; pip install -r this file to reproduce."]
     for p in PACKAGES:
         v = dist_version(p)
         if v:
@@ -551,7 +551,7 @@ def pip_install(pkg: str) -> int:
 # ---------------------------------------------------------------- per project
 # A project (Studio's Projects, scripts/director.py) has its own needs: the
 # toolchain and libraries its build files name, its Python dependencies, the
-# hardware it wants, and which NeuronScope features it relies on. They are
+# hardware it wants, and which OmniCortex features it relies on. They are
 # inferred from a checkout, edited by a person, and checked like the rest.
 
 PROJECT_KINDS = ("tool", "library", "package", "hardware", "feature", "note")

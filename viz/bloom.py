@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuronScope frontend backend, and the three.js client.
+OmniCortex frontend backend, and the three.js client.
 
 This serves the API that all three frontends consume:
 
@@ -233,7 +233,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 PAGE = r"""<!DOCTYPE html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope Bloom</title>
+<title>OmniCortex Bloom</title>
 <style>
 html,body{margin:0;height:100%;background:#05050a;color:#c9c9d2;
 font:13px ui-sans-serif,system-ui,sans-serif;overflow:hidden}

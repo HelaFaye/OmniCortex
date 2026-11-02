@@ -1,6 +1,6 @@
 # Requirements: libraries, programs, drivers and hardware
 
-NeuronScope touches many layers: Python packages, llama.cpp builds for
+OmniCortex touches many layers: Python packages, llama.cpp builds for
 different GPU backends, kernel drivers and device permissions, and the
 machine's memory. `scripts/ns_requirements.py` keeps track of all of it per
 feature, and **Setup → Requirements** in Studio shows the same.
@@ -43,7 +43,7 @@ instead of running it.
 
 **Take a snapshot** records every installed Python package, the programs
 above with their versions, the llama.cpp builds (time and backends), the
-devices and the NeuronScope commit, to `~/.neuronscope/env/<time>.json`.
+devices and the OmniCortex commit, to `~/.neuronscope/env/<time>.json`.
 **Compare** two snapshots after an update, a driver change or a rebuild:
 "it was faster last week" usually turns out to be a llama.cpp rebuilt
 without its GPU backend, or a package that moved a major version.

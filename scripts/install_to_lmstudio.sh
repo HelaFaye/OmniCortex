@@ -110,7 +110,7 @@ cat > "${DEST_DIR}/neuronscope.json" <<EOF
   "adapter": "$(basename "$LORA")",
   "adapter_scale": ${ALPHA},
   "merged": "$(date -Iseconds)",
-  "note": "NeuronScope suppression baked in. Effective neuron scale is 1 + alpha*(s-1) where s is the profile scale the adapter was exported at."
+  "note": "OmniCortex suppression baked in. Effective neuron scale is 1 + alpha*(s-1) where s is the profile scale the adapter was exported at."
 }
 EOF
 

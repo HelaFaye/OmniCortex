@@ -49,7 +49,7 @@ details summary{cursor:pointer}
 <section class="wide"><div class="tiles" id="tiles"></div></section>
 <section>
  <div class="card"><div class="row"><h2 class="grow">Workers</h2><label class="note" style="margin:0"><input type="checkbox" id="allLocal"> show every local model</label></div>
-  <div class="note">This Studio is the <b>controller</b>: it plans the work and sends each task to a worker. A worker is where the model runs and the work happens: <b>this computer</b> (Studio starts the model when a task needs it), an <b>endpoint</b> (a server you started yourself, here or on another computer), or a <b>remote host</b> (a computer running NeuronScope Remote, or a linked Studio).</div>
+  <div class="note">This Studio is the <b>controller</b>: it plans the work and sends each task to a worker. A worker is where the model runs and the work happens: <b>this computer</b> (Studio starts the model when a task needs it), an <b>endpoint</b> (a server you started yourself, here or on another computer), or a <b>remote host</b> (a computer running OmniCortex Remote, or a linked Studio).</div>
   <div class="tscroll"><table id="workers"></table></div><div id="werr" class="err"></div></div>
  <div class="card"><h2>Queue</h2><div class="note">Unfinished tasks of approved, running and paused projects. Pick another worker to move a task; it takes effect when the task next starts.</div>
   <div class="tscroll"><table id="queue"></table></div></div>
@@ -110,7 +110,7 @@ function renderGpus(){ const T=D.telemetry; let h=(T.local||[]).map(g=>gpuRow(g,
   for(const [host,t] of Object.entries(T.hosts||{})){ if(t.error){ h+=`<div class="err">${esc(host)}: ${esc(t.error)}</div>`; continue; }
     const th=t.thermal||{}; if(th.tripped) h+=`<div class="err"><b>${esc(host)} paused: ${esc(th.tripped.gpu)} at ${f0(th.tripped.temp)}°C</b></div>`;
     h+=(t.gpus||[]).map(g=>gpuRow(g,host+(th.enabled?` · guard at ${th.limit_c}°C`:''))).join('')||`<div class="note">${esc(host)}: no GPU sensors</div>`; }
-  $('#gpus').innerHTML=h||'No GPU sensors found yet. NVIDIA needs nvidia-smi; AMD needs rocm-smi, or Linux’s amdgpu driver. Remote hosts report theirs once they run this version of NeuronScope Remote.';
+  $('#gpus').innerHTML=h||'No GPU sensors found yet. NVIDIA needs nvidia-smi; AMD needs rocm-smi, or Linux’s amdgpu driver. Remote hosts report theirs once they run this version of OmniCortex Remote.';
   $('#upd').textContent=T.t?'updated '+ago(T.t)+' ago':''; }
 function renderRoutes(){ if(editing) return; const opts=w=>`<option value="">—</option>`+D.workers.filter(x=>x.kind!=='local'||shown(x)||Object.values(D.routes).some(ids=>ids.includes(x.id))).map(x=>`<option value="${esc(x.id)}" ${x.id===w?'selected':''}>${esc(x.name)} (${KIND[x.kind]})</option>`).join('');
   $('#routes').innerHTML='<table style="table-layout:fixed"><colgroup><col style="width:6.5rem"><col><col><col></colgroup>'+D.subjects.map(s=>{ const r=D.routes[s]||[]; return `<tr><td>${esc(s)}</td>${[0,1,2].map(i=>`<td><select style="width:100%" data-route="${esc(s)}" data-i="${i}">${opts(r[i]||'')}</select></td>`).join('')}</tr>`; }).join('')+'</table>';

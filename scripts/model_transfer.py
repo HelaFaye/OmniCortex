@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NeuronScope Model Transfer: browser/WebRTC signaling and file-transfer UI server.
+"""OmniCortex Model Transfer: browser/WebRTC signaling and file-transfer UI server.
 
 This server only relays signaling metadata (SDP offers/answers, ICE
 candidates). File bytes go peer-to-peer over DTLS-encrypted WebRTC
@@ -445,7 +445,7 @@ def turn_from_args(a) -> dict:
 
 
 def parse_args(argv=None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="NeuronScope P2P model transfer (WebRTC) server")
+    p = argparse.ArgumentParser(description="OmniCortex P2P model transfer (WebRTC) server")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8798)
     p.add_argument("--public-host", default=None, help="hostname/IP to print in share URLs")
@@ -489,7 +489,7 @@ def main(argv=None) -> int:
     if not host_for_urls:
         addrs = local_addresses() if args.host in {"0.0.0.0", "::"} else []
         host_for_urls = addrs[0] if addrs else args.host
-    print("NeuronScope Model Transfer")
+    print("OmniCortex Model Transfer")
     print(f"Listening: {scheme}://{args.host}:{args.port}/")
     print(f"Share URL: {scheme}://{host_for_urls}:{args.port}/")
     print(f"ICE mode:  {args.ice_mode}")

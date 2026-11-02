@@ -480,7 +480,7 @@ def _n_judge(n, i, env, run):
       params=[{"name": "model", "kind": "model", "default": "", "help": "the model that wrote the reply (needs its classifier)"},
               {"name": "max_risk", "kind": "float", "default": 0.5, "help": "fail when any token's risk reaches this"},
               {"name": "max_flagged", "kind": "int", "default": 0, "help": "…or more than this many tokens are flagged"}],
-      help="NeuronScope's own check: each token's hallucination risk from the model's neuron activations. "
+      help="OmniCortex's own check: each token's hallucination risk from the model's neuron activations. "
            "Fails with the flagged words, and links the 3D view.")
 def _n_halluc(n, i, env, run):
     p = n["params"]
@@ -723,7 +723,7 @@ def _n_http(n, i, env, run):
     if not re.match(r"https?://", url):
         raise GraphError("http or https URLs only")
     env.permit("net", url, n["params"].get("profile", ""))
-    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "NeuronScope-graph"}), timeout=30) as r:
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "OmniCortex-graph"}), timeout=30) as r:
         body = r.read(2_000_000).decode("utf-8", "replace")
     if "<html" in body[:500].lower():
         body = re.sub(r"(?s)<(script|style).*?</\1>", " ", body)

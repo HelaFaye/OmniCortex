@@ -2,7 +2,7 @@
 # Source this before running local stages:  source env.sh
 #
 # Every script reads the model path from $NS_GGUF instead of embedding it, so
-# this is the one place to point NeuronScope at your model. Put your values in
+# this is the one place to point OmniCortex at your model. Put your values in
 # env.local.sh (gitignored) or export them before sourcing:
 #
 #   export NS_GGUF=~/models/Qwen3-8B-Q6_K.gguf

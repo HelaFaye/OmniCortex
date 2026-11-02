@@ -37,7 +37,7 @@ DEFAULT_NAME = "default"
 NAME_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,40}")
 ENV_RX = re.compile(r"[A-Z_][A-Z0-9_]{0,63}")
 # Variables a workspace may not set: they would change how Python, the shell or
-# NeuronScope itself run rather than where things are.
+# OmniCortex itself run rather than where things are.
 ENV_DENY = {"PATH", "PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "HOME", "SHELL", "NS_STUDIO_TOKEN",
             "NS_CONFIG", "BASH_ENV", "ENV"}
 

@@ -20,7 +20,7 @@ neurons and averaging erases them), which brings 512 bins down to about 16 MB.
         --input_path data/consistency_samples.jsonl --qid <id> \\
         --out runs/trace-<id> --bin-neurons 512
 
-Writes a NeuronScope session with one sample holding the full trace, so
+Writes a OmniCortex session with one sample holding the full trace, so
 viz/timeline.py and anything else that reads records can consume it.
 """
 

@@ -1,4 +1,4 @@
-"""ComfyUI for NeuronScope: install it in its own virtual environment, keep it updated, run it.
+"""ComfyUI for OmniCortex: install it in its own virtual environment, keep it updated, run it.
 
 ComfyUI (https://github.com/comfy-org/ComfyUI) is GPL-3.0 and is downloaded from its own repository at
 install time; nothing of it is shipped here. Where it went and how it runs is remembered in
@@ -116,4 +116,4 @@ def neuronscope_nodes(root: Path):
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
-    say(f"NeuronScope nodes -> {dst}")
+    say(f"OmniCortex nodes -> {dst}")

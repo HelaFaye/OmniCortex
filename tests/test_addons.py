@@ -62,7 +62,7 @@ def test_packages_install_update_uninstall_and_repo(tmp_path):
     pk.install_bytes(_zip({"plugin.json": MANIFEST, "hi.py": "print('changed')"}))
     assert pm.get("hello", need_on=False)["status"] == "off"            # an update waits for review again
     with pytest.raises(A.AddonError):
-        pk.uninstall("ships")                                          # came with NeuronScope: turn it off instead
+        pk.uninstall("ships")                                          # came with OmniCortex: turn it off instead
     # a repository: pack, index, install by name, sha256 checked
     src = tmp_path / "src" / "greeter"
     src.mkdir(parents=True)
@@ -168,7 +168,7 @@ def test_studio_addons(studio_srv, tmp_path):  # noqa: F811
         assert "plugin:comfyui:install" in jobs.all_specs()
         assert "not running" in _get(studio_srv, "/plugins/comfyui/")[1]
         assert _post(studio_srv, "/api/addons/uninstall", {"name": "hello"})[0] == 200
-        assert _post(studio_srv, "/api/addons/uninstall", {"name": "comfyui"})[0] == 400        # ships with NeuronScope
+        assert _post(studio_srv, "/api/addons/uninstall", {"name": "comfyui"})[0] == 400        # ships with OmniCortex
     finally:
         studio.STATE["addons_off"] = []
         studio.STATE.pop("plugin_dirs", None)
@@ -197,7 +197,7 @@ def test_comfyui_addon_files():
 
 
 def test_default_addons(studio_srv, tmp_path):  # noqa: F811
-    """Add-ons that ship with NeuronScope and are on unless turned off: the Godot client, jewel styles,
+    """Add-ons that ship with OmniCortex and are on unless turned off: the Godot client, jewel styles,
     the theme pack and the graph screens. ComfyUI ships too but waits to be turned on."""
     import studio
     import graph_engine as G

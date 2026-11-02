@@ -6,7 +6,7 @@ Studio offers other apps two separate things. Set up either or both:
    `http://127.0.0.1:7870/v1`. Any app with an "OpenAI compatible" provider
    can chat with the models in your Studio, including `auto`, which picks the
    model with the best measured record for each prompt.
-2. **NeuronScope as tools (MCP).** An agent can list and route models, check
+2. **OmniCortex as tools (MCP).** An agent can list and route models, check
    a reply for hallucination risk, run TestQA, retraining and benchmark jobs,
    and plan and review projects. These are the same operations as the UI, under
    the same rules.
@@ -19,11 +19,11 @@ Which computer controls and which does the work, and which port is which: [ROLES
 
 ## MCP, step by step
 
-NeuronScope has three MCP pieces. Pick by what should control what:
+OmniCortex has three MCP pieces. Pick by what should control what:
 
 | you want | the MCP piece | set up |
 |---|---|---|
-| an agent app (Cline, Claude Desktop, Cursor…) to use NeuronScope: route models, check replies, run jobs | Studio's MCP **server** | A below |
+| an agent app (Cline, Claude Desktop, Cursor…) to use OmniCortex: route models, check replies, run jobs | Studio's MCP **server** | A below |
 | an agent app to use the LLMs on another computer (LM Studio, Ollama, llama.cpp there) | the Remote agent's MCP **bridge** | B below |
 | Studio's chat to call tools (files, search, your plugins…) | Studio's MCP **client** | C below |
 
@@ -38,13 +38,13 @@ NeuronScope has three MCP pieces. Pick by what should control what:
    - With a Studio token, the entry carries it; keep that file private.
 
 **B. Another computer's LLMs for an agent app**
-1. On the computer with the models (the *host*), run NeuronScope Remote
-   (Studio → Connect → Remote hosts → *Download NeuronScope Remote*, or copy `remote/`).
+1. On the computer with the models (the *host*), run OmniCortex Remote
+   (Studio → Connect → Remote hosts → *Download OmniCortex Remote*, or copy `remote/`).
    Python 3.9+, nothing else.
 2. On the computer with the agent app (the *controller*), pair it once:
    `python -m neuronscope_remote add-host nsr://…` with the pairing link the
    host's console shows. Run it in the folder that holds
-   `neuronscope_remote` (NeuronScope's `remote/`, or the unpacked Remote zip).
+   `neuronscope_remote` (OmniCortex's `remote/`, or the unpacked Remote zip).
 3. Add to the app's MCP settings:
    ```json
    {"mcpServers": {"gpu-box": {"command": "python",
@@ -98,7 +98,7 @@ compare yours (`model_stats` shows the results to an agent).
 }
 ```
 
-Or let NeuronScope write it: `python scripts/ns_connect.py cline --write`
+Or let OmniCortex write it: `python scripts/ns_connect.py cline --write`
 (`--editor cursor`, `codium`, `code-insiders` or `windsurf` for other
 editors). It adds only the `neuronscope` entry and keeps a backup of the file.
 
@@ -227,8 +227,8 @@ python scripts/ns_mcp.py --studio http://HOST:7870 --token-file studio.token   #
 
 ## The other direction: controlling LLMs on other computers
 
-Everything above makes NeuronScope a tool for other apps. To have
-NeuronScope, or any MCP client, use the models on a computer that runs LM
-Studio, Ollama or llama.cpp but not NeuronScope, put the NeuronScope Remote
+Everything above makes OmniCortex a tool for other apps. To have
+OmniCortex, or any MCP client, use the models on a computer that runs LM
+Studio, Ollama or llama.cpp but not OmniCortex, put the OmniCortex Remote
 agent there. That computer is then a *host*, and Studio or the MCP client is
 its *controller*. See [REMOTE.md](REMOTE.md).

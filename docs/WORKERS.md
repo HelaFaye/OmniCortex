@@ -14,12 +14,12 @@ lets you steer them.
 |---|---|---|
 | **this computer** | a model in Studio's model folders | Studio starts it on a free device when a task needs it, and stops it when idle |
 | **endpoint** | an OpenAI-compatible server you run yourself (llama-server, vLLM, LM Studio, Ollama), here or on another computer | you start it; Studio only sends it tasks |
-| **remote host** | a model on a computer running NeuronScope Remote, or on a linked Studio | through that host's agent ([REMOTE.md](REMOTE.md)) |
+| **remote host** | a model on a computer running OmniCortex Remote, or on a linked Studio | through that host's agent ([REMOTE.md](REMOTE.md)) |
 
 An endpoint on another computer is reached directly over the network, so
 put it on a VPN or a LAN you trust. llama-server can require a key
 (`--api-key`), which you give Studio when you add the endpoint. A remote host
-through NeuronScope Remote adds pairing, TLS, the host owner's permissions
+through OmniCortex Remote adds pairing, TLS, the host owner's permissions
 and its thermal guard.
 
 All the roles and ports in one place: [ROLES.md](ROLES.md).
@@ -74,7 +74,7 @@ both with TestQA (Jobs → *TestQA run*) and let the measured route decide.
 
 ## Overheating
 
-NeuronScope Remote can pause a host before its GPUs get too hot (host
+OmniCortex Remote can pause a host before its GPUs get too hot (host
 console → *GPUs and thermal guard*):
 - above the limit you set, the host refuses new chats and traces, and
   unloads what LM Studio and Ollama can unload;

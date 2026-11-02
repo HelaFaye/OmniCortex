@@ -112,7 +112,7 @@ class Plugins:
     """The plugins found in some folders, and which of them the owner turned on."""
 
     def __init__(self, dirs: list, state_path: str | Path, bundled: list | None = None):
-        """bundled: folders that ship with NeuronScope (the checkout's plugins/). A plugin there marked
+        """bundled: folders that ship with OmniCortex (the checkout's plugins/). A plugin there marked
         "default": true is on unless the owner turned it off: it is trusted like the rest of the checkout."""
         self.dirs = [Path(d).expanduser() for d in dirs if d]
         self.bundled = {Path(d).expanduser().resolve() for d in bundled or []}
@@ -182,7 +182,7 @@ class Plugins:
             if p["status"] == "broken":
                 raise PluginError(p["error"])
             st = self._state()
-            if p.get("default"):                       # ships with NeuronScope and is on by default
+            if p.get("default"):                       # ships with OmniCortex and is on by default
                 if on:
                     st.pop(name, None)
                 else:

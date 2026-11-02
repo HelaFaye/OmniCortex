@@ -284,7 +284,7 @@ class Handler(BaseHTTPRequestHandler):
 
 LOGIN = """<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope</title><style>body{font:16px system-ui;background:#0b0b10;
+<title>OmniCortex</title><style>body{font:16px system-ui;background:#0b0b10;
 color:#c9c9d2;display:flex;align-items:center;justify-content:center;height:100vh;
 margin:0}form{width:300px}input{width:100%;padding:.8rem;font-size:16px;
 border:1px solid #2a2a34;border-radius:8px;background:#14141c;color:#fff}
@@ -298,7 +298,7 @@ headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t.value})
 
 PAGE = r"""<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>NeuronScope live</title>
+<title>OmniCortex live</title>
 <style>
 :root{--hot:#FF4D1A;--act:#3D8BFF}
 *{box-sizing:border-box}
@@ -489,7 +489,7 @@ def main():
         ctx.load_cert_chain(a.tls_cert, a.tls_key or a.tls_cert)
         srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
 
-    print(f"NeuronScope live on {scheme}://{a.host}:{a.port}")
+    print(f"OmniCortex live on {scheme}://{a.host}:{a.port}")
     print(f"tier {a.tier}: {TIERS[a.tier][0]}, "
           f"~{TIERS[a.tier][1] / 1024:.1f} KB/token")
 

@@ -1,6 +1,6 @@
 @echo off
-rem NeuronScope Remote: double-click to start. This computer becomes a HOST that a controller
-rem (NeuronScope Studio, or an MCP client) can use after you pair it.
+rem OmniCortex Remote: double-click to start. This computer becomes a HOST that a controller
+rem (OmniCortex Studio, or an MCP client) can use after you pair it.
 cd /d "%~dp0"
 where py >nul 2>nul
 if %errorlevel%==0 (

@@ -101,7 +101,7 @@ def test_wizard_access():
         url = p.stdout.readline().split()[-1]
         base = url.rsplit("/", 2)[0]
         page = urllib.request.urlopen(url).read().decode()
-        assert "Install NeuronScope" in page
+        assert "Install OmniCortex" in page
         det = json.loads(urllib.request.urlopen(url + "api/detect").read())
         assert det["python_ok"] and "auto" in det["torch"]
         with pytest.raises(urllib.error.HTTPError) as e:                 # no token, no page
@@ -120,9 +120,9 @@ def test_wizard_access():
 
 
 def test_launchers_are_well_formed():
-    bat = (ROOT / "Install NeuronScope.bat").read_bytes()
+    bat = (ROOT / "Install OmniCortex.bat").read_bytes()
     assert b"\r\n" in bat and b"\n" not in bat.replace(b"\r\n", b"")     # CRLF throughout: cmd's labels need it
     assert b"WindowsApps" in bat and b"winget install" in bat
-    for f in ("Install NeuronScope.command", "install-gui.sh"):
+    for f in ("Install OmniCortex.command", "install-gui.sh"):
         assert subprocess.run(["bash", "-n", str(ROOT / f)]).returncode == 0
         assert (ROOT / f).stat().st_mode & 0o111

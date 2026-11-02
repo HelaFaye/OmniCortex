@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuronScope control: run the pipeline and watch it, from a browser.
+OmniCortex control: run the pipeline and watch it, from a browser.
 
 viz/server.py shows where the pipeline is. This runs it. One page with the
 stage list, a live view of whatever is currently going, and a Run button per
@@ -343,7 +343,7 @@ class Handler(BaseHTTPRequestHandler):
 
 LOGIN = """<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope</title><style>body{font:16px system-ui;background:#0b0b10;
+<title>OmniCortex</title><style>body{font:16px system-ui;background:#0b0b10;
 color:#c9c9d2;display:flex;align-items:center;justify-content:center;
 height:100vh;margin:0}input,button{width:280px;padding:.8rem;font-size:16px;
 border-radius:8px;border:1px solid #2a2a34;background:#14141c;color:#fff}
@@ -356,7 +356,7 @@ headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t.value})
 
 PAGE = r"""<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>NeuronScope control</title>
+<title>OmniCortex control</title>
 <style>
 <!--NS_SHELL_CSS-->
 *{box-sizing:border-box}
@@ -384,7 +384,7 @@ font:11px ui-monospace,monospace;max-height:320px;overflow:auto;white-space:pre-
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 </style>
 <!--NS_TABS-->
-<h1>NeuronScope control</h1>
+<h1>OmniCortex control</h1>
 <div class="card">
   <div class="mut">balanced pairs</div>
   <div class="big" id="pairs">–</div>
@@ -481,7 +481,7 @@ def main():
     except sec.SecurityConfigError as e:
         raise SystemExit(f"error: {e}")
 
-    print(f"NeuronScope control on http://{a.host}:{a.port}")
+    print(f"OmniCortex control on http://{a.host}:{a.port}")
     print(f"root: {STATE['root']}")
     c = collection_state()
     print(f"collection: {c['attempted']} attempted, {c['pairs']} pairs")

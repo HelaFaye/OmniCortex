@@ -1,7 +1,7 @@
 {
   "name": "theme-pack",
   "version": "1.0",
-  "author": "NeuronScope",
+  "author": "OmniCortex",
   "default": true,
   "description": "More themes for Studio and the 3D views: Arcade, Ember, Forest and Solar, and the Ember, Cool, Arcade, Forest and Solar 3D palettes.",
   "themes": "themes.json"

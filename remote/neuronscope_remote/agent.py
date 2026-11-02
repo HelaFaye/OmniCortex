@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-NeuronScope Remote: the agent for a computer that runs LLMs but not NeuronScope.
+OmniCortex Remote: the agent for a computer that runs LLMs but not OmniCortex.
 
 There are always two roles:
 
   HOST        this computer. It runs the models (LM Studio, Ollama, llama.cpp's
               llama-server, or any OpenAI-compatible server) and this agent.
-  CONTROLLER  the computer that tells it what to do: NeuronScope Studio, or any
+  CONTROLLER  the computer that tells it what to do: OmniCortex Studio, or any
               MCP client (Claude Desktop, Cline, Cursor, ...).
 
 The agent is the host's one control surface, an MCP server: list, load and
@@ -36,7 +36,7 @@ How a controller reaches the host (the "link"):
     neuronscope-remote controllers           # who may control this host; --revoke ID
     neuronscope-remote stdio                 # MCP over stdin/stdout, for a local MCP client
 
-On a CONTROLLER that is not NeuronScope Studio (Claude Desktop, Cline...),
+On a CONTROLLER that is not OmniCortex Studio (Claude Desktop, Cline...),
 the same package pairs with hosts and bridges the MCP client to them:
 
     neuronscope-remote add-host 'nsr://192.168.1.20:47871/#c=...'   # prints the MCP client entry
@@ -90,12 +90,12 @@ MAX_CHUNK = 64 * 1024 * 1024
 ALLOW_DEFAULT = {"chat": True, "load": True, "receive": True, "install": True, "delete": False, "trace": True,
                  "jobs": False, "restart": True, "busy": True}
 ALLOW_TEXT = {"chat": "chat with the models",
-              "trace": "check replies with NeuronScope's tracer (runs a model file once more, for a 3D view)",
+              "trace": "check replies with OmniCortex's tracer (runs a model file once more, for a 3D view)",
               "load": "load and unload models",
               "receive": "send files to this computer (into the incoming folder)",
               "install": "install received models into LM Studio or Ollama",
               "delete": "delete files in the incoming and models folders",
-              "jobs": "run NeuronScope jobs (evaluations, benchmarks, training) with the NeuronScope folder on this "
+              "jobs": "run OmniCortex jobs (evaluations, benchmarks, training) with the OmniCortex folder on this "
                       "computer; they run Python code, so only for controllers you trust",
               "restart": "restart this agent (it starts again by itself)",
               "busy": "mark this computer busy or free and unload its models (Studio's automation rules)"}
@@ -955,7 +955,7 @@ class Agent:
     def need(self, what: str) -> None:
         if not self.cfg["allow"].get(what):
             raise ToolError(f"the host does not allow controllers to {ALLOW_TEXT[what]}; the host owner can allow "
-                            "it in the NeuronScope Remote console")
+                            "it in the OmniCortex Remote console")
 
     def note(self, who: str, what: str, ok: bool, detail: str = "") -> None:
         with self.lock:
@@ -979,9 +979,9 @@ class Agent:
                 "jobs": bool(self.cfg["allow"].get("jobs") and self.neuronscope_dir()),
                 "tracer": self.tracer()}
 
-    # -- NeuronScope jobs on this host (off unless the host owner allows "jobs")
+    # -- OmniCortex jobs on this host (off unless the host owner allows "jobs")
     def neuronscope_dir(self) -> Path | None:
-        """The NeuronScope folder jobs run from: configured, or the one this agent was started from."""
+        """The OmniCortex folder jobs run from: configured, or the one this agent was started from."""
         cand = [self.cfg.get("neuronscope_dir")] if self.cfg.get("neuronscope_dir") else []
         cand.append(str(Path(__file__).resolve().parents[2]))
         for c in cand:
@@ -993,11 +993,11 @@ class Agent:
     def _jobs(self):
         if not self.cfg["allow"].get("jobs"):
             raise ToolError("this host does not run jobs: its owner can allow them in the agent's console "
-                            "(Allow: run NeuronScope jobs)")
+                            "(Allow: run OmniCortex jobs)")
         root = self.neuronscope_dir()
         if root is None:
-            raise ToolError("no NeuronScope folder on this host: set one in the agent's console, or start the agent "
-                            "from inside a NeuronScope folder")
+            raise ToolError("no OmniCortex folder on this host: set one in the agent's console, or start the agent "
+                            "from inside a OmniCortex folder")
         with self.lock:
             cached = getattr(self, "_jobs_cache", None)
             if cached and cached[0] == root:
@@ -1216,7 +1216,7 @@ class Agent:
         return {"model": a["model"], "file": f.name, "size": f.stat().st_size, "sha256": self.sha256(f)}
 
     def tracer(self) -> dict:
-        """NeuronScope's tracer on this host: its scripts folder and llama-cett-dump, if present."""
+        """OmniCortex's tracer on this host: its scripts folder and llama-cett-dump, if present."""
         t = dict(self.cfg.get("tracer") or {})
         root = Path(t.get("neuronscope") or Path(__file__).resolve().parents[2]).expanduser()
         cett = t.get("cett") or os.environ.get("NS_CETT") or shutil.which("llama-cett-dump") or ""
@@ -1229,7 +1229,7 @@ class Agent:
         self.not_busy()
         tr = self.tracer()
         if not tr["available"]:
-            raise ToolError("this host has no NeuronScope tracer: install NeuronScope here and build llama.cpp with "
+            raise ToolError("this host has no OmniCortex tracer: install OmniCortex here and build llama.cpp with "
                             "cett-dump, then set tracer in config.json (neuronscope folder, cett binary)")
         f = self.find_gguf(a["model"], a.get("backend", ""))
         import tempfile
@@ -1390,8 +1390,8 @@ class Agent:
         ("model_file", "Where a model's GGUF file is on this host, its size and SHA-256 (for finding the same "
          "file elsewhere).", {"model": {"type": "string"}, "backend": {"type": "string"}}, {"readOnlyHint": True},
          ["model"]),
-        ("trace_reply", "Run a reply through the model's GGUF with NeuronScope's tracer and an H-Neuron classifier; "
-         "returns the per-token activation trace (.npz, base64) for a 3D view. Needs NeuronScope and "
+        ("trace_reply", "Run a reply through the model's GGUF with OmniCortex's tracer and an H-Neuron classifier; "
+         "returns the per-token activation trace (.npz, base64) for a 3D view. Needs OmniCortex and "
          "llama-cett-dump on this host.",
          {"model": {"type": "string"}, "messages": {"type": "array", "items": {"type": "object"}},
           "text": {"type": "string"}, "classifier": {"type": "string", "description": "the classifier .npz, base64"},
@@ -1421,10 +1421,10 @@ class Agent:
         ("delete_file", "Delete a file from the incoming or models folder. Off unless the host owner allows it.",
          {"file": {"type": "string"}, "where": {"type": "string", "enum": ["incoming", "models"]}},
          {"readOnlyHint": False, "destructiveHint": True}, ["file"]),
-        ("jobs_info", "Whether this host runs NeuronScope jobs, from which NeuronScope folder, and the job kinds it has.",
+        ("jobs_info", "Whether this host runs OmniCortex jobs, from which OmniCortex folder, and the job kinds it has.",
          {}, {"readOnlyHint": True}),
-        ("run_job", "Start a NeuronScope job on this host: the same job kinds and fields as Studio's Jobs page, "
-         "checked by the host's own copy of NeuronScope. Paths in values are paths on this host.",
+        ("run_job", "Start a OmniCortex job on this host: the same job kinds and fields as Studio's Jobs page, "
+         "checked by the host's own copy of OmniCortex. Paths in values are paths on this host.",
          {"kind": {"type": "string"}, "values": {"type": "object"}},
          {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True}, ["kind"]),
         ("jobs", "Jobs on this host, newest first, with progress for running ones and a reason for failed ones.",
@@ -1473,7 +1473,7 @@ class Agent:
             return {"content": [{"type": "text", "text": msg}], "isError": True}
 
     def instructions(self) -> str:
-        return (f"You are connected to the NeuronScope Remote agent on the HOST '{self.cfg['name']}'. The host is the "
+        return (f"You are connected to the OmniCortex Remote agent on the HOST '{self.cfg['name']}'. The host is the "
                 "computer that runs the models (LM Studio, Ollama, llama.cpp); you, the MCP client, are the "
                 "CONTROLLER. Your tool calls act on the host: list_models and chat use its models, load_model and "
                 "unload_model change what is in its memory, receive_file and install_model put new models on it. "
@@ -1494,7 +1494,7 @@ class Agent:
         if method == "initialize":
             res = {"protocolVersion": params.get("protocolVersion") or PROTOCOL_VERSION,
                    "capabilities": {"tools": {"listChanged": False}},
-                   "serverInfo": {"name": "neuronscope-remote", "title": f"NeuronScope Remote host: {self.cfg['name']}",
+                   "serverInfo": {"name": "neuronscope-remote", "title": f"OmniCortex Remote host: {self.cfg['name']}",
                                   "version": VERSION},
                    "instructions": self.instructions()}
         elif method == "ping":
@@ -1599,7 +1599,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         if c is None:
             self.throttle.fail(ip)
             self._send(401, {"error": "not paired with this host: pair with the code shown in the host's "
-                                      "NeuronScope Remote console"})
+                                      "OmniCortex Remote console"})
         return c
 
     def do_GET(self):
@@ -1838,7 +1838,7 @@ class ConsoleHandler(BaseHTTPRequestHandler):
             elif self.path == "/api/neuronscope-dir":
                 d = str(req.get("dir", "")).strip()
                 if d and not (Path(d).expanduser() / "viz" / "jobs.py").is_file():
-                    raise ValueError(f"{d} is not a NeuronScope folder (no viz/jobs.py in it)")
+                    raise ValueError(f"{d} is not a OmniCortex folder (no viz/jobs.py in it)")
                 ag.cfg["neuronscope_dir"] = d
                 ag._jobs_cache = None
                 ag.save_config()
@@ -2007,9 +2007,9 @@ def _probe(address: str) -> tuple[str, str | None]:
                 continue
             if st == 200 and info.get("nsr"):
                 return base, ("" if trust is None and base.startswith("http://") else trust)
-            errors.append(f"{base}: not a NeuronScope Remote host")
+            errors.append(f"{base}: not a OmniCortex Remote host")
             break
-    raise LinkError("no NeuronScope Remote host answered at " + address + ". Is the agent running there, and is "
+    raise LinkError("no OmniCortex Remote host answered at " + address + ". Is the agent running there, and is "
                       "the link right? (" + "; ".join(errors[-2:])[:300] + ")")
 
 
@@ -2045,7 +2045,7 @@ def controller_hosts(store: Store) -> list:
 
 def add_host(store: Store, target: str, code: str = "", name: str = "") -> dict:
     """CONTROLLER side: pair this computer with a host and keep its token here, for
-    MCP clients that are not NeuronScope Studio (Studio keeps its own)."""
+    MCP clients that are not OmniCortex Studio (Studio keeps its own)."""
     fp = ""
     if target.startswith("nsr://") or "#c=" in target:
         inv = parse_invite(target)
@@ -2229,7 +2229,7 @@ class Runtime:
 
 def banner(agent: Agent, urls: list[str], console: str) -> str:
     ag = agent
-    lines = ["", f"NeuronScope Remote {VERSION} on '{ag.cfg['name']}'", ROLE_LINE, ""]
+    lines = ["", f"OmniCortex Remote {VERSION} on '{ag.cfg['name']}'", ROLE_LINE, ""]
     mode = ag.link["mode"]
     how = {"lan": "Controllers on this network find this host while pairing is open.",
            "vpn": "Controllers reach this host over the VPN at the address below.",
@@ -2249,7 +2249,7 @@ def banner(agent: Agent, urls: list[str], console: str) -> str:
         lines += ["", f"Pairing code: {fmt_code(p['code'])}  (valid {max(1, round((p['expires'] - time.time()) / 60))} min)"]
         if ag.pair_link(p["code"]):
             lines.append(f"Pairing link: {ag.pair_link(p['code'])}")
-        lines.append("Type the code (or paste the link) on the controller: NeuronScope Studio → Remote → Add a host.")
+        lines.append("Type the code (or paste the link) on the controller: OmniCortex Studio → Remote → Add a host.")
     n = len(ag.controllers.list())
     lines += ["", f"Controllers paired: {n}." + (" Revoke them in the console." if n else ""),
               f"Console (this computer only): {console}", ""]
@@ -2366,7 +2366,7 @@ def main(argv=None) -> int:
     if a.cmd == "pair":
         r = ag.pairing.open()
         print(f"Pairing code: {r['code']} (valid {PAIR_TTL // 60} min). Type it on the controller: "
-              "NeuronScope Studio → Remote → Add a host.")
+              "OmniCortex Studio → Remote → Add a host.")
         return 0
     if a.cmd == "controllers":
         if a.revoke:
@@ -2429,7 +2429,7 @@ def main(argv=None) -> int:
 
 CONSOLE_PAGE = r"""<!DOCTYPE html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope Remote</title><link rel="icon" href="data:,">
+<title>OmniCortex Remote</title><link rel="icon" href="data:,">
 <style>
 :root{--bg:#f7f7f5;--panel:#fff;--fg:#1c1c1a;--mut:#6b6b64;--line:#e3e2dd;--ok:#2f7d4f;--no:#b23c2e;--acc:#2c5f8a;
   --soft:#eef4f9;--code:#f3f2ee;color-scheme:light}
@@ -2454,9 +2454,9 @@ table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:.3rem .4
 @media(max-width:640px){.roles{grid-template-columns:1fr}.arrow{transform:rotate(90deg);justify-self:center}}
 </style>
 <main>
-<h1>NeuronScope Remote</h1>
+<h1>OmniCortex Remote</h1>
 <div class="card roles">
- <div class="role"><b>Controllers</b><div class="mut">NeuronScope Studio, Claude Desktop, Cline… on other computers. They send instructions.</div><div id="ctlCount" class="mut"></div></div>
+ <div class="role"><b>Controllers</b><div class="mut">OmniCortex Studio, Claude Desktop, Cline… on other computers. They send instructions.</div><div id="ctlCount" class="mut"></div></div>
  <div class="arrow">→</div>
  <div class="role me"><b>This computer: HOST <span id="hname"></span></b><div class="mut">Runs the models. Does what paired controllers ask, within what you allow below.</div></div>
 </div>
@@ -2473,11 +2473,11 @@ table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:.3rem .4
 <label style="display:block"><input type="checkbox" id="ypad"> or a game controller is used</label>
 <label style="display:block"><input type="checkbox" id="yvr"> or a VR session runs (SteamVR, Oculus, Monado…)</label>
 <label>Take work again after <input id="ycool" type="number" min="0" style="width:5rem"> s of quiet</label>
-<label style="display:block"><input type="checkbox" id="yjobs"> also stop NeuronScope jobs running here</label>
+<label style="display:block"><input type="checkbox" id="yjobs"> also stop OmniCortex jobs running here</label>
 <div class="note" id="ystate" style="margin-top:.3rem"></div>
 <button id="yfree" style="margin-top:.3rem">I am done: take work again now</button></div></div>
 <div class="card"><h2>What controllers may do</h2><div id="allow"></div>
-<div style="margin-top:.6rem"><label>NeuronScope folder for jobs <input id="nsdir" placeholder="found automatically when the agent runs from one" style="width:100%"></label>
+<div style="margin-top:.6rem"><label>OmniCortex folder for jobs <input id="nsdir" placeholder="found automatically when the agent runs from one" style="width:100%"></label>
 <button id="nsdirsave" style="margin-top:.3rem">Save</button> <span id="nsdirmsg" class="note"></span></div></div>
 <div class="card"><h2>GPUs and thermal guard</h2><div id="gpus" class="mut"></div>
 <label style="display:block;margin-top:.4rem"><input type="checkbox" id="thOn"> Stop taking work when a GPU reaches <input id="thLim" type="number" min="50" max="110" style="width:4.5em"> °C (the hottest sensor: junction, edge or memory), and resume <input id="thMar" type="number" min="2" max="30" style="width:3.5em"> °C below</label>
@@ -2511,9 +2511,9 @@ $('#yfree').onclick=()=>ysend({free_now:true});
 $('#nsdirsave').onclick=async()=>{ try{ S=await api('/api/neuronscope-dir',{dir:$('#nsdir').value.trim()}); render(); }catch(e){} };
 function extra(){ const m=pick; let h='';
   if(m==='vpn') h=`VPN address of this computer: <input id="xbind" value="${esc(S.link.mode==='vpn'?S.link.bind:(S.addresses.find(a=>a.kind.startsWith('vpn'))||{}).address||'')}" placeholder="100.x.y.z"> <span class="mut">Tailscale: <code>tailscale ip -4</code></span>`;
-  if(m==='ssh') h=`<div class="mut">On the controller: <code>ssh -N -L 47871:127.0.0.1:${S.link.port||47871} you@${esc((S.addresses[0]||{}).address||'this-computer')}</code>, then add the host at <code>http://127.0.0.1:47871</code>. NeuronScope Studio can run the tunnel for you.</div>`;
+  if(m==='ssh') h=`<div class="mut">On the controller: <code>ssh -N -L 47871:127.0.0.1:${S.link.port||47871} you@${esc((S.addresses[0]||{}).address||'this-computer')}</code>, then add the host at <code>http://127.0.0.1:47871</code>. OmniCortex Studio can run the tunnel for you.</div>`;
   if(m==='tunnel') h=`Public address the tunnel gives: <input id="xpub" size="34" placeholder="https://name.trycloudflare.com" value="${esc(S.link.mode==='tunnel'?(S.link.urls[0]||''):'')}"><div class="mut">For example <code>cloudflared tunnel --url http://127.0.0.1:${S.link.port||47871}</code> or <code>ngrok http ${S.link.port||47871}</code>.</div>`;
-  if(m==='callhome') h=`Invite from the controller: <input id="xinv" size="44" placeholder="nsr1:…"> <button id="join">Join</button><div class="mut">In NeuronScope Studio: Remote → Add a host → "The host calls this Studio".</div>`+
+  if(m==='callhome') h=`Invite from the controller: <input id="xinv" size="44" placeholder="nsr1:…"> <button id="join">Join</button><div class="mut">In OmniCortex Studio: Remote → Add a host → "The host calls this Studio".</div>`+
     (S.callhome.length?'<table>'+S.callhome.map(c=>`<tr><td>${esc(c.controller||c.url)}</td><td>${esc(c.status)}</td><td><button data-ch="${esc(c.url)}">Leave</button></td></tr>`).join('')+'</table>':'');
   $('#modeExtra').innerHTML=h;
   if($('#join')) $('#join').onclick=async()=>{ S=await api('/api/callhome',{invite:$('#xinv').value.trim()}); render(); };
@@ -2529,7 +2529,7 @@ function render(){ const s=S; $('#hname').textContent='“'+s.name+'”'; $('#ho
   $('#pairCard').style.display=s.link.mode==='callhome'?'none':'';
   $('#pair').innerHTML=p?`<div>Code: <span class="big">${esc(p.code)}</span> <span class="mut">until ${new Date(p.expires*1000).toLocaleTimeString()}, single use</span></div>
     ${p.link?`<div style="margin:.3rem 0">or paste this link on the controller: <span class="code" id="plink">${esc(p.link)}</span> <button id="cp">Copy</button></div>`:''}
-    <div class="mut">On the controller: NeuronScope Studio → <b>Remote</b> → <b>Add a host</b>${s.link.mode==='lan'?' (it lists this host by itself)':''}. Other MCP clients: see the README.</div>
+    <div class="mut">On the controller: OmniCortex Studio → <b>Remote</b> → <b>Add a host</b>${s.link.mode==='lan'?' (it lists this host by itself)':''}. Other MCP clients: see the README.</div>
     <button id="pclose" style="margin-top:.4rem">Stop pairing</button>`:
     `<button class="pri" id="popen">Show a pairing code</button> <span class="mut">valid 10 minutes, for one controller</span>`;
   if($('#popen')) $('#popen').onclick=async()=>{ S=await api('/api/pair/open',{}); render(); };
@@ -2548,7 +2548,7 @@ function render(){ const s=S; $('#hname').textContent='“'+s.name+'”'; $('#ho
     const p=s.presence||{}; const known=p.idle_s!=null||p.gamepad!=null||p.vr!=null;
     $('#ystate').textContent=(s.busy?'Busy now: '+s.busy.why+'. ':'Taking work. ')+(known?`Last input ${p.idle_s!=null?Math.round(p.idle_s)+' s ago':'unknown'}${p.vr?', VR running':''}${p.gamepad?', controller in use':''}.`:'This computer cannot tell when it is in use (no desktop session visible to the agent).');
     $('#yfree').hidden=!(s.busy&&s.busy.source==='owner'); }
-  $('#nsdirmsg').textContent=s.neuronscope_dir?('jobs run from '+s.neuronscope_dir):'no NeuronScope folder found';
+  $('#nsdirmsg').textContent=s.neuronscope_dir?('jobs run from '+s.neuronscope_dir):'no OmniCortex folder found';
   $('#allow').innerHTML=Object.keys(s.allow).map(k=>`<label style="display:block"><input type="checkbox" data-al="${k}" ${s.allow[k]?'checked':''}> ${esc(s.allow_text[k])}</label>`).join('');
   document.querySelectorAll('[data-al]').forEach(c=>c.onchange=async()=>{ S=await api('/api/allow',{allow:{[c.dataset.al]:c.checked}}); render(); });
   $('#bks').innerHTML=s.backends.length?'<table>'+s.backends.map(b=>`<tr><td>${esc(b.kind)}</td><td><code>${esc(b.url)}</code></td><td class="ok">running</td><td>${b.source==='configured'?`<button data-rb="${esc(b.url)}">Remove</button>`:''}</td></tr>`).join('')+'</table>':'<span class="err">No LLM server found. Start LM Studio\'s server (Developer → Start server), Ollama, or llama-server.</span>';

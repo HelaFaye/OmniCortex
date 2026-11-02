@@ -1218,7 +1218,7 @@ def test_launcher_starts_studio_and_opens_setup_first(tmp_path):
     launch = [sys.executable, str(ROOT / "scripts" / "launch.py"), "--no-browser", "--port", str(port)]
     try:
         out = subprocess.run(launch, env=env, capture_output=True, text=True, timeout=90).stdout
-        assert "starting NeuronScope Studio" in out and out.strip().endswith("/setup")   # nothing set up yet
+        assert "starting OmniCortex Studio" in out and out.strip().endswith("/setup")   # nothing set up yet
         out = subprocess.run(launch, env=env, capture_output=True, text=True, timeout=30).stdout
         assert "already running" in out
     finally:

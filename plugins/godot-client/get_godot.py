@@ -29,7 +29,7 @@ base = f"https://github.com/godotengine/godot/releases/download/{v}/"
 
 def get(url, limit=400 * 1024 * 1024):
     print(f"downloading {url}", flush=True)
-    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "NeuronScope"}), timeout=120) as r:
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "OmniCortex"}), timeout=120) as r:
         data = r.read(limit + 1)
     if len(data) > limit:
         raise SystemExit("download too large")

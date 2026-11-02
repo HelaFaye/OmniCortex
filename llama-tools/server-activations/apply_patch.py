@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Apply the NeuronScope activation-streaming patch to a llama.cpp checkout.
+Apply the OmniCortex activation-streaming patch to a llama.cpp checkout.
 
     python llama-tools/server-activations/apply_patch.py ~/llama.cpp
     cmake --build ~/llama.cpp/build --target llama-server

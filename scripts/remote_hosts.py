@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-The controller side of NeuronScope Remote: Studio driving LLM hosts that do not
-run NeuronScope (a Windows box with LM Studio, a server with Ollama...).
+The controller side of OmniCortex Remote: Studio driving LLM hosts that do not
+run OmniCortex (a Windows box with LM Studio, a server with Ollama...).
 
 Roles: this computer (Studio) is the CONTROLLER; the computer that runs the
 models and the agent (remote/neuronscope_remote) is the HOST. Everything Studio

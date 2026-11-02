@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuronScope's installer, the same on Windows, macOS and Linux. Standard
+OmniCortex's installer, the same on Windows, macOS and Linux. Standard
 library only, so it runs before anything is installed.
 
     python scripts/installer.py              # the wizard, in your browser
@@ -9,7 +9,7 @@ library only, so it runs before anything is installed.
     python scripts/installer.py --yes --torch none          # without PyTorch
     python scripts/installer.py --yes --torch rocm --rocm 7.0
 
-The launchers next to it (Install NeuronScope.bat, Install NeuronScope.command,
+The launchers next to it (Install OmniCortex.bat, Install OmniCortex.command,
 install-gui.sh) find a suitable Python first, and say how to get one if there
 is none.
 
@@ -130,7 +130,7 @@ def platform_notes(d: dict) -> list[dict]:
     """What is peculiar about this computer, as {level: ok|info|warn|stop, text}."""
     n, g = [], d["gpus"]
     if not d["python_ok"]:
-        n.append({"level": "stop", "text": f"Python {d['python_version']} is too old; NeuronScope needs 3.10 or newer."})
+        n.append({"level": "stop", "text": f"Python {d['python_version']} is too old; OmniCortex needs 3.10 or newer."})
     if not d.get("venv_ok", True):
         n.append({"level": "stop", "text": "Python's venv module is missing: "
                   + _pkg_hint(d, "python3-venv", "python3", "python")})
@@ -143,7 +143,7 @@ def platform_notes(d: dict) -> list[dict]:
                                                "hidden folder; the python.org installer is easier to manage."})
         if len(d["root"]) > 120:
             n.append({"level": "warn", "text": "The folder path is long; Windows limits paths to 260 characters "
-                      "unless long paths are turned on. Move NeuronScope closer to the drive's root (e.g. "
+                      "unless long paths are turned on. Move OmniCortex closer to the drive's root (e.g. "
                       "C:\\neuronscope) if installing fails with 'path too long'."})
         if g["amd"] and not g["nvidia"]:
             n.append({"level": "info", "text": "AMD GPU on Windows: PyTorch has no ROCm build for Windows, so it "
@@ -245,7 +245,7 @@ def plan(d: dict, torch: dict, extras: bool = True, shortcut: bool = True) -> li
         steps.append({"id": "smoke", "title": "Check that PyTorch works on this GPU",
                       "cmd": [py, str(ROOT / "scripts" / "torch_smoke.py")], "optional": True})
     if shortcut:
-        steps.append({"id": "shortcut", "title": "Add NeuronScope to the " + {"Windows": "Start menu",
+        steps.append({"id": "shortcut", "title": "Add OmniCortex to the " + {"Windows": "Start menu",
                       "Darwin": "Applications folder"}.get(SYSTEM, "app menu"), "fn": "shortcut"})
     return steps
 
@@ -255,32 +255,32 @@ def make_shortcut(d: dict) -> str:
     if SYSTEM == "Windows":
         start = Path(os.environ.get("APPDATA", str(Path.home()))) / "Microsoft/Windows/Start Menu/Programs"
         start.mkdir(parents=True, exist_ok=True)
-        lnk = start / "NeuronScope.lnk"
+        lnk = start / "OmniCortex.lnk"
         ps = (f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut('{lnk}');"
-              f"$s.TargetPath='{root / 'NeuronScope.bat'}';$s.WorkingDirectory='{root}';"
-              "$s.WindowStyle=7;$s.Description='NeuronScope Studio';$s.Save()")
+              f"$s.TargetPath='{root / 'OmniCortex.bat'}';$s.WorkingDirectory='{root}';"
+              "$s.WindowStyle=7;$s.Description='OmniCortex Studio';$s.Save()")
         r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True)
         if r.returncode != 0:
             raise RuntimeError(r.stderr.strip()[-300:] or "could not create the shortcut")
         return str(lnk)
     if SYSTEM == "Darwin":
-        app = Path.home() / "Applications" / "NeuronScope.app"
+        app = Path.home() / "Applications" / "OmniCortex.app"
         (app / "Contents" / "MacOS").mkdir(parents=True, exist_ok=True)
         (app / "Contents" / "Info.plist").write_text(
             '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
             '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>'
-            "<key>CFBundleName</key><string>NeuronScope</string>"
+            "<key>CFBundleName</key><string>OmniCortex</string>"
             "<key>CFBundleIdentifier</key><string>org.neuronscope.studio</string>"
-            "<key>CFBundleExecutable</key><string>NeuronScope</string>"
+            "<key>CFBundleExecutable</key><string>OmniCortex</string>"
             "<key>CFBundlePackageType</key><string>APPL</string></dict></plist>\n")
-        exe = app / "Contents" / "MacOS" / "NeuronScope"
+        exe = app / "Contents" / "MacOS" / "OmniCortex"
         exe.write_text(f'#!/bin/bash\nexec "{root}/neuronscope"\n')
         exe.chmod(0o755)
         return str(app)
     apps = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "applications"
     apps.mkdir(parents=True, exist_ok=True)
     f = apps / "neuronscope.desktop"
-    f.write_text("[Desktop Entry]\nType=Application\nName=NeuronScope\nComment=Run, test and look inside local "
+    f.write_text("[Desktop Entry]\nType=Application\nName=OmniCortex\nComment=Run, test and look inside local "
                  f"models\nExec={root / 'neuronscope'}\nTerminal=false\nCategories=Development;Science;\n")
     return str(f)
 
@@ -372,7 +372,7 @@ def advice(step: str, d: dict) -> str:
 # ---------------------------------------------------------------- the wizard
 
 PAGE = r"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Install NeuronScope</title>
+<title>Install OmniCortex</title>
 <style>
 :root{--bg:#fafaf9;--panel:#fff;--fg:#1c1c1a;--mut:#6b6b66;--line:#e4e4df;--acc:#2d5bd7;--accfg:#fff;--ok:#1f8a4c;--no:#c0392b;--warn:#a8701c;--code:#f3f3f0}
 @media (prefers-color-scheme:dark){:root{--bg:#151514;--panel:#1d1d1b;--fg:#ececea;--mut:#9a9a94;--line:#33332f;--acc:#6f93ff;--accfg:#0b0b0a;--ok:#4cc27e;--no:#ff7a6b;--warn:#e7b65c;--code:#262624}}
@@ -396,7 +396,7 @@ pre{font:12px/1.4 ui-monospace,monospace;background:var(--code);padding:.6rem;bo
 input[type=text]{font:13px ui-monospace,monospace;padding:.35rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);width:100%}
 </style>
 <main>
-<h1>Install NeuronScope</h1><div class="note">Everything happens on this computer. Nothing is sent anywhere except package downloads (pypi.org, download.pytorch.org).</div>
+<h1>Install OmniCortex</h1><div class="note">Everything happens on this computer. Nothing is sent anywhere except package downloads (pypi.org, download.pytorch.org).</div>
 <div class="steps"><span data-s="1">1 · This computer</span><span data-s="2">2 · Choices</span><span data-s="3">3 · Installing</span><span data-s="4">4 · Done</span></div>
 <section id="s1" class="card"><h2>What the installer found</h2><table id="facts"></table><div id="notes" style="margin-top:.6rem"></div>
  <div class="row" style="margin-top:.8rem"><button class="pri" id="next1">Next</button></div></section>
@@ -409,7 +409,7 @@ input[type=text]{font:13px ui-monospace,monospace;padding:.35rem;border:1px soli
  <div class="row" style="margin-top:.8rem"><button id="back2">Back</button><button class="pri" id="go">Install</button><span class="note">About 1-10 minutes, depending on the PyTorch download.</span></div></section>
 <section id="s3" class="card" hidden><h2>Installing</h2><div id="plist"></div><details open style="margin-top:.5rem"><summary class="note">Output</summary><pre id="log"></pre></details></section>
 <section id="s4" class="card" hidden><h2 id="endh">Done</h2><div id="endmsg"></div>
- <div class="row" style="margin-top:.8rem"><button class="pri" id="open">Open NeuronScope</button><button id="quit">Close the installer</button></div></section>
+ <div class="row" style="margin-top:.8rem"><button class="pri" id="open">Open OmniCortex</button><button id="quit">Close the installer</button></div></section>
 </main>
 <script>
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -426,7 +426,7 @@ async function load(){ D=await api('/api/detect'); const g=D.gpus;
   if(D.system!=='Darwin'){ opts.push(['cuda','NVIDIA (CUDA)','for NVIDIA GPUs; the build is picked per GPU generation']); if(D.system==='Linux') opts.push(['rocm','AMD (ROCm)','Linux with an AMD GPU that ROCm supports']); opts.push(['cpu','CPU only','smaller; works everywhere']); }
   opts.push(['none','No PyTorch','smallest; Studio, TestQA, Projects and the llama.cpp path still work']);
   $('#torch').innerHTML=opts.map(([v,t,d],i)=>`<label class="opt"><input type="radio" name="torch" value="${v}" ${i===0?'checked':''}><span><b>${esc(t)}</b><span class="note">${esc(d)}</span></span></label>`).join('');
-  $('#scnote').textContent={Windows:'NeuronScope in the Start menu.',Darwin:'NeuronScope in your Applications folder.'}[D.system]||'NeuronScope in the app menu.';
+  $('#scnote').textContent={Windows:'OmniCortex in the Start menu.',Darwin:'OmniCortex in your Applications folder.'}[D.system]||'OmniCortex in the app menu.';
   $('#venv').value=D.venv; show(1); }
 $('#next1').onclick=()=>show(2); $('#back2').onclick=()=>show(1);
 $('#go').onclick=async()=>{ const torch=document.querySelector('[name=torch]:checked').value;
@@ -437,9 +437,9 @@ function follow(){ const es=new EventSource('/'+T+'/api/events'); const log=$('#
     if(ev.kind==='line'){ log.textContent+=ev.text+'\n'; log.scrollTop=1e9; }
     if(ev.kind==='step'){ const el=$('#st-'+ev.id); if(el){ el.textContent=ev.status; el.className='st '+ev.status; } }
     if(ev.kind==='end'){ es.close(); show(4); $('#endh').textContent=ev.ok?'Done':'Not finished';
-      $('#endmsg').innerHTML=ev.ok?'<p>NeuronScope is installed. It opens in your browser on its Setup page, which builds llama.cpp (or uses one you have), finds your models and checks everything. The first time, it offers a short tour (optional).</p>':'<p>A step failed; the output says why, and what to try. Fix it and press Install again: finished steps are quick the second time.</p>';
+      $('#endmsg').innerHTML=ev.ok?'<p>OmniCortex is installed. It opens in your browser on its Setup page, which builds llama.cpp (or uses one you have), finds your models and checks everything. The first time, it offers a short tour (optional).</p>':'<p>A step failed; the output says why, and what to try. Fix it and press Install again: finished steps are quick the second time.</p>';
       $('#open').hidden=!ev.ok; } }; }
-$('#open').onclick=async()=>{ await api('/api/launch',{}); $('#endmsg').innerHTML+='<p class="note">Starting NeuronScope… it opens in a new tab.</p>'; };
+$('#open').onclick=async()=>{ await api('/api/launch',{}); $('#endmsg').innerHTML+='<p class="note">Starting OmniCortex… it opens in a new tab.</p>'; };
 $('#quit').onclick=async()=>{ try{ await api('/api/quit',{}); }catch{} document.body.innerHTML='<main><h1>You can close this tab.</h1></main>'; };
 load().catch(e=>{ document.body.innerHTML='<main><h1>Installer error</h1><pre>'+esc(e.message)+'</pre></main>'; });
 </script>"""
@@ -524,7 +524,7 @@ def serve(port: int = 0, open_browser: bool = True) -> None:
     srv = ThreadingHTTPServer(("127.0.0.1", port), H)
     url = f"http://127.0.0.1:{srv.server_port}/{token}/"
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    print(f"NeuronScope installer: {url}\n(open it in a browser if it did not open; Ctrl+C to quit)", flush=True)
+    print(f"OmniCortex installer: {url}\n(open it in a browser if it did not open; Ctrl+C to quit)", flush=True)
     if open_browser:
         try:
             webbrowser.open(url)
@@ -578,7 +578,7 @@ def main(argv=None) -> int:
     r = Run(d, steps)
     r.subs.append(_Printer())
     ok = r.run()
-    print("\nDone. Start it from the shortcut, or: " + ("NeuronScope.bat" if SYSTEM == "Windows" else "./neuronscope")
+    print("\nDone. Start it from the shortcut, or: " + ("OmniCortex.bat" if SYSTEM == "Windows" else "./neuronscope")
           if ok else "\nNot finished; the output above says why.")
     return 0 if ok else 1
 
@@ -593,6 +593,6 @@ class _Printer:
 
 if __name__ == "__main__":
     if sys.version_info[:2] < MIN_PY:
-        sys.exit(f"NeuronScope needs Python {MIN_PY[0]}.{MIN_PY[1]} or newer; this is {platform.python_version()}. "
+        sys.exit(f"OmniCortex needs Python {MIN_PY[0]}.{MIN_PY[1]} or newer; this is {platform.python_version()}. "
                  "Get it from https://www.python.org/downloads/")
     sys.exit(main())

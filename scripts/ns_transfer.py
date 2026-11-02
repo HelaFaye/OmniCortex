@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NeuronScope reliable transfer: resumable, checksummed HTTP(S) file transfer.
+"""OmniCortex reliable transfer: resumable, checksummed HTTP(S) file transfer.
 
     # receiver (e.g. the LM Studio host)
     python scripts/ns_security.py token --out ~/.config/neuronscope/transfer.token
@@ -565,7 +565,7 @@ def main(argv=None) -> int:
             srv.socket = ctx.wrap_socket(srv.socket, server_side=True, do_handshake_on_connect=False)
         scheme = "https" if tls else "http"
         display_host = f"[{bind_host}]" if ":" in bind_host else bind_host
-        print(f"NeuronScope transfer receiver: {scheme}://{display_host}:{a.port}  root={Handler.receiver.root}"
+        print(f"OmniCortex transfer receiver: {scheme}://{display_host}:{a.port}  root={Handler.receiver.root}"
               f"  family={server_class.address_family}"
               f"  auth={'token' if token else 'none (loopback only)'}")
         srv.serve_forever()

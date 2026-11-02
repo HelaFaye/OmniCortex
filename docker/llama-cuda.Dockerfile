@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# llama.cpp with NeuronScope's tools (cett-dump, activation-streaming llama-server),
+# llama.cpp with OmniCortex's tools (cett-dump, activation-streaming llama-server),
 # built with CUDA 12.9: the newest toolkit that still compiles for Maxwell, Pascal
 # and Volta (CUDA 13 starts at sm_75). Covers a Tesla M10 (sm_50) by default.
 #

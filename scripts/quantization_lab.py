@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NeuronScope capability-preserving quantization planner and runner.
+"""OmniCortex capability-preserving quantization planner and runner.
 
 This module deliberately does not invent a new GGUF quantizer. It builds on
 llama.cpp's supported importance-matrix and per-tensor-type quantization paths:
@@ -210,7 +210,7 @@ def load_profiles(inputs: Sequence[CapabilityInput]) -> list[tuple[CapabilityInp
         except Exception as e:
             raise QuantizationLabError(f"cannot read profile {spec.path}: {e}") from e
         if not isinstance(data, dict) or "by_layer" not in data:
-            raise QuantizationLabError(f"not a NeuronScope profile: {spec.path}")
+            raise QuantizationLabError(f"not a OmniCortex profile: {spec.path}")
         raw = data.get("by_layer") or {}
         by_layer: dict[int, list[int]] = {}
         for k, values in raw.items():
@@ -393,7 +393,7 @@ def build_plan(
     ranked, profile_layers = score_layers(profile_inputs) if profile_inputs else ([], 0)
     n_layers = int(info.get("n_layers") or profile_layers or (max((r.layer for r in ranked), default=-1) + 1))
     if n_layers <= 0:
-        raise QuantizationLabError("could not determine model layer count; supply a valid NeuronScope profile")
+        raise QuantizationLabError("could not determine model layer count; supply a valid OmniCortex profile")
 
     if info.get("n_layers") and profile_layers and int(info["n_layers"]) != profile_layers:
         raise QuantizationLabError(
@@ -582,7 +582,7 @@ def build_model(
         raise QuantizationLabError("at least one calibration file is required")
     if not _is_high_precision(model) and not allow_requantize_source:
         raise QuantizationLabError(
-            "source model does not look like F16/BF16/F32; canonical NeuronScope builds should start from a high-precision source. "
+            "source model does not look like F16/BF16/F32; canonical OmniCortex builds should start from a high-precision source. "
             "Use --allow-requantize-source only when you explicitly accept source requantization."
         )
 
@@ -662,7 +662,7 @@ def build_model(
 
 
 def _cli() -> int:
-    p = argparse.ArgumentParser(description="NeuronScope capability-preserving quantization lab")
+    p = argparse.ArgumentParser(description="OmniCortex capability-preserving quantization lab")
     sub = p.add_subparsers(dest="command", required=True)
 
     pi = sub.add_parser("inspect", help="inspect GGUF metadata")

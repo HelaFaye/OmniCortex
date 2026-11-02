@@ -1,8 +1,8 @@
-"""NeuronScope nodes for ComfyUI: chat through Studio (with its model routing), check a reply for
-hallucination from the model's own neurons, and run a NeuronScope graph. Standard library only.
+"""OmniCortex nodes for ComfyUI: chat through Studio (with its model routing), check a reply for
+hallucination from the model's own neurons, and run a OmniCortex graph. Standard library only.
 
 Studio's address comes from each node (default http://127.0.0.1:7870); its token from NS_STUDIO_TOKEN,
-or ~/.neuronscope/studio.token if that exists. Installed by NeuronScope's ComfyUI add-on."""
+or ~/.neuronscope/studio.token if that exists. Installed by OmniCortex's ComfyUI add-on."""
 import json
 import os
 import time
@@ -31,7 +31,7 @@ def _call(base, method, path, body=None, timeout=900):
             msg = json.loads(e.read()).get("error")
         except Exception:
             msg = str(e)
-        raise RuntimeError(f"NeuronScope Studio: {msg}")
+        raise RuntimeError(f"OmniCortex Studio: {msg}")
 
 
 STUDIO = ("STRING", {"default": "http://127.0.0.1:7870"})
@@ -39,7 +39,7 @@ STUDIO = ("STRING", {"default": "http://127.0.0.1:7870"})
 
 class NeuronScopeChat:
     """Ask one of your models through Studio. model 'auto' lets Studio pick by the prompt's subject."""
-    CATEGORY = "NeuronScope"
+    CATEGORY = "OmniCortex"
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("text", "reasoning", "model")
     FUNCTION = "run"
@@ -61,7 +61,7 @@ class NeuronScopeChat:
 
 class NeuronScopeCheck:
     """Each token's hallucination risk from the model's neurons (needs its H-Neuron classifier)."""
-    CATEGORY = "NeuronScope"
+    CATEGORY = "OmniCortex"
     RETURN_TYPES = ("FLOAT", "STRING", "BOOLEAN", "STRING")
     RETURN_NAMES = ("peak_risk", "flagged_text", "flagged", "view_3d")
     FUNCTION = "run"
@@ -79,8 +79,8 @@ class NeuronScopeCheck:
 
 
 class NeuronScopeGraph:
-    """Run a NeuronScope graph (Studio -> Graphs) and return one of its outputs."""
-    CATEGORY = "NeuronScope"
+    """Run a OmniCortex graph (Studio -> Graphs) and return one of its outputs."""
+    CATEGORY = "OmniCortex"
     RETURN_TYPES = ("STRING", "STRING")
     RETURN_NAMES = ("result", "outputs_json")
     FUNCTION = "run"
@@ -110,5 +110,5 @@ class NeuronScopeGraph:
 
 NODE_CLASS_MAPPINGS = {"NeuronScopeChat": NeuronScopeChat, "NeuronScopeCheck": NeuronScopeCheck,
                        "NeuronScopeGraph": NeuronScopeGraph}
-NODE_DISPLAY_NAME_MAPPINGS = {"NeuronScopeChat": "NeuronScope: chat", "NeuronScopeCheck": "NeuronScope: hallucination check",
-                              "NeuronScopeGraph": "NeuronScope: run a graph"}
+NODE_DISPLAY_NAME_MAPPINGS = {"NeuronScopeChat": "OmniCortex: chat", "NeuronScopeCheck": "OmniCortex: hallucination check",
+                              "NeuronScopeGraph": "OmniCortex: run a graph"}

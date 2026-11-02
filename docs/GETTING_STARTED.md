@@ -3,7 +3,7 @@
 New to the vocabulary? [GLOSSARY.md](GLOSSARY.md) explains GGUF, CETT,
 H-Neurons, abstention, MCP and the rest, and why each matters here.
 
-NeuronScope is a set of Python tools plus two small llama.cpp additions. Most
+OmniCortex is a set of Python tools plus two small llama.cpp additions. Most
 of it runs anywhere Python 3.10+ runs; the parts that touch model internals
 want either PyTorch (any backend) or a llama.cpp build.
 
@@ -21,13 +21,13 @@ only the wall-clock timeout applies.
 
 ## The short way
 
-Get NeuronScope (clone it, or *Download ZIP* and unpack it), then
+Get OmniCortex (clone it, or *Download ZIP* and unpack it), then
 double-click the installer for your system:
 
 | system | double-click | if it will not start |
 |---|---|---|
-| Windows | `Install NeuronScope.bat` | it offers to install Python with winget, or opens python.org |
-| macOS | `Install NeuronScope.command` | right-click → Open the first time (it is a downloaded script); needs Python 3.10+ from python.org or Homebrew, since the built-in one is 3.9 |
+| Windows | `Install OmniCortex.bat` | it offers to install Python with winget, or opens python.org |
+| macOS | `Install OmniCortex.command` | right-click → Open the first time (it is a downloaded script); needs Python 3.10+ from python.org or Homebrew, since the built-in one is 3.9 |
 | Linux | `install-gui.sh` | it prints the package to install if Python's venv module is missing |
 
 The installer opens in your browser:
@@ -46,7 +46,7 @@ The installer opens in your browser:
    app menu); and where to install.
 3. **Installing**: each step with its output. A failed step says what to
    try, and *Install* again resumes quickly.
-4. **Done**: *Open NeuronScope* starts Studio on its Setup page, which
+4. **Done**: *Open OmniCortex* starts Studio on its Setup page, which
    builds llama.cpp (or uses one you have) and finds your models.
 
 The first time you open Studio it offers a two-minute tour, which is
@@ -63,7 +63,7 @@ python3 scripts/installer.py --yes --torch none
 ./install.sh                                  # the original Linux/macOS script, still supported
 ```
 
-Then start it from the shortcut, `NeuronScope.bat` or `./neuronscope`.
+Then start it from the shortcut, `OmniCortex.bat` or `./neuronscope`.
 Everything after that is in the browser; see [UI_AND_CLI.md](UI_AND_CLI.md)
 for where each feature lives, and the steps below for doing the same from
 a terminal.
@@ -123,7 +123,7 @@ build for others), and pre-Turing cards need a CUDA 12.x toolkit, or
 llama.cpp's own converter its CETT values match the PyTorch hook path on every
 layer (`tests/test_llamacpp_integration.py`, run with `NS_LLAMA` set).
 
-## 3. Get a model and point NeuronScope at it
+## 3. Get a model and point OmniCortex at it
 
 No GGUF yet? Start Studio (step 4) and use its **Models** tab to search Hugging
 Face and download one; a 7-8B model at Q4_K_M (about 5 GB) is a good first
@@ -143,7 +143,7 @@ sizes the pipeline measures (see [GLOSSARY.md](GLOSSARY.md#models-and-files)).
 
 ## 4. Pick a starting point
 
-**Run models like LM Studio, with the NeuronScope dials:**
+**Run models like LM Studio, with the OmniCortex dials:**
 
 ```bash
 python viz/studio.py --models-dir ~/models --server "$NS_LLAMA_SERVER"

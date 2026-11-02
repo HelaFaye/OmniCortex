@@ -1,6 +1,6 @@
 class_name StudioClient
 extends Node
-## Talks to a NeuronScope Studio over HTTP(S): the same API the web pages use.
+## Talks to a OmniCortex Studio over HTTP(S): the same API the web pages use.
 ##
 ## The Godot client is built to run on a different computer from Studio, so
 ## drawing never takes GPU memory from the model: Studio serves models on the

@@ -1,5 +1,5 @@
 """
-Widgets for NeuronScope's views: small, self-contained pieces of UI that take
+Widgets for OmniCortex's views: small, self-contained pieces of UI that take
 data and settings from outside and can be put on any page (docs/WIDGETS.md).
 
 The Godot client has the same widgets in plugins/godot-client/client/widgets/, with the same

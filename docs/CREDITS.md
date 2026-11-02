@@ -1,6 +1,6 @@
 # Credits
 
-NeuronScope is built on other people's research and software. This page
+OmniCortex is built on other people's research and software. This page
 lists every paper, method, dataset and project it uses, and where each one
 is used. When a feature adapts someone's work, it gets a line here and a
 mention in the code or doc that uses it.
@@ -11,12 +11,17 @@ Something missing or credited wrongly? Please open an issue.
 
 | Work | Used for |
 |---|---|
-| **H-Neurons**: Gao et al. (2025), *H-Neurons: On the Existence, Impact, and Origin of Hallucination-Associated Neurons in LLMs*, [arXiv:2512.01797](https://arxiv.org/abs/2512.01797); code at [thunlp/H-Neurons](https://github.com/thunlp/H-Neurons) | The method NeuronScope grew from: CETT, sparse classifiers over MLP neurons, and suppressing the neurons tied to over-confident answers. What changed from upstream is listed in [RESEARCH_NOTES.md](RESEARCH_NOTES.md). |
+| **H-Neurons**: Gao et al. (2025), *H-Neurons: On the Existence, Impact, and Origin of Hallucination-Associated Neurons in LLMs*, [arXiv:2512.01797](https://arxiv.org/abs/2512.01797); code at [thunlp/H-Neurons](https://github.com/thunlp/H-Neurons) | The method OmniCortex grew from: CETT, sparse classifiers over MLP neurons, and suppressing the neurons tied to over-confident answers. What changed from upstream is listed in [RESEARCH_NOTES.md](RESEARCH_NOTES.md). |
 
 ## Reading what a model computes
 
 | Work | Used for |
 |---|---|
+| Rudrendu Paul & Sourav Nandy, [RudrenduPaul/NeuronScope](https://github.com/RudrenduPaul/NeuronScope) (MIT) | The `trace`, `activations`, `patch` and `circuit` operations and their versioned JSON in `interventions.py`; and the reason this project is now called OmniCortex |
+| [TransformerLens](https://github.com/TransformerLensOrg/TransformerLens) and [nnsight](https://nnsight.net/) | The hook-point vocabulary (`resid_pre`, `attn_out`, `mlp_out`, `mlp_post`) and the activation- and path-patching workflows `interventions.py` follows |
+| Wang et al. (2022), *Interpretability in the Wild: a Circuit for Indirect Object Identification in GPT-2 small*, [arXiv:2211.00593](https://arxiv.org/abs/2211.00593) | Path patching and the clean/corrupted prompt design of `act-patch` and `path-patch` |
+| Joseph Bloom et al., [SAELens](https://github.com/decoderesearch/SAELens) (MIT) | Its dictionary format, and its catalogue of pretrained releases that `features.py import --release` downloads from |
+| [Neuronpedia](https://www.neuronpedia.org) | Feature descriptions (`interventions.py neuronpedia`) |
 | nostalgebraist (2020), [*interpreting GPT: the logit lens*](https://www.lesswrong.com/posts/AcKRB8wDpdaN6v6ru/interpreting-gpt-the-logit-lens) | `logit_lens.py`; the per-layer logits SLED compares |
 | Belrose et al. (2023), *Eliciting Latent Predictions from Transformers with the Tuned Lens*, [arXiv:2303.08112](https://arxiv.org/abs/2303.08112) | Named in `logit_lens.py` and [CONFIDENCE.md](CONFIDENCE.md) as the more accurate lens for early layers |
 | Xiao et al. (2024), *Efficient Streaming Language Models with Attention Sinks* (StreamingLLM), ICLR, [arXiv:2309.17453](https://arxiv.org/abs/2309.17453) | `when.py` ignores the first position (the attention sink); the engine's "tokens to keep" with context shift |
@@ -79,7 +84,7 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 | Rafailov et al. (2023), *Direct Preference Optimization*, [arXiv:2305.18290](https://arxiv.org/abs/2305.18290) | `deficits.py` writes `dpo.jsonl`; `finetune.py --dpo` |
 | Gekhman et al. (2024), *Does Fine-Tuning LLMs on New Knowledge Encourage Hallucinations?*, EMNLP, [arXiv:2405.05904](https://arxiv.org/abs/2405.05904) | Why `deficits.py` teaches a decline, not an answer, for facts the model does not hold ([RETRAINING.md](RETRAINING.md)) |
 | Goddard et al. (2024), *Arcee's MergeKit*, [arXiv:2403.13257](https://arxiv.org/abs/2403.13257); [arcee-ai/mergekit](https://github.com/arcee-ai/mergekit) | `mergekit_neuronscope.py` registers a merge method in it |
-| Ilharco et al. (2023), *Editing Models with Task Arithmetic*, [arXiv:2212.04089](https://arxiv.org/abs/2212.04089); Yadav et al. (2023), *TIES-Merging*, [arXiv:2306.01708](https://arxiv.org/abs/2306.01708); Yu et al. (2024), *Language Models are Super Mario* (DARE), [arXiv:2311.03099](https://arxiv.org/abs/2311.03099) | The merge methods NeuronScope's neuron-selected merge is compared with ([MERGING.md](MERGING.md)); mergekit implements them |
+| Ilharco et al. (2023), *Editing Models with Task Arithmetic*, [arXiv:2212.04089](https://arxiv.org/abs/2212.04089); Yadav et al. (2023), *TIES-Merging*, [arXiv:2306.01708](https://arxiv.org/abs/2306.01708); Yu et al. (2024), *Language Models are Super Mario* (DARE), [arXiv:2311.03099](https://arxiv.org/abs/2311.03099) | The merge methods OmniCortex's neuron-selected merge is compared with ([MERGING.md](MERGING.md)); mergekit implements them |
 
 ## Retrieval, search and statistics
 
@@ -111,13 +116,13 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 | Deng et al. (2009), *ImageNet*, CVPR; Recht et al. (2019), *Do ImageNet Classifiers Generalize to ImageNet?* ([ImageNetV2](https://github.com/modestyachts/ImageNetV2)), ICML; Wang et al. (2019), *Learning Robust Global Representations by Penalizing Local Predictive Power* ([ImageNet-Sketch](https://github.com/HaohanWang/ImageNet-Sketch)), NeurIPS; Hendrycks et al. (2021), *Natural Adversarial Examples* (ImageNet-A), CVPR, and *The Many Faces of Robustness* (ImageNet-R), ICCV | Vision benchmarks through CLIP_benchmark |
 | Zhai et al. (2019), *A Large-scale Study of Representation Learning with the Visual Task Adaptation Benchmark* (VTAB), [google-research/task_adaptation](https://github.com/google-research/task_adaptation) | Vision benchmarks through CLIP_benchmark |
 | Krizhevsky (2009), *Learning Multiple Layers of Features from Tiny Images* (CIFAR-10/100) | Vision benchmarks through CLIP_benchmark |
-| [BenchLM](https://benchlm.ai/benchmarks) and other published leaderboards | `benchmarks.py leaderboard import`. Imported scores keep their benchmark's name (HumanEval, MMLU, GSM8K, SimpleQA…) only to sort them by subject; NeuronScope does not use those datasets itself |
+| [BenchLM](https://benchlm.ai/benchmarks) and other published leaderboards | `benchmarks.py leaderboard import`. Imported scores keep their benchmark's name (HumanEval, MMLU, GSM8K, SimpleQA…) only to sort them by subject; OmniCortex does not use those datasets itself |
 
 ## Workflows and graphs
 
 [GRAPHS.md](GRAPHS.md) takes these ideas; none of their code is included.
 
-| Project | What NeuronScope took |
+| Project | What OmniCortex took |
 |---|---|
 | [PySpur](https://github.com/PySpur-Dev/PySpur) (PySpur-Dev) | Human-in-the-loop breakpoints that pause a workflow until a person approves; node-level debugging; test cases and evals over a workflow; execution traces; loops; JSON-schema structured outputs; adding a node as one file |
 | [comfyui_LLM_party](https://github.com/heshengtao/comfyui_LLM_party) (heshengtao) | An MCP tool node; the reasoning of thinking models split from the answer; workflows saved as files and reused as steps |
@@ -129,14 +134,14 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 
 | Project | Used for |
 |---|---|
-| [llama.cpp / ggml](https://github.com/ggml-org/llama.cpp) | Serving (`llama-server`), quantizing (`llama-quantize`, `llama-imatrix`), control vectors, GGUF and `gguf-py`, converters. `llama-cett-dump` is NeuronScope's addition built on it ([ENGINE.md](ENGINE.md)) |
+| [llama.cpp / ggml](https://github.com/ggml-org/llama.cpp) | Serving (`llama-server`), quantizing (`llama-quantize`, `llama-imatrix`), control vectors, GGUF and `gguf-py`, converters. `llama-cett-dump` is OmniCortex's addition built on it ([ENGINE.md](ENGINE.md)) |
 | [PyTorch](https://pytorch.org) | Hooks, extraction, training, decoding variants |
 | Hugging Face [transformers](https://github.com/huggingface/transformers), [datasets](https://github.com/huggingface/datasets), [huggingface_hub](https://github.com/huggingface/huggingface_hub), [safetensors](https://github.com/huggingface/safetensors), [PEFT](https://github.com/huggingface/peft), [TRL](https://github.com/huggingface/trl), [accelerate](https://github.com/huggingface/accelerate) | Loading models and data, LoRA, SFT and DPO training; the Hub's parquet export when `datasets` is missing |
 | [bitsandbytes](https://github.com/bitsandbytes-foundation/bitsandbytes) | QLoRA |
 | [scikit-learn](https://scikit-learn.org), [NumPy](https://numpy.org), [pandas](https://pandas.pydata.org), [Apache Arrow](https://arrow.apache.org) | Classifiers, arrays, tables, parquet |
 | [Optuna](https://optuna.org) | Engine optimization |
 | [three.js](https://threejs.org) and [Godot Engine](https://godotengine.org) | The 3D views and the Godot client |
-| [LM Studio](https://lmstudio.ai), [Ollama](https://ollama.com), [vLLM](https://github.com/vllm-project/vllm) | Serving stacks NeuronScope connects to |
+| [LM Studio](https://lmstudio.ai), [Ollama](https://ollama.com), [vLLM](https://github.com/vllm-project/vllm) | Serving stacks OmniCortex connects to |
 | [Model Context Protocol](https://modelcontextprotocol.io) and [FastMCP](https://github.com/jlowin/fastmcp); [Cline](https://github.com/cline/cline) | `ns_mcp.py` and the MCP client; the Cline configuration |
 | [Tailscale](https://tailscale.com), [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Reaching hosts and Studio from elsewhere ([REMOTE.md](REMOTE.md), [SECURITY.md](SECURITY.md)) |
 | WebRTC | Peer-to-peer model transfer ([TRANSFER.md](TRANSFER.md)) |
@@ -145,4 +150,4 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 
 Each project keeps its own licence. Using its models, datasets or outputs
 is subject to that licence, and the same goes for the model weights you
-load into NeuronScope.
+load into OmniCortex.

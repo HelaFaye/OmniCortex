@@ -18,7 +18,7 @@ that. Studio handles everything around it.
 
 ## Built around what people do most
 
-People who run NeuronScope most often come to do these things, in roughly
+People who run OmniCortex most often come to do these things, in roughly
 this order. Each is a click or two from where they start:
 
 | what people come to do | the short path |
@@ -195,7 +195,7 @@ curl http://127.0.0.1:7870/api/stats
 
 ## Runtime controls
 
-**Suppression α.** Load a model with a NeuronScope LoRA (`export_lora.py`) in
+**Suppression α.** Load a model with a OmniCortex LoRA (`export_lora.py`) in
 the adapter field, then drag the slider. It sets the adapter scale through
 llama-server's `/lora-adapters` with no reload, so you can compare behaviour
 at several suppression strengths in one conversation.
@@ -420,4 +420,4 @@ compare. See [REQUIREMENTS.md](REQUIREMENTS.md).
 
 `/connect` has ready-made settings for Cline, Claude Desktop and other
 OpenAI-compatible apps, and Studio serves MCP at `/mcp` so agents can use
-NeuronScope's tools. See [CONNECT.md](CONNECT.md).
+OmniCortex's tools. See [CONNECT.md](CONNECT.md).

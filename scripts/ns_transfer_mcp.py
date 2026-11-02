@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Optional MCP control plane for NeuronScope transfers.
+"""Optional MCP control plane for OmniCortex transfers.
 
 Two ways to serve it:
 * stdio (default): an MCP client on this computer starts it as a process;
@@ -178,7 +178,7 @@ def ensure() -> None:
                            "security advisories; pip install -U 'mcp>=2.3,<3'")
 
 
-INSTRUCTIONS = ("NeuronScope transfers. You, the MCP client, are the controller; every tool acts on the computer "
+INSTRUCTIONS = ("OmniCortex transfers. You, the MCP client, are the controller; every tool acts on the computer "
                 "running this server: the targets registered here, and file paths on this computer.")
 
 def _ann(**kw):
@@ -200,7 +200,7 @@ if FastMCP:
     @mcp.tool(annotations=_ann(**CHANGE))
     def register_target(name: str, url: str, token: str = "", cafile: str = "",
                         destination_hint: str = "") -> dict:
-        """Register a remote NeuronScope transfer receiver. The token is moved to
+        """Register a remote OmniCortex transfer receiver. The token is moved to
         the OS keyring (or a 0600 file) and is never echoed back."""
         if not NAME_RE.match(name):
             raise ValueError("name must match [A-Za-z0-9_.-]{1,64}")
@@ -340,7 +340,7 @@ def http_app(token: str, allowed_origins=(), path: str = "/mcp"):
 def main(argv=None) -> None:
     import argparse
     p = argparse.ArgumentParser(
-        description="MCP server for NeuronScope transfers. Default: stdio (an MCP client on this computer starts "
+        description="MCP server for OmniCortex transfers. Default: stdio (an MCP client on this computer starts "
                     "it; run on its own it waits silently). --http: serve over the network with a token.",
         epilog='stdio client config: {"mcpServers": {"neuronscope-transfer": {"command": "python", '
                '"args": ["/path/to/neuronscope/scripts/ns_transfer_mcp.py"]}}}. '

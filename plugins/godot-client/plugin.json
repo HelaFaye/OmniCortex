@@ -1,7 +1,7 @@
 {
   "name": "godot-client",
   "version": "1.0",
-  "author": "NeuronScope",
+  "author": "OmniCortex",
   "homepage": "https://godotengine.org",
   "description": "The Godot client: all of Studio from another computer, with a native 3D view of activations, the emotion jewel and Blender-style navigation. Gets Godot for you, opens the client here, or gives you a download for another machine.",
   "tab": {

@@ -103,7 +103,7 @@ def issue_parts(card: dict, log: dict, pub_b64: str) -> tuple[str, str, list[str
     cj = json.dumps(card, indent=1)
     if len(cj) > CARD_MAX:
         raise ValueError("the card is too large for an issue")
-    body = (f"{MARK}\nA NeuronScope score card. This board's workflow verifies it, then commits it or says why "
+    body = (f"{MARK}\nA OmniCortex score card. This board's workflow verifies it, then commits it or says why "
             f"not.\n\n```json\n{cj}\n```\n\nVerification log, sealed to the board's key "
             f"(part 1 of {len(chunks)}):\n\n```sealed\n{chunks[0]}\n```\n")
     comments = [f"{MARK} part {i + 2} of {len(chunks)}\n\n```sealed\n{c}\n```\n" for i, c in enumerate(chunks[1:])]
@@ -112,7 +112,7 @@ def issue_parts(card: dict, log: dict, pub_b64: str) -> tuple[str, str, list[str
 
 def parse_issue(body: str, comments: list[str] = ()) -> tuple[dict, str]:
     if MARK not in (body or ""):
-        raise ValueError("not a NeuronScope card")
+        raise ValueError("not a OmniCortex card")
     m = re.search(r"```json\n(.*?)\n```", body, re.S)
     if not m:
         raise ValueError("no card JSON in the issue")
@@ -306,10 +306,10 @@ def init(board: Path, ns_repo: str, ns_ref: str = "main") -> dict:
     (board / "cards").mkdir(exist_ok=True)
     (board / "cards" / ".keep").write_text("")
     (board / "README.md").write_text(
-        "# NeuronScope scoreboard\n\nScore cards arrive as issues and are verified by the workflow in "
+        "# OmniCortex scoreboard\n\nScore cards arrive as issues and are verified by the workflow in "
         "`.github/workflows/accept.yml`: replies are regraded with the TestQA bank of "
         f"`{ns_repo}` ({ns_ref}). Accepted cards are in `cards/`; `board.json` aggregates them.\n\n"
-        "Submit from NeuronScope Studio: Settings → Sharing results → scoreboard `github:OWNER/REPO`.\n")
+        "Submit from OmniCortex Studio: Settings → Sharing results → scoreboard `github:OWNER/REPO`.\n")
     rebuild(board)
     return {"board": str(board), "public_key": pub, "private_key_file": str(kp),
             "next": ["create the repository on GitHub and push these files",

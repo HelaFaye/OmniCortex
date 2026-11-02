@@ -91,7 +91,7 @@ const NS_NAV=[
   {sep:1},
   {label:'Connect',icon:'share',tip:'Other apps, other computers and your devices',kids:[
     {href:'/connect',label:'Apps',tip:'Use these models and tools from Cline, Claude and other apps'},
-    {href:'/remote',label:'Remote hosts',tip:'Models on other computers (NeuronScope Remote)'},
+    {href:'/remote',label:'Remote hosts',tip:'Models on other computers (OmniCortex Remote)'},
     {href:'/link',label:'Devices',tip:'Pair devices; link other Studios'}]},
   {sep:1,bottom:1},
   {href:'/addons',label:'Add-ons',icon:'puzzle',tip:'Install, remove and update add-ons; ComfyUI and other packages',bottom:1},
@@ -168,7 +168,7 @@ body.ns-railed aside>.tabs{display:none}
   let top='',bot='';
   NS_NAV.forEach((it,i)=>{ const h=it.sep?'<hr>':item(it,i); if(it.bottom) bot+=h; else top+=h; });
   const r=document.createElement('nav'); r.id='ns-rail'; r.setAttribute('aria-label','Studio');
-  r.innerHTML=`<a class="brand" href="/#chats" title="NeuronScope Studio" aria-label="NeuronScope Studio home"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="4.5" cy="6" r="1.6"/><circle cx="19.5" cy="6" r="1.6"/><circle cx="4.5" cy="18" r="1.6"/><circle cx="19.5" cy="18" r="1.6"/><path d="M6 6.8l3.6 3.4M18 6.8l-3.6 3.4M6 17.2l3.6-3.4M18 17.2l-3.6-3.4"/></svg></a><a class="it" href="#" data-find="1" title="Search every page, setting and job (Ctrl+K)">${nsSvg('find')}<span>Search</span></a><hr>${top}<div class="grow"></div>${bot}`;
+  r.innerHTML=`<a class="brand" href="/#chats" title="OmniCortex Studio" aria-label="OmniCortex Studio home"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="4.5" cy="6" r="1.6"/><circle cx="19.5" cy="6" r="1.6"/><circle cx="4.5" cy="18" r="1.6"/><circle cx="19.5" cy="18" r="1.6"/><path d="M6 6.8l3.6 3.4M18 6.8l-3.6 3.4M6 17.2l3.6-3.4M18 17.2l-3.6-3.4"/></svg></a><a class="it" href="#" data-find="1" title="Search every page, setting and job (Ctrl+K)">${nsSvg('find')}<span>Search</span></a><hr>${top}<div class="grow"></div>${bot}`;
   const bar=document.createElement('nav'); bar.id='ns-bar'; bar.setAttribute('aria-label','Studio');
   bar.innerHTML=NS_NAV.map((it,i)=>it.mobile?item(it,i):'').join('')+`<a class="it" href="#" data-more="1" aria-haspopup="true">${nsSvg('more')}<span>More</span></a>`;
   const more=document.createElement('div'); more.id='ns-more'; more.hidden=true;
@@ -213,7 +213,7 @@ async function nsRestart(what){ const o=document.createElement('div');
     try{ if(sessionStorage.getItem('ns-stale-later')) return; }catch(e){}
     const b=document.createElement('div'); b.id='ns-stale'; b.setAttribute('role','status');
     b.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9600;max-width:min(680px,calc(100vw - 24px));background:var(--panel,#1d1d1b);color:var(--fg,#ececea);border:1px solid var(--warn,#e7b65c);border-radius:10px;padding:.55rem .8rem;font:13.5px/1.45 ui-sans-serif,system-ui;box-shadow:0 6px 24px rgba(0,0,0,.35);display:flex;gap:.6rem;align-items:center;flex-wrap:wrap';
-    b.innerHTML='<span style="flex:1;min-width:14rem">NeuronScope was updated after this Studio started. Pages and fixes added since then are missing until it restarts.</span><button data-s="go" style="background:var(--acc,#6f93ff);color:var(--accfg,#0b0b0a);border:1px solid var(--acc,#6f93ff);border-radius:6px;padding:.3rem .8rem;font-weight:600;cursor:pointer">Restart Studio</button><button data-s="later" style="background:none;border:1px solid var(--line,#33332f);color:inherit;border-radius:6px;padding:.3rem .7rem;cursor:pointer">Later</button>';
+    b.innerHTML='<span style="flex:1;min-width:14rem">OmniCortex was updated after this Studio started. Pages and fixes added since then are missing until it restarts.</span><button data-s="go" style="background:var(--acc,#6f93ff);color:var(--accfg,#0b0b0a);border:1px solid var(--acc,#6f93ff);border-radius:6px;padding:.3rem .8rem;font-weight:600;cursor:pointer">Restart Studio</button><button data-s="later" style="background:none;border:1px solid var(--line,#33332f);color:inherit;border-radius:6px;padding:.3rem .7rem;cursor:pointer">Later</button>';
     b.querySelector('[data-s=go]').onclick=()=>{ b.remove(); nsRestart(); };
     b.querySelector('[data-s=later]').onclick=()=>{ try{ sessionStorage.setItem('ns-stale-later','1'); }catch(e){} b.remove(); };
     document.body.appendChild(b); }).catch(()=>{});
@@ -304,7 +304,7 @@ function nsProfiles(el,o){ let P={profiles:{},default:null};
       <button type="button" data-p="star" style="${btn}" title="Load the selected profile automatically when this tool opens">★ Default</button>
       <button type="button" data-p="del" style="${btn}" title="Delete the selected profile">Delete</button>
       <span style="flex:1"></span>
-      <button type="button" data-p="sys" style="${btn}" title="Reset every setting to NeuronScope's own defaults">System defaults</button>
+      <button type="button" data-p="sys" style="${btn}" title="Reset every setting to OmniCortex's own defaults">System defaults</button>
       <button type="button" data-p="def" style="${btn}" ${P.default?'':'disabled'} title="${P.default?'Load the saved default: '+nsEsc(P.default):'No saved default yet: select a profile and press ★ Default'}">Saved default</button>
       <span data-p="m" style="color:var(--mut,#9a9a94);min-width:0"></span></div>`;
     const q=k=>el.querySelector(`[data-p=${k}]`), sel=q('sel');
@@ -441,7 +441,7 @@ function nsFitInput(i){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start(); })();
 // ---- the tour: optional, offered once, restartable from the ? button on every page
 const NS_TOUR=[
- {path:'/', sel:'header', title:'Welcome to NeuronScope Studio', body:'Studio runs your local models, lets you chat with them, and shows what happens inside them: which neurons fire, and how likely a reply is to be a confident guess. Two minutes, eleven stops. Skip any time.'},
+ {path:'/', sel:'header', title:'Welcome to OmniCortex Studio', body:'Studio runs your local models, lets you chat with them, and shows what happens inside them: which neurons fire, and how likely a reply is to be a confident guess. Two minutes, eleven stops. Skip any time.'},
  {path:'/', sel:'#ns-rail', title:'The sidebar', body:'Everything Studio does is one click away here, on every page, in a few groups. Models: the GGUF files in your folders (load one, see its measured accuracy, set its options) and Discover to download more. Tasks: jobs, projects and the workers that run them. Studio: the analysis tools (features and emotions, neuron review, labs). Connect: other apps, other computers, your devices. Hover a group to see its pages; inside one, tabs at the top switch between them.'},
  {path:'/', sel:'#in', title:'Chat', body:'Ask anything. The model picker below chooses which model answers; auto picks the one with the best measured record for the question.'},
  {path:'/', sel:'label:has(#autoCheck),label:has(#confOn)', title:'How sure was it?', body:'With confidence on, Studio marks the words the model was unsure about. check replies scores each reply with the model\'s hallucination classifier and opens a 3D view of its neurons.'},
@@ -450,8 +450,8 @@ const NS_TOUR=[
  {path:'/features', sel:'#ftabs', title:'Features', body:'What a model represents, as features instead of neurons: train or import a dictionary, read any reply token by token, trace which features produced an output, explore emotion vectors, and steer with both. Start here walks through it.'},
  {path:'/review', sel:'#heat', title:'Neuron review', body:'Every checked reply leaves its activations here. Colour neurons by how they relate to right and wrong answers, per subject, over time.'},
  {path:'/projects', sel:'main', title:'Projects', body:'Paste a project\'s notes; the director splits it into tasks by skill. You approve the plan, worker models do the tasks, you review the results.'},
- {path:'/workers', sel:'#workers', title:'Workers', body:'Where those tasks run: models on this computer, servers you started elsewhere, and other computers running NeuronScope Remote. Pause, limit, route subjects, and watch GPU temperatures.'},
- {path:'/connect', sel:'main', title:'Connect your other apps', body:'Use these models from Cline, Claude Desktop or any OpenAI-compatible app, and give agents NeuronScope\'s tools over MCP. This page shows who controls whom.'},
+ {path:'/workers', sel:'#workers', title:'Workers', body:'Where those tasks run: models on this computer, servers you started elsewhere, and other computers running OmniCortex Remote. Pause, limit, route subjects, and watch GPU temperatures.'},
+ {path:'/connect', sel:'main', title:'Connect your other apps', body:'Use these models from Cline, Claude Desktop or any OpenAI-compatible app, and give agents OmniCortex\'s tools over MCP. This page shows who controls whom.'},
  {path:'/settings', sel:'#appearance', title:'Make it yours', body:'Themes, workspaces, models per subject, tool approval, plugins and opt-in sharing. The ? button at the bottom right restarts this tour, and opens the help pages.'}];
 function nsTourGet(){ try{ return JSON.parse(localStorage.getItem('ns-tour')||'null'); }catch(e){ return null; } }
 function nsTourSet(v){ try{ localStorage.setItem('ns-tour',JSON.stringify(v)); }catch(e){} }

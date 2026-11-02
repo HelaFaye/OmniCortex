@@ -76,11 +76,11 @@ sources on untuned tasks is the only evidence you get.
 
 mergekit already does general merging well -- TIES, DARE, SLERP, task
 arithmetic, model stock, SCE -- and reimplementing any of it would be waste.
-What NeuronScope adds is a different **selection criterion**.
+What OmniCortex adds is a different **selection criterion**.
 
 TIES and DARE decide what to keep by *magnitude*: large deltas survive, small
 ones are pruned or randomly dropped. That is a statistical heuristic with no
-reference to what the parameters do. NeuronScope selects by a classifier trained on
+reference to what the parameters do. OmniCortex selects by a classifier trained on
 measured behaviour. Semantic selection instead of magnitude selection, and to
 my knowledge nobody has tried it as a merge criterion.
 

@@ -6,7 +6,7 @@ A worker is anywhere a task can run:
             devices when a task needs it (Studio's worker pool)
   endpoint  an OpenAI-compatible server you started yourself, here or on
             another computer (llama-server, vLLM, LM Studio, Ollama...)
-  remote    a model on a computer that runs NeuronScope Remote, or on a
+  remote    a model on a computer that runs OmniCortex Remote, or on a
             linked Studio ("host:model")
 
 Worker ids: a local model's id; "ep:<name>" for an endpoint; "<host>:<model>"

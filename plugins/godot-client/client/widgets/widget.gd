@@ -1,5 +1,5 @@
 extends Control
-## Base for NeuronScope's HUD widgets (docs/WIDGETS.md).
+## Base for OmniCortex's HUD widgets (docs/WIDGETS.md).
 ##
 ## A widget is a Control that draws one thing and takes its data and settings
 ## from outside: set_data() with the current token's values, set_settings()

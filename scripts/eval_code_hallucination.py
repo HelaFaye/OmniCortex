@@ -16,7 +16,7 @@ What it measures per task:
     unparsable    code produced but syntactically invalid
 
 The suppression trade shows up as hallucinated -> abstained. That is the whole
-question: does NeuronScope convert wrong answers into declined ones, and at what
+question: does OmniCortex convert wrong answers into declined ones, and at what
 cost in clean answers lost.
 
 METHODOLOGY WARNING. Do not add tasks here in response to failures you saw

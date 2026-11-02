@@ -2,7 +2,7 @@
 """
 Turn collected pairs into an abstention-tuning dataset.
 
-NeuronScope induces abstention by scaling neurons down. A small LoRA can induce it
+OmniCortex induces abstention by scaling neurons down. A small LoRA can induce it
 directly, and your consistency-filtered data is already the right shape for
 that: questions the model got right every time become "answer it", questions it
 got wrong every time become "decline". That is the same behavioural target,
@@ -11,8 +11,8 @@ gradient descent can shape when to decline, whereas a scalar on a neuron column
 cannot.
 
 Running both and comparing on the same held-out set is the experiment worth
-doing. They are not redundant: NeuronScope needs no GPU and no training, the LoRA
-needs a rented 24GB card for an afternoon. If the LoRA wins clearly, NeuronScope
+doing. They are not redundant: OmniCortex needs no GPU and no training, the LoRA
+needs a rented 24GB card for an afternoon. If the LoRA wins clearly, OmniCortex
 was scaffolding. If it does not, that is a real finding about how much of this
 behaviour is localised in those neurons.
 
@@ -156,7 +156,7 @@ Then, on a rented 24GB card (this will not run on a Vega iGPU or a 16GB card):
       --load_in_4bit --learning_rate 1e-4 --num_train_epochs 2 \\
       --output_dir out/abstention-lora
 
-Then evaluate it against NeuronScope on the same held-out set with
+Then evaluate it against OmniCortex on the same held-out set with
 eval_code_hallucination.py. That comparison is the point of the exercise.""")
 
 

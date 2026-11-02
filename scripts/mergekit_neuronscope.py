@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-NeuronScope as a mergekit merge method.
+OmniCortex as a mergekit merge method.
 
 mergekit already does general model merging well -- TIES, DARE, SLERP, task
 arithmetic, model stock, SCE. Reimplementing any of that would be a waste. What
-NeuronScope contributes is a different *selection criterion*.
+OmniCortex contributes is a different *selection criterion*.
 
 TIES and DARE decide which parameters to keep by magnitude: large deltas
 survive, small ones are pruned or randomly dropped. That is a statistical
-heuristic with no reference to what the parameters do. NeuronScope selects by a
+heuristic with no reference to what the parameters do. OmniCortex selects by a
 classifier trained on measured behaviour -- these specific neurons carry the
 signal that separated hallucinated answers from grounded ones. Semantic
 selection instead of magnitude selection.
@@ -117,7 +117,7 @@ def _spec_path():
 
 @merge_method(
     name="neuronscope_select",
-    pretty_name="NeuronScope Neuron Selection",
+    pretty_name="OmniCortex Neuron Selection",
     reference_url="https://arxiv.org/abs/2512.01797",
 )
 def neuronscope_select_merge(

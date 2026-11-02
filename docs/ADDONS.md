@@ -1,6 +1,6 @@
 # Add-ons
 
-**Studio → Add-ons** (`/addons`) manages NeuronScope's optional parts:
+**Studio → Add-ons** (`/addons`) manages OmniCortex's optional parts:
 
 - **Built into Studio.** Parts not everyone needs. **Remove** one and its pages, API routes, jobs and sidebar entries go; **Reinstall** brings them back. The code stays in the checkout, so nothing is downloaded, and your data (dictionaries, graphs, projects…) is kept either way.
 - **Packages.** Plugins ([PLUGINS.md](PLUGINS.md)) installed from a `.zip` file or a repository, updated, turned on or off, and uninstalled. A package runs code on this computer, so it stays off until you turn it on, and goes off again whenever its files change (a SHA-256 over every file is checked).
@@ -35,7 +35,7 @@ model transfer (the transfer lab stays on the Lab page), and device pairing.
 
 These ship in the checkout's `plugins/` folder, marked `"default": true`. They are
 on unless you turn them off, and they are trusted like the rest of the checkout, so
-updating NeuronScope does not turn them off. Like any package, they can be packed
+updating OmniCortex does not turn them off. Like any package, they can be packed
 and installed elsewhere.
 
 | package | what it is |
@@ -56,7 +56,7 @@ downloads ([PLUGINS.md](PLUGINS.md)).
 
 - **From a file.** Drop a `.zip` on the Add-ons page. `plugin.json` sits at the top of the zip or in one top folder. Absolute paths, `..`, links and device files are refused; at most 200 MB and 5000 files.
 - **From a repository.** Add the address of an `index.json` (https, or a path on this computer). Every package it lists can be installed or updated, and each download must match the `sha256` the index gives.
-- **Uninstall** deletes an installed package's folder. A package that came with NeuronScope (in the checkout's `plugins/`) can only be turned off.
+- **Uninstall** deletes an installed package's folder. A package that came with OmniCortex (in the checkout's `plugins/`) can only be turned off.
 
 Make a package and a repository:
 
@@ -74,19 +74,19 @@ page also gets a sidebar tab (under *Add-ons*) while it is on.
 
 ## ComfyUI
 
-`plugins/comfyui` comes with NeuronScope. Turn it on, and a **ComfyUI** tab shows ComfyUI inside Studio. Its jobs (Jobs → Plugins: comfyui):
+`plugins/comfyui` comes with OmniCortex. Turn it on, and a **ComfyUI** tab shows ComfyUI inside Studio. Its jobs (Jobs → Plugins: comfyui):
 
 - **install** clones [ComfyUI](https://github.com/comfy-org/ComfyUI) into its own folder (default `~/.neuronscope/comfyui`) and gives it its own Python environment (`.venv`). It installs the PyTorch build for this machine: CUDA, ROCm, XPU, Apple (MPS), DirectML or CPU, picked from the GPUs found. Optionally it also adds:
   - [ComfyUI-Manager](https://github.com/Comfy-Org/ComfyUI-Manager);
   - the LLM node packs [comfyui_LLM_party](https://github.com/heshengtao/comfyui_LLM_party), [ComfyUI-LLMs-Toolkit](https://github.com/ComfyUI-Kelin/ComfyUI-LLMs-Toolkit) and [ComfyUI-LLMs](https://github.com/leoleelxh/ComfyUI-LLMs);
-  - NeuronScope's own nodes (below).
+  - OmniCortex's own nodes (below).
   
   Run it again to repair an install.
 - **run** starts ComfyUI on a port (8188) and keeps it running until you cancel the job. It listens on this computer only unless you change that; ComfyUI has no login of its own.
 - **update** runs `git pull` for ComfyUI and its custom nodes, then updates their requirements.
 - **add a custom node** clones any GitHub, GitLab or Codeberg repository into `custom_nodes`.
 
-**NeuronScope's nodes in ComfyUI** (category *NeuronScope*):
+**OmniCortex's nodes in ComfyUI** (category *OmniCortex*):
 
 - **chat** asks your models through Studio. `auto` picks a model by subject. Reasoning comes out separately.
 - **hallucination check** gives each token's risk from the model's neurons, the flagged text, and a link to the 3D view.

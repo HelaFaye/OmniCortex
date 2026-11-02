@@ -1,6 +1,6 @@
 # Plugins
 
-A plugin adds to Studio without changing NeuronScope's code. It is a folder
+A plugin adds to Studio without changing OmniCortex's code. It is a folder
 with a `plugin.json`, and it can add any of:
 
 | part | what it is | where it shows |

@@ -1,6 +1,6 @@
 # Roles and ports: which computer controls, which does the work
 
-Every connection in NeuronScope has two ends:
+Every connection in OmniCortex has two ends:
 - the **controller** decides what to do and sends the request;
 - the other end **does the work**: it runs the model or the tool, on its
   own hardware.
@@ -13,11 +13,11 @@ work in another.
  agent app (Cline, Claude Desktop…)     controller
         │  MCP /mcp, or OpenAI /v1
         ▼
- NeuronScope Studio  ───────────────►  does the work for the app,
+ OmniCortex Studio  ───────────────►  does the work for the app,
         │                              and controls what is below
         ├─ this computer's models      worker: started by Studio
         ├─ endpoints (/v1)             worker: a server you started
-        └─ NeuronScope Remote hosts    worker: the host runs the model
+        └─ OmniCortex Remote hosts    worker: the host runs the model
               │  OpenAI /v1 on the host itself
               ▼
            LM Studio, Ollama, llama-server, vLLM on that host
@@ -27,9 +27,9 @@ work in another.
 
 | connection | controller | does the work | protocol | where you set it up |
 |---|---|---|---|---|
-| an agent app uses NeuronScope's tools | the agent app | Studio's computer | MCP at Studio's `/mcp` (or `scripts/ns_mcp.py`, stdio) | Connect page |
+| an agent app uses OmniCortex's tools | the agent app | Studio's computer | MCP at Studio's `/mcp` (or `scripts/ns_mcp.py`, stdio) | Connect page |
 | an app chats with your models | the app | Studio's computer (or wherever Studio routes it) | OpenAI API at Studio's `/v1` | Connect page |
-| Studio uses another computer's LLMs | Studio | the host | MCP to NeuronScope Remote on the host | Remote page |
+| Studio uses another computer's LLMs | Studio | the host | MCP to OmniCortex Remote on the host | Remote page |
 | an agent app uses another computer's LLMs | the agent app | the host | MCP: `neuronscope_remote bridge <host>` on the app's computer | CONNECT.md, *MCP, step by step* B |
 | Studio sends project tasks to an endpoint | Studio | the endpoint's computer | OpenAI API at the endpoint's `/v1` | Workers page |
 | Studio's chat calls tools | Studio | wherever each tool server runs | MCP, from `mcp.json` and plugins | Settings, Plugins |
@@ -40,10 +40,10 @@ work in another.
 
 | default port | what listens | protocol | is it MCP? |
 |---|---|---|---|
-| 7870 | NeuronScope Studio: UI, `/v1`, `/mcp` | HTTP(S) | yes, at `/mcp` |
-| 47871 | NeuronScope Remote, on a host | HTTPS on a LAN, HTTP on a VPN | yes, at `/mcp` |
-| 47872 | NeuronScope Remote's console, on the host itself only | HTTP | no |
-| 47870 (UDP) | NeuronScope Remote's beacon while pairing is open | UDP | no |
+| 7870 | OmniCortex Studio: UI, `/v1`, `/mcp` | HTTP(S) | yes, at `/mcp` |
+| 47871 | OmniCortex Remote, on a host | HTTPS on a LAN, HTTP on a VPN | yes, at `/mcp` |
+| 47872 | OmniCortex Remote's console, on the host itself only | HTTP | no |
+| 47870 (UDP) | OmniCortex Remote's beacon while pairing is open | UDP | no |
 | 8080 | llama-server (Studio's chat model) | OpenAI API | no |
 | 8090 | decode_lab (optional) | OpenAI API | no |
 | 8765 | `ns_transfer_mcp.py --http` (optional) | HTTP(S), bearer token | yes, at `/mcp` |
@@ -74,7 +74,7 @@ things:
 ## Telling them apart in the UI
 
 - Remote page: *This computer: CONTROLLER* → *Hosts*.
-- Host console (NeuronScope Remote): *This computer: HOST*, with the paired
+- Host console (OmniCortex Remote): *This computer: HOST*, with the paired
   controllers listed.
 - Connect page: *Your agent app: CONTROLLER* → *This Studio: does the work*.
 - Workers page: each worker's kind (*this computer*, *endpoint*, *remote

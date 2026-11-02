@@ -1,6 +1,6 @@
 # Confidence signals: how sure the model was, token by token
 
-NeuronScope has three ways to see where a reply may be wrong. They measure
+OmniCortex has three ways to see where a reply may be wrong. They measure
 different things and cost different amounts:
 
 | signal | what it reads | needs | cost | where |
@@ -87,5 +87,5 @@ like a confident mistake.
 The logit lens adds one hint: an answer whose middle layers held a
 different top-1 than the final layer is worth a look for this.
 
-NeuronScope doesn't label replies "dishonest". The probe has to be
+OmniCortex doesn't label replies "dishonest". The probe has to be
 validated per model before such a label would mean anything.

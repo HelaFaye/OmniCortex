@@ -1,5 +1,5 @@
 extends Node3D
-## NeuronScope Godot client.
+## OmniCortex Godot client.
 ##
 ## Fetches the same api/meta, api/theme and api/trace the three.js client
 ## uses. All thresholding and flagging happened in Python; this only draws, so

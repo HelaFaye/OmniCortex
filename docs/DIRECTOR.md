@@ -127,9 +127,9 @@ python scripts/director.py analyze notes.md --repo ~/src/project   # the split, 
 
 ## Requirements of a project
 
-A project has its own needs, separate from NeuronScope's: the toolchain,
+A project has its own needs, separate from OmniCortex's: the toolchain,
 libraries and Python packages its build files name, the hardware it wants,
-which NeuronScope features it relies on, and anything to check by hand. The
+which OmniCortex features it relies on, and anything to check by hand. The
 project page's **Requirements** card keeps that list:
 
 - **Inferred** when the project is created from a checkout (and on **Scan
@@ -144,7 +144,7 @@ project page's **Requirements** card keeps that list:
   read (not `node_modules`, `build`, vendored or third-party folders), never
   sources.
 - **Edited** by you: add a tool, library (pkg-config name), Python package,
-  hardware (`ram_gib`, `vram_gib`, `disk_gib`, `gpu` vendor), a NeuronScope
+  hardware (`ram_gib`, `vram_gib`, `disk_gib`, `gpu` vendor), a OmniCortex
   feature, or a note; remove what doesn't apply. Your items survive
   re-scans. Every change is in the plan's history.
 - **Checked** on this machine (**Check now**): versions against the

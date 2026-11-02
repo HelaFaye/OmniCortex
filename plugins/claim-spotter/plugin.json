@@ -1,7 +1,7 @@
 {
   "name": "claim-spotter",
   "version": "1.0",
-  "author": "NeuronScope",
+  "author": "OmniCortex",
   "description": "Marks the checkable claims in a reply (numbers, dates, years, quotations) so you know what to verify, and collects them from saved chats into a CSV.",
   "checks": [
     {"name": "claims", "title": "Claims to verify", "script": "check.py", "auto": false,

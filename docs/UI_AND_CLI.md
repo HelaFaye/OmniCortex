@@ -1,10 +1,10 @@
 # Every feature: in the UI, on the command line, and for agents
 
-After `./install.sh`, nothing needs a terminal: start **NeuronScope** from the
-app menu (or `./neuronscope`, or `NeuronScope.bat` on Windows) and Studio opens
+After `./install.sh`, nothing needs a terminal: start **OmniCortex** from the
+app menu (or `./neuronscope`, or `OmniCortex.bat` on Windows) and Studio opens
 in your browser. Everything below is also scriptable, for people who prefer a
 shell and for automation; and the third column is what an AI agent (Cline,
-Claude Desktop) can do through NeuronScope's MCP server ([CONNECT.md](CONNECT.md)).
+Claude Desktop) can do through OmniCortex's MCP server ([CONNECT.md](CONNECT.md)).
 
 Every page has the same sidebar on the left (a bar along the bottom on a
 phone, with the rest under **More**). Related pages share a group: hover a
@@ -37,7 +37,7 @@ machine; [CLIENTS.md](CLIENTS.md) compares the three.
 
 | feature | in the UI | command line | MCP tool |
 |---|---|---|---|
-| Start Studio and open it | app menu → NeuronScope | `./neuronscope`, `python scripts/launch.py` | — |
+| Start Studio and open it | app menu → OmniCortex | `./neuronscope`, `python scripts/launch.py` | — |
 | Models folder, llama-server, vLLM, cett-dump, unloading, routing thresholds, workers and jobs, document search, MCP config | **Setup → Settings** | `~/.neuronscope/config.json`, or Studio's flags | — |
 | Listen address, port, token, TLS, pairing limits | **Setup → Settings → Advanced** (refuses an address Studio could not start on) | `--host`, `--port`, `--token-file`, `--tls-cert/--tls-key`, `--pair-*` | — |
 | Build llama.cpp with cett-dump | **Setup → Build**, or Jobs → Setup | `scripts/build_llama_tools.sh --backend vulkan` | `start_job build_llama` |
@@ -68,7 +68,7 @@ deliberately not on the Setup page: set it in `config.json` or with flags
 | Chat with documents (RAG) | Studio → **Docs** | `python scripts/rag.py` | — |
 | MCP tools inside chat | Studio → **Tools** | `~/.neuronscope/mcp.json`, `python scripts/mcp_client.py` | — |
 | Other devices and linked machines | **Connect → Devices** | `/api/pair/*`, `/api/links/*` | — |
-| Computers running LM Studio, Ollama or llama.cpp without NeuronScope (remote hosts): pair, models, load/unload, send and install models | **Remote** | the agent: `neuronscope-remote` ([REMOTE.md](REMOTE.md)); `/api/remote/*` | `remote_hosts`, `remote_call` |
+| Computers running LM Studio, Ollama or llama.cpp without OmniCortex (remote hosts): pair, models, load/unload, send and install models | **Remote** | the agent: `neuronscope-remote` ([REMOTE.md](REMOTE.md)); `/api/remote/*` | `remote_hosts`, `remote_call` |
 | Cline, Claude Desktop, OpenAI apps | **Connect** | `python scripts/ns_connect.py` | — |
 
 ## Measuring and improving models

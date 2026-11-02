@@ -24,7 +24,7 @@ a{color:var(--acc)}
 </style>
 <main>
 <h1>Add-ons</h1>
-<div class="note">NeuronScope's optional parts. Remove what you do not use, and its pages, jobs and sidebar entries go. Install more from a package file or a repository. A packaged add-on runs code on this computer, so it stays off until you turn it on, and goes off again whenever its files change. <a href="/help/ADDONS">How add-ons work</a></div>
+<div class="note">OmniCortex's optional parts. Remove what you do not use, and its pages, jobs and sidebar entries go. Install more from a package file or a repository. A packaged add-on runs code on this computer, so it stays off until you turn it on, and goes off again whenever its files change. <a href="/help/ADDONS">How add-ons work</a></div>
 <div id="msg"></div>
 <section class="card"><h2>Installed packages</h2><div class="grid" id="pk"></div>
   <div class="drop" id="drop" style="margin-top:.8rem">Drop an add-on package (.zip) here, or <label style="color:var(--acc);cursor:pointer"><input type="file" id="file" accept=".zip,application/zip" hidden>choose one</label>.
@@ -63,7 +63,7 @@ async function load(){ A=await api('/api/addons');
   $('#pk').innerHTML=A.packages.map(p=>`<div class="ad${p.status==='on'?'':' off'}"><b>${esc(p.name)} <span class="note">${esc(p.version||'')}</span></b>
     <span class="note">${esc(p.description)}</span>${p.error?`<span class="err">${esc(p.error)}</span>`:''}
     <span class="note">${[...(p.adds.jobs||[]).map(x=>'job: '+x),...(p.adds.nodes||[]).map(x=>'node: '+x),p.adds.page?'a page':'',p.tab?'a tab':'',p.adds.mcp?'MCP tools':''].filter(Boolean).map(esc).join(' · ')}</span>
-    <span class="note" title="${esc(p.folder)}">${p.removable?'installed here':'came with NeuronScope'} · sha256 ${esc((p.sha256||'').slice(0,12))}</span>
+    <span class="note" title="${esc(p.folder)}">${p.removable?'installed here':'came with OmniCortex'} · sha256 ${esc((p.sha256||'').slice(0,12))}</span>
     <div class="row"><span class="tag ${p.status}">${{on:'on',off:'off',changed:'changed: review it',broken:'broken'}[p.status]||p.status}</span><span style="flex:1"></span>
     ${p.status==='broken'?'':`<button data-en="${esc(p.name)}" data-on="${p.status==='on'?0:1}" class="${p.status==='on'?'':'pri'}">${p.status==='on'?'Turn off':'Turn on'}</button>`}
     ${p.status==='on'&&p.tab?`<a href="/plugins/${esc(p.name)}/"><button>Open</button></a>`:''}

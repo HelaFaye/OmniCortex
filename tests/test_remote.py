@@ -1,4 +1,4 @@
-"""NeuronScope Remote: the host agent on its own, and Studio as its controller."""
+"""OmniCortex Remote: the host agent on its own, and Studio as its controller."""
 import hashlib
 import io
 import json
@@ -329,7 +329,7 @@ def test_studio_pairs_lists_and_chats_through_a_host(studio_srv, tmp_path, backe
         st, out = call(studio_srv, "/api/remote/pair", {"method": "lan", "address": url, "code": code})
         assert st == 200, out
         assert out["name"] == "gpu-box" and out["models"] == ["tiny-chat"] and out["short_fingerprint"]
-        assert ag.controllers.list()[0]["name"].startswith("NeuronScope Studio")
+        assert ag.controllers.list()[0]["name"].startswith("OmniCortex Studio")
         st, s = call(studio_srv, "/api/remote")
         h = s["hosts"][0]
         assert s["role"] == "controller" and h["pinned"] and h["method"] == "lan" and h["models"] == ["tiny-chat"]
@@ -374,7 +374,7 @@ def test_host_that_calls_in(studio_srv, tmp_path, backend):
     with pytest.raises(RuntimeError):
         nsr.claim_invite(ag, bad)
     entry = nsr.claim_invite(ag, inv["invite"])
-    assert entry["controller"].startswith("NeuronScope Studio")
+    assert entry["controller"].startswith("OmniCortex Studio")
     with pytest.raises(RuntimeError):                        # single use
         nsr.claim_invite(nsr.Agent(tmp_path / "other"), inv["invite"])
     rt = nsr.Runtime(ag)
@@ -488,7 +488,7 @@ def test_package_is_standalone_and_downloadable(studio_srv):
         z = zipfile.ZipFile(io.BytesIO(r.read()))
     names = set(z.namelist())
     assert {"neuronscope-remote/neuronscope_remote/agent.py", "neuronscope-remote/pyproject.toml",
-            "neuronscope-remote/README.md", "neuronscope-remote/NeuronScope Remote.bat"} <= names
+            "neuronscope-remote/README.md", "neuronscope-remote/OmniCortex Remote.bat"} <= names
     assert not any("__pycache__" in n for n in names)
 
 
@@ -552,7 +552,7 @@ def test_check_a_hosts_reply_here_or_on_the_host(studio_srv, tmp_path, backend):
         assert st == 200
         ag.cfg["tracer"] = {"neuronscope": str(tmp_path / "no-neuronscope-here")}     # whatever this machine has
         st, r = call(studio_srv, "/api/trace", ask)
-        assert st == 502 and "no NeuronScope tracer" in r["error"]
+        assert st == 502 and "no OmniCortex tracer" in r["error"]
         fake = tmp_path / "ns" / "scripts" / "hscore.py"
         fake.parent.mkdir(parents=True)
         fake.write_text(FAKE_TRACER.format(scripts=str(ROOT / "scripts")))
@@ -584,7 +584,7 @@ def test_jobs_run_on_a_host_when_its_owner_allows(studio_srv, tmp_path, backend)
         assert targets[0]["id"] == "local" and not host["ok"] and "not allowed" in host["why"]
         st, r = call(studio_srv, "/api/jobs", {"kind": "split", "values": {}, "target": "host:gpu-box"})
         assert st == 502 and "does not run jobs" in r["error"]
-        # the host's owner allows jobs; the agent finds the NeuronScope folder it runs from
+        # the host's owner allows jobs; the agent finds the OmniCortex folder it runs from
         ag.cfg["allow"]["jobs"] = True
         ag.cfg["jobs_cwd"] = str(tmp_path)
         import studio

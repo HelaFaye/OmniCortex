@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Adaptive NeuronScope scale tuning controller and local/remote worker client.
+"""Adaptive OmniCortex scale tuning controller and local/remote worker client.
 
 The controller samples a broad scale range, evaluates a batch, narrows around
 its best observed score, and repeats until either the requested autotuning

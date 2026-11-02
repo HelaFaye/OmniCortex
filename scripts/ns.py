@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuronScope from a terminal: everything Studio's web pages do, against a
+OmniCortex from a terminal: everything Studio's web pages do, against a
 running Studio on this machine or another.
 
 Every command is one of the MCP tools (scripts/ns_mcp.py), so the terminal,
