@@ -85,5 +85,5 @@ def test_default_theme_is_dark_blue_and_red_orange():
     for mod in (bloom, timeline):
         src = open(mod.__file__).read()
         assert 'p.add_argument("--theme", default="dark"' in src
-    studio_src = (Path(bloom.__file__).parent / "studio.py").read_text()
+    studio_src = "".join((Path(bloom.__file__).parent / f).read_text() for f in ("studio.py", "studio_page.py"))
     assert 'or "dark"' in studio_src and "localStorage.getItem('ns-theme')||'dark'" in studio_src
