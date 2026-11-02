@@ -1,0 +1,134 @@
+# Binaries for every platform: the llama.cpp tools OmniCortex drives (llama-cett-dump, llama-server,
+# llama-quantize, llama-eval-callback) and the remote agent as one executable (omnicortex-remote).
+# docs/BINARIES.md lists what each package holds and how to use it.
+#
+# Runs on tags v*, by hand (Actions -> binaries -> Run workflow, optionally pinning a llama.cpp ref), and on
+# pull requests that touch what it builds. A tag also attaches every package to the GitHub release.
+name: binaries
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths: [".github/workflows/binaries.yml", "scripts/ci/**", "scripts/build_llama_tools.sh",
+            "llama-tools/**", "remote/**"]
+  workflow_dispatch:
+    inputs:
+      llama_ref:
+        description: "llama.cpp tag or commit (empty: latest)"
+        required: false
+        default: ""
+permissions:
+  contents: write
+concurrency:
+  group: binaries-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  LLAMA_REF: ${{ github.event.inputs.llama_ref }}
+
+jobs:
+  native:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x64,   os: ubuntu-24.04,     backend: cpu}
+          - {target: linux-arm64, os: ubuntu-24.04-arm, backend: cpu}
+          - {target: macos-arm64, os: macos-14,         backend: metal, python_arch: arm64}
+          # Intel Macs: cross-compiled on Apple silicon; the agent is built with x64 Python (Rosetta)
+          - {target: macos-x64,   os: macos-14,         backend: metal, python_arch: x64,
+             cmake: "-DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_SYSTEM_PROCESSOR=x86_64"}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: ${{ matrix.python_arch || '' }}
+      - name: build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake ninja-build
+      - name: build
+        env:
+          BACKEND: ${{ matrix.backend }}
+          CMAKE_EXTRA: ${{ matrix.cmake }}
+        run: bash scripts/ci/build_unix.sh ${{ matrix.target }} "$LLAMA_REF"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omnicortex-${{ matrix.target }}
+          path: dist/omnicortex-${{ matrix.target }}.tar.gz
+
+  # 32-bit x86 and 32-bit ARM have no hosted runners: build inside a container of that architecture
+  # (QEMU emulates ARM, so that one is slow). llama.cpp keeps these working on a best-effort basis, so a
+  # failure here does not fail the run.
+  container:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: linux-x86,   platform: linux/386,    image: "i386/debian:bookworm",
+             cmake: "-DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF"}
+          - {target: linux-armv7, platform: linux/arm/v7, image: "arm32v7/debian:bookworm", cmake: ""}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+        if: matrix.platform == 'linux/arm/v7'
+      - name: build in ${{ matrix.image }}
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD:/src" -w /src \
+            -e CMAKE_EXTRA="${{ matrix.cmake }}" -e PIP_BREAK_SYSTEM_PACKAGES=1 ${{ matrix.image }} bash -c '
+              set -e
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends git cmake g++ make ca-certificates \
+                python3 python3-pip python3-dev zlib1g-dev binutils
+              git config --global --add safe.directory "*"
+              bash scripts/ci/build_unix.sh ${{ matrix.target }} "'"$LLAMA_REF"'"'
+          sudo chown -R "$USER" dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omnicortex-${{ matrix.target }}
+          path: dist/omnicortex-${{ matrix.target }}.tar.gz
+
+  windows:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: windows-x64,   os: windows-2022,   arch: x64,   python_arch: x64}
+          - {target: windows-x86,   os: windows-2022,   arch: Win32, python_arch: x86,
+             cmake: "-DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF"}
+          - {target: windows-arm64, os: windows-11-arm, arch: ARM64, python_arch: arm64}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: ${{ matrix.python_arch }}
+      - name: build
+        shell: pwsh
+        run: ./scripts/ci/build_windows.ps1 -Target ${{ matrix.target }} -Arch ${{ matrix.arch }} -Ref "$env:LLAMA_REF" -CMakeExtra "${{ matrix.cmake }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omnicortex-${{ matrix.target }}
+          path: dist/omnicortex-${{ matrix.target }}.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [native, container, windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {path: dist, merge-multiple: true}
+      - name: checksums
+        run: cd dist && sha256sum omnicortex-* > SHA256SUMS && cat SHA256SUMS
+      - name: attach to the release
+        env: {GH_TOKEN: "${{ github.token }}"}
+        run: |
+          gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes "Binaries: see docs/BINARIES.md"
+          gh release upload "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --clobber dist/*
