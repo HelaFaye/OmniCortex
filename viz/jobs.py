@@ -305,12 +305,55 @@ SPECS.update({
                    F("device", default="auto"), F("out", req=True, help="e.g. runs/features/mymodel-resid-12")]},
     "feat_import": {
         "title": "Features: import a dictionary", "group": "Interpret", "argv": [S / "features.py", "import"],
-        "help": "Use a dictionary trained elsewhere: SAELens folders, Gemma Scope params.npz, or safetensors with "
-                "W_enc / W_dec.",
-        "fields": [F("path", req=True), F("model", help="the model it belongs to"),
+        "help": "Use a dictionary trained elsewhere: SAELens folders or any SAELens pretrained release by name, "
+                "Gemma Scope params.npz, or safetensors with W_enc / W_dec.",
+        "fields": [F("path", help="a folder or file (or use release and sae_id)"),
+                   F("release", help="a SAELens pretrained release, e.g. gemma-scope-2b-pt-res: downloaded"),
+                   F("sae_id", help="the dictionary in that release, e.g. layer_12/width_16k/average_l0_82"),
+                   F("model", help="the model it belongs to"),
                    F("site", choices=SITE_CHOICES), F("layer", kind="int"),
                    F("target_site", choices=SITE_CHOICES), F("acts", help="activations to interpret it on"),
                    F("out", req=True)]},
+    "iv_trace": {
+        "title": "Interventions: trace a prediction", "group": "Interpret", "argv": [S / "interventions.py", "trace"],
+        "help": "The predicted token, and the attention heads and MLP neurons that drove it (direct logit attribution).",
+        "fields": [F("model", req=True), F("prompt", req=True), F("top_k", kind="int", default=10),
+                   F("target", help="a token to explain instead of the prediction; #ID names a token id"),
+                   F("device", default="auto"), F("out", help="JSON output file")]},
+    "iv_patch": {
+        "title": "Interventions: ablate a component", "group": "Interpret", "argv": [S / "interventions.py", "patch"],
+        "help": "Zero- or mean-ablate a layer's residual, attention or MLP output, a head, a neuron or an SAE "
+                "feature at chosen positions, and see how the prediction moves.",
+        "fields": [F("model", req=True), F("prompt", req=True), F("layer", kind="int", req=True),
+                   F("component", choices=["resid_pre", "resid_post", "attn_out", "mlp_out", "mlp_post", "head", "neuron"],
+                     default="mlp_out"),
+                   F("index", kind="int", help="the head or neuron"), F("mode", choices=["zero", "mean"], default="zero"),
+                   F("positions", default="last", help="last, all, 3, 2,5,-1 or 0:4"),
+                   F("mean_prompt", repeat=True, help="prompts to average over for mean ablation"),
+                   F("sae", help="an SAE folder: set one of its features instead"), F("feature", kind="int"),
+                   F("value", kind="float", default=0.0), F("device", default="auto"), F("out")]},
+    "iv_act_patch": {
+        "title": "Interventions: activation patching (clean vs corrupted)", "group": "Interpret",
+        "argv": [S / "interventions.py", "act-patch"],
+        "help": "Put clean activations into the corrupted run one at a time, by layer and position or by head, "
+                "and see which restore the clean answer.",
+        "fields": [F("model", req=True), F("clean", req=True), F("corrupt", req=True),
+                   F("target", req=True, help="the clean answer's token"), F("baseline", help="the corrupted answer's token"),
+                   F("by", choices=["resid", "attn", "mlp", "head"], default="resid"),
+                   F("layers", default="all"), F("positions", default="all"), F("device", default="auto"), F("out")]},
+    "iv_path_patch": {
+        "title": "Interventions: path patching", "group": "Interpret", "argv": [S / "interventions.py", "path-patch"],
+        "help": "A sender head's corrupted output reaches only the receivers you name; everything else stays clean.",
+        "fields": [F("model", req=True), F("clean", req=True), F("corrupt", req=True), F("target", req=True),
+                   F("baseline"), F("sender", req=True, help="LAYER.HEAD, e.g. 9.6"),
+                   F("receiver", req=True, repeat=True, help="LAYER:attn or LAYER:mlp"),
+                   F("device", default="auto"), F("out")]},
+    "iv_circuit": {
+        "title": "Interventions: circuit sketch", "group": "Interpret", "argv": [S / "interventions.py", "circuit"],
+        "help": "Candidates by attribution, then each one's ablation effect (and patching effect, with a corrupted "
+                "prompt).",
+        "fields": [F("model", req=True), F("prompt", req=True), F("top_k", kind="int", default=10),
+                   F("corrupt"), F("baseline"), F("device", default="auto"), F("out")]},
     "feat_interpret": {
         "title": "Features 3: describe and label", "group": "Interpret", "argv": [S / "features.py", "interpret"],
         "help": "Top examples and examples across activation levels, logit effects, neighbours and a map for every "
@@ -424,7 +467,7 @@ SPECS.update({
                    F("server_activations", kind="bool", help="also patch llama-server to stream /activations")]},
     "install_package": {
         "title": "Install a Python package", "group": "Setup", "argv": [S / "ns_requirements.py", "install"],
-        "help": "pip install one package NeuronScope uses, at the version requirements*.txt asks for, into Studio's "
+        "help": "pip install one package OmniCortex uses, at the version requirements*.txt asks for, into Studio's "
                 "Python. Only packages from the catalog (scripts/ns_requirements.py); torch comes from install.sh.",
         "fields": [F("package", flag="", req=True, choices=_installable())]},
     "env_snapshot": {
@@ -1214,7 +1257,7 @@ async function loadTargets(){ try{ TARGETS=await api('/api/jobs/targets'); }catc
   const was=$('#target').value; $('#target').innerHTML=TARGETS.map(t=>`<option value="${esc(t.id)}" ${t.ok?'':'disabled'} title="${esc(t.why||'')}">${esc(t.label)}${t.ok?'':' (not available)'}</option>`).join('');
   if(TARGETS.some(t=>t.id===was&&t.ok)) $('#target').value=was; targetNote(); }
 function targetNote(){ const t=TARGETS.find(x=>x.id===$('#target').value)||{}; const off=TARGETS.filter(x=>!x.ok&&x.id!=='local');
-  $('#tnote').innerHTML=(t.id&&t.id!=='local'?`Runs on <b>${esc(t.id.slice(5))}</b> with its own NeuronScope; paths are paths on that computer.`:'')
+  $('#tnote').innerHTML=(t.id&&t.id!=='local'?`Runs on <b>${esc(t.id.slice(5))}</b> with its own OmniCortex; paths are paths on that computer.`:'')
     +(off.length?`<div>${off.map(x=>`${esc(x.label)}: ${esc(x.why||'not available')}`).join('<br>')}</div>`:''); }
 $('#target').onchange=targetNote;
 $('#run').onclick=async()=>{const k=$('#kind').value, v=formValues(); $('#ferr').textContent='';

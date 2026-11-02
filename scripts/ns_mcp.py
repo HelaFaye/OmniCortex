@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuronScope as an MCP server: the harness and lab as tools for Cline, Claude
+OmniCortex as an MCP server: the harness and lab as tools for Cline, Claude
 Desktop, LM Studio or any other MCP client.
 
 Every tool is a call to Studio's HTTP API, so an agent sees exactly what the
@@ -34,12 +34,12 @@ SERVER_NAME = "neuronscope"
 SERVER_VERSION = "1.0"
 PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 INSTRUCTIONS = (
-    "NeuronScope Studio: local models (llama.cpp), graded evaluation (TestQA), hallucination checks from "
+    "OmniCortex Studio: local models (llama.cpp), graded evaluation (TestQA), hallucination checks from "
     "neuron activations, retraining and benchmark jobs, and projects split into tasks for worker models. "
     "Start with studio_status and list_models. Model ids from list_models go in every 'model' argument. "
     "Jobs and projects run on the user's machine and can take hours; start them only when asked, then "
     "poll job_status or get_project. Results of check_reply are a risk signal (classifier AUROC ~0.7), "
-    "not a verdict. Roles: you, the MCP client, are the CONTROLLER. This server is NeuronScope Studio, and every "
+    "not a verdict. Roles: you, the MCP client, are the CONTROLLER. This server is OmniCortex Studio, and every "
     "tool acts on the computer Studio runs on (studio_status names it), not on the computer you run on. Studio "
     "may in turn send project tasks to worker models on other computers (its Workers page).")
 
@@ -186,6 +186,33 @@ def _job_log(st, a):
     return {"id": a["id"], "log": log[-n:]}
 
 
+IV_OPS = {"trace": "iv_trace", "patch": "iv_patch", "act_patch": "iv_act_patch", "path_patch": "iv_path_patch",
+          "circuit": "iv_circuit"}
+
+
+def _intervene(st, a):
+    """Run one interventions.py operation as a job and return its JSON document (or the job id to poll)."""
+    import time as _t
+    kind = IV_OPS.get(a.get("operation"))
+    if kind is None:
+        raise ToolError(f"operation: one of {', '.join(IV_OPS)}")
+    j = st.call("POST", "/api/jobs", {"kind": kind, "values": a.get("values") or {}})
+    jid, deadline = j.get("id"), _t.time() + min(int(a.get("wait_seconds") or 300), 1800)
+    while jid and _t.time() < deadline:
+        cur = _job_status(st, {"id": jid})
+        if cur.get("status") not in ("running", "queued"):
+            log = st.call("GET", f"/api/jobs/{jid}/log").get("log", "")
+            i = log.find('{\n "schema_version"')
+            if cur.get("status") == "done" and i >= 0:
+                try:
+                    return json.loads(log[i:log.rindex("}") + 1])
+                except ValueError:
+                    pass
+            return {"id": jid, "status": cur.get("status"), "log": log[-3000:]}
+        _t.sleep(2)
+    return {"id": jid, "status": "running", "note": "still running: poll job_status / job_log with this id"}
+
+
 def _project(st, a):
     p = st.call("GET", f"/api/projects/{a['id']}")
     for t in p.get("tasks", []):
@@ -235,6 +262,13 @@ TOOLS = [
      "user's machine; long jobs can take hours.",
      _s({"kind": STR, "values": {"type": "object"}}, ["kind"]), RISKY,
      lambda st, a: st.call("POST", "/api/jobs", {"kind": a["kind"], "values": a.get("values") or {}})),
+    ("intervene", "Which attention heads and neurons drove a model's output, and what changes without them, on a "
+     "Hugging Face model: operation 'trace' (attribution), 'patch' (zero/mean ablation of a component, head, "
+     "neuron or SAE feature), 'act_patch' (clean vs corrupted activation patching), 'path_patch' (a head's effect "
+     "through chosen receivers only) or 'circuit' (candidates, each ablated). 'values' are that job's fields "
+     "(job_kinds lists them: iv_trace, iv_patch…). Waits up to wait_seconds and returns the result document.",
+     _s({"operation": {"type": "string", "enum": list(IV_OPS)}, "values": {"type": "object"}, "wait_seconds": INT},
+        ["operation", "values"]), RISKY, _intervene),
     ("job_status", "One job's state, or the most recent jobs.", _s({"id": STR, "limit": INT}), READ, _job_status),
     ("job_log", "The end of a job's output.", _s({"id": STR, "tail_chars": INT}, ["id"]), READ, _job_log),
     ("cancel_job", "Stop a running job.", _s({"id": STR}, ["id"]), RISKY,
@@ -258,7 +292,7 @@ TOOLS = [
      "force when the user agreed.",
      _s({"id": STR, "force": BOOL}, ["id"]), RISKY, _pact("start")),
     ("project_requirements", "Check a project's own requirements on this machine: the toolchain, libraries and "
-     "Python packages its build files name, hardware, NeuronScope features, notes; each with what is installed "
+     "Python packages its build files name, hardware, OmniCortex features, notes; each with what is installed "
      "and the fix for this OS.", _s({"id": STR}, ["id"]), READ,
      lambda st, a: st.call("GET", f"/api/projects/{a['id']}/requirements", timeout=120)),
     ("set_project_requirements", "Replace a project's requirement list. items: [{kind: tool|library|package|"
@@ -304,7 +338,7 @@ TOOLS = [
      "dictionary keeps, how accurately the emotion vectors classify). Make them with start_job kinds feat_* and "
      "emo_*; read replies, trace and steer on Studio's /features page.", _s({}), READ,
      lambda st, a: st.call("GET", "/api/features/list")),
-    ("requirements", "What each NeuronScope feature needs (Python packages, programs, llama.cpp builds and their GPU "
+    ("requirements", "What each OmniCortex feature needs (Python packages, programs, llama.cpp builds and their GPU "
      "backends, drivers, device access, memory) and what this machine is missing, with the fix for its OS. "
      "Install a missing Python package with start_job kind 'install_package'.",
      _s({"feature": STR}), READ, _requirements),
@@ -325,8 +359,8 @@ TOOLS = [
      "'wrong' or 'abstained'), so it counts in the association. The id is the 'review' id a check returns.",
      _s({"model": STR, "id": STR, "verdict": {"type": "string", "enum": ["correct", "wrong", "abstained"]}},
         ["model", "id", "verdict"]), WRITE, lambda st, a: st.call("POST", "/api/review/label", a)),
-    ("remote_hosts", "Computers this Studio controls that run models but not NeuronScope (LM Studio, Ollama or "
-     "llama.cpp with the NeuronScope Remote agent): how each is reached, whether it answers, its models. Studio is "
+    ("remote_hosts", "Computers this Studio controls that run models but not OmniCortex (LM Studio, Ollama or "
+     "llama.cpp with the OmniCortex Remote agent): how each is reached, whether it answers, its models. Studio is "
      "the controller, they are hosts. Their models work everywhere as '<host>:<model>'.", _s({}), READ,
      lambda st, a: st.call("GET", "/api/remote?refresh=1")),
     ("remote_call", "Run one of a remote host's own tools: host_info, list_backends, list_models, chat, load_model, "
@@ -417,7 +451,7 @@ def serve_stdio(studio: Studio) -> None:
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(description="NeuronScope MCP server (stdio). An MCP client starts this; "
+    p = argparse.ArgumentParser(description="OmniCortex MCP server (stdio). An MCP client starts this; "
                                             "run alone it waits for requests on stdin.")
     p.add_argument("--studio", default=os.environ.get("NS_STUDIO_URL", "http://127.0.0.1:7870"),
                    help="Studio URL (default $NS_STUDIO_URL or http://127.0.0.1:7870)")

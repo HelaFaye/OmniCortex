@@ -492,6 +492,12 @@ def cmd_train(a) -> int:
 
 def cmd_import(a) -> int:
     import sae as S
+    if a.release:
+        path, cat = S.from_release(a.release, a.sae_id or "")
+        a.path, a.model = str(path), a.model or cat.get("model")
+        print(f"downloaded {a.release} / {a.sae_id} from {cat['repo_id']}")
+    elif not a.path:
+        raise SystemExit("--path, or --release and --sae-id (a SAELens pretrained dictionary)")
     sae, meta = S.load(a.path)
     site = a.site or meta.get("site")
     layer = a.layer if a.layer is not None else meta.get("layer")
@@ -1094,7 +1100,9 @@ def main(argv=None) -> int:
     t.add_argument("--out", required=True, help="folder for the dictionary")
 
     m = sub.add_parser("import", help="use a dictionary trained elsewhere (SAELens, Gemma Scope, safetensors)")
-    m.add_argument("--path", required=True, help="folder or file")
+    m.add_argument("--path", help="folder or file")
+    m.add_argument("--release", help="a SAELens pretrained release, e.g. gemma-scope-2b-pt-res (downloads it)")
+    m.add_argument("--sae-id", help="the dictionary within the release, e.g. layer_12/width_16k/average_l0_82")
     m.add_argument("--model", help="the model it was trained on (HF id or folder)")
     m.add_argument("--site", choices=SITES, help="where it reads (taken from SAELens hook names when present)")
     m.add_argument("--layer", type=int)

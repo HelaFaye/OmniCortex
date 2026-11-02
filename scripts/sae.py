@@ -351,7 +351,7 @@ HOOK_RX = re.compile(r"blocks\.(\d+)\.hook_(resid_post|resid_pre|mlp_out|resid_m
 
 
 def site_from_hook(hook: str) -> tuple[str | None, int | None]:
-    """TransformerLens hook name -> (site, layer) in NeuronScope's terms."""
+    """TransformerLens hook name -> (site, layer) in OmniCortex's terms."""
     m = HOOK_RX.search(hook or "")
     if not m:
         return None, None
@@ -361,8 +361,48 @@ def site_from_hook(hook: str) -> tuple[str | None, int | None]:
             "resid_mid": ("mlp_in", layer)}[kind]
 
 
+SAELENS_REGISTRY = "https://raw.githubusercontent.com/decoderesearch/SAELens/main/sae_lens/pretrained_saes.yaml"
+
+
+def saelens_registry(cache: str | Path | None = None, url: str = SAELENS_REGISTRY, max_age: float = 7 * 86400) -> dict:
+    """SAELens's catalogue of pretrained dictionaries ({release: {repo_id, model, saes: [{id, path, ...}]}}),
+    fetched from its repository and cached for a week."""
+    import os
+    import time
+    import urllib.request
+    import yaml
+    p = Path(cache or Path(os.environ.get("NS_HOME") or Path.home() / ".neuronscope") / "saelens" / "pretrained_saes.yaml")
+    if not p.exists() or time.time() - p.stat().st_mtime > max_age:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "OmniCortex"}), timeout=60) as r:
+            p.write_bytes(r.read())
+    return yaml.safe_load(p.read_text()) or {}
+
+
+def from_release(release: str, sae_id: str, registry: dict | None = None, download=None) -> tuple[Path, dict]:
+    """Download one SAELens release's dictionary (e.g. gemma-scope-2b-pt-res, layer_12/width_16k/average_l0_82)
+    from Hugging Face. -> (local folder to load(), what the catalogue says about it)."""
+    reg = registry if registry is not None else saelens_registry()
+    rel = reg.get(release)
+    if rel is None:
+        close = sorted(k for k in reg if release.split("-")[0] in k)[:8]
+        raise ValueError(f"no SAELens release {release!r}" + (f"; similar: {', '.join(close)}" if close else ""))
+    entry = next((x for x in rel.get("saes") or [] if x.get("id") == sae_id), None)
+    if entry is None:
+        ids = [x.get("id") for x in rel.get("saes") or []]
+        raise ValueError(f"{release} has no {sae_id!r}; it has {len(ids)}, e.g. {', '.join(map(str, ids[:5]))}")
+    if download is None:
+        from huggingface_hub import snapshot_download as download
+    path = entry.get("path") or sae_id
+    root = download(repo_id=rel["repo_id"], allow_patterns=[f"{path}/*", f"{path}*"])
+    folder = Path(root) / path
+    info = {"release": release, "sae_id": sae_id, "repo_id": rel["repo_id"], "model": rel.get("model"),
+            "conversion_func": rel.get("conversion_func"), **{k: v for k, v in entry.items() if k not in ("id", "path")}}
+    return (folder if folder.is_dir() else folder.parent), info
+
+
 def load(path: str | Path, device: str = "cpu") -> tuple[SAE, dict]:
-    """-> (dictionary, its metadata). A NeuronScope folder or sae.pt, an SAELens folder, a Gemma Scope
+    """-> (dictionary, its metadata). A OmniCortex folder or sae.pt, an SAELens folder, a Gemma Scope
     params.npz, or a file with W_enc / W_dec / b_enc / b_dec."""
     p = Path(path).expanduser()
     meta: dict = {}
