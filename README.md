@@ -1,4 +1,4 @@
-# NeuronScope
+# OmniCortex
 
 A cross-platform workbench for finding, visualizing and editing the neurons
 behind confident mistakes in local models. It also covers serving, routing,
