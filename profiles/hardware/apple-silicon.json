@@ -1,0 +1,37 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "apple-silicon",
+ "title": "Apple silicon (M1 and newer)",
+ "era": "modern",
+ "examples": [
+  "M1\u2013M4 (Pro, Max, Ultra)"
+ ],
+ "match": {
+  "vendor": "apple"
+ },
+ "purposes": {
+  "general": {
+   "summary": "llama.cpp with Metal; PyTorch with MPS for training small models.",
+   "llama": {
+    "backend": "metal",
+    "cmake": ""
+   },
+   "engine": {
+    "flash_attn": "on"
+   },
+   "torch": {
+    "spec": "torch",
+    "index": null
+   },
+   "training": {
+    "dtype": "float16",
+    "quantized_base": false,
+    "method": "lora"
+   },
+   "notes": "Unified memory: a model can use most of RAM. bitsandbytes is not available on MPS."
+  }
+ },
+ "notes": "",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

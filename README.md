@@ -86,7 +86,8 @@ scripts/build_llama_tools.sh --backend vulkan  # llama.cpp + the cett-dump extra
 ```
 
 Full setup: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md). Hardware notes,
-including AMD APUs: [docs/HARDWARE.md](docs/HARDWARE.md).
+including AMD APUs: [docs/HARDWARE.md](docs/HARDWARE.md). OmniCortex supports legacy and modern
+hardware alike; [hardware support profiles](docs/HARDWARE_PROFILES.md) record the right setup per family and purpose.
 
 Each block below is safe to paste as a whole. Set your folders once (or set
 them on Studio's **Settings** page and skip the flags):

@@ -1,0 +1,39 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "shared-igpu",
+ "title": "Integrated GPUs sharing system memory (AMD APUs, Intel iGPUs)",
+ "era": "modern",
+ "examples": [
+  "Radeon 680M/780M/890M",
+  "Radeon 8060S",
+  "Intel Iris Xe"
+ ],
+ "match": {
+  "unified": true,
+  "vendor_any": [
+   "amd",
+   "intel"
+  ]
+ },
+ "purposes": {
+  "general": {
+   "summary": "llama.cpp with Vulkan; keep the model and context within the memory the BIOS gives the GPU.",
+   "llama": {
+    "backend": "vulkan",
+    "cmake": ""
+   },
+   "engine": {
+    "cache_type_k": "q8_0",
+    "cache_type_v": "q8_0"
+   },
+   "torch": {
+    "spec": "torch",
+    "index": "https://download.pytorch.org/whl/cpu"
+   },
+   "notes": "Memory bandwidth is shared with the CPU: a draft model on the iGPU with the main model on a dGPU is a good use."
+  }
+ },
+ "notes": "",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

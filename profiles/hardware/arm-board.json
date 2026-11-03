@@ -1,0 +1,38 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "arm-board",
+ "title": "ARM boards and servers",
+ "era": "any",
+ "examples": [
+  "Raspberry Pi 4/5",
+  "RK3588 boards",
+  "Ampere Altra",
+  "Graviton"
+ ],
+ "match": {
+  "backend_only": "cpu",
+  "machine": [
+   "aarch64",
+   "arm64",
+   "armv7l"
+  ]
+ },
+ "purposes": {
+  "general": {
+   "summary": "llama.cpp for the CPU with NEON (and SVE where present); PyTorch CPU wheels on 64-bit.",
+   "llama": {
+    "backend": "cpu",
+    "cmake": "",
+    "native": true
+   },
+   "torch": {
+    "spec": "torch",
+    "index": "https://download.pytorch.org/whl/cpu"
+   },
+   "notes": "32-bit ARM has no PyTorch wheels: inference and the remote agent only. A PCIe GPU on an ARM board uses its vendor's profile."
+  }
+ },
+ "notes": "",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

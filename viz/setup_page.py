@@ -37,6 +37,7 @@ details.feat{border-bottom:1px solid var(--line);padding:.35rem 0}details.feat s
 .ri{display:grid;grid-template-columns:4.2rem 1fr;gap:.1rem .5rem;padding:.25rem 0 .25rem 1rem;font-size:13px}
 .ri code{font-size:12px}.ri .fx{grid-column:2;color:var(--mut);font-size:12px}
 .diffsec{margin:.4rem 0}.diffsec b{font-size:12px;color:var(--mut);text-transform:uppercase}
+a.btn{display:inline-block;padding:.3rem .7rem;border:1px solid var(--line);border-radius:6px;text-decoration:none;color:inherit}
 </style>
 <header><h1>Studio · Setup</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/lab">Lab</a><a href="/review">Review</a><a href="/projects">Projects</a><a href="/workers">Workers</a><a href="/jobs">Jobs</a><a href="/connect">Connect</a></header>
 <main>
@@ -54,6 +55,20 @@ details.feat{border-bottom:1px solid var(--line);padding:.35rem 0}details.feat s
 <label style="margin:0"><input type="checkbox" id="portable">portable (runs on other CPUs)</label>
 <button class="pri" id="build">Build</button><span id="buildst" class="note"></span></div>
 <pre id="buildlog" style="display:none"></pre></section>
+
+<section class="card" id="hwprofiles"><h2>Hardware support profiles</h2>
+<div class="note">OmniCortex supports legacy and current hardware alike: a Maxwell Tesla, a Vega card, a Raspberry Pi and a new GPU each get the backends and settings that suit them. A profile says what to install and how to configure it for one family of hardware, separately for each purpose (<b>inference</b>, <b>retraining</b>, or one <b>general</b> setup). Profiles are files you can make, share and submit for review.</div>
+<div id="hpMatch" class="note" style="margin:.4rem 0">…</div>
+<div class="row"><label style="flex:2">Profile <select id="hpId"></select></label><label>Purpose <select id="hpPur"></select></label></div>
+<div id="hpPlan" style="margin-top:.4rem"></div>
+<div class="row" style="margin-top:.4rem"><a id="hpApply" class="btn" href="#">Apply (starts a job)</a><button id="hpExport" title="download this profile as a file to share">Export</button>
+<button id="hpSubmit" title="send it to the community board for review (Settings → Sharing results: a github: board and a token)">Submit for review</button>
+<button id="hpWorked" title="tell the board this profile worked on your hardware">It worked here</button><button id="hpFailed" title="tell the board it did not">It did not work</button>
+<span id="hpMsg" class="note"></span></div>
+<details style="margin-top:.5rem"><summary class="note">Make your own (starts from the selected profile)</summary>
+<textarea id="hpEdit" style="min-height:14rem;font:12px ui-monospace,monospace;width:100%"></textarea>
+<div class="row"><button id="hpSave">Save as yours</button><span id="hpEditMsg" class="note"></span></div></details>
+</section>
 
 <section class="card" id="hardware"><h2>Hardware for worker models</h2>
 <div class="note">Where the director's worker models may run. AMD is used first when several devices have room. Saved to <code id="hwpath"></code>.</div>
@@ -235,6 +250,40 @@ $('#snapdiff').onclick=async()=>{ try{ const d=await api('api/requirements/diff'
 loadReqs(); loadSnaps();
 
 if(location.hash){ const t=document.querySelector(location.hash); if(t) setTimeout(()=>t.scrollIntoView(),300); }
+let HP=null;
+async function hpLoad(){ HP=await (await fetch('/api/hw-profiles')).json();
+  const ids=new Set(HP.matches.map(m=>m.id));
+  $('#hpMatch').innerHTML=HP.matches.length?'Fits this computer: '+HP.matches.map(m=>`<b>${esc(m.id)}</b> (${esc(m.devices.join('; '))})`).join(', '):'No profile matches the devices found here; pick one by hand.';
+  const era={legacy:'legacy',modern:'current',any:'any hardware'};
+  $('#hpId').innerHTML=HP.profiles.filter(p=>!p.invalid).sort((a,b)=>(ids.has(b.id)-ids.has(a.id))||a.title.localeCompare(b.title)).map(p=>{const r=HP.reports[p.id]||{};const n=Object.values(r).reduce((a,x)=>a+x.worked,0),f=Object.values(r).reduce((a,x)=>a+x.failed,0);
+    return `<option value="${esc(p.id)}" title="${esc((p.examples||[]).join(', '))}">${ids.has(p.id)?'✓ ':''}${esc(p.title)} · ${era[p.era]||p.era||''} · ${esc(p.status||'')}${n+f?` · ${n}✓ ${f}✗`:''}</option>`}).join('');
+  hpPick(); }
+function hpCur(){ return HP.profiles.find(p=>p.id===$('#hpId').value); }
+function hpPick(){ const p=hpCur(); if(!p) return; $('#hpPur').innerHTML=Object.keys(p.purposes).map(k=>`<option>${k}</option>`).join('');
+  $('#hpEdit').value=JSON.stringify({...Object.fromEntries(Object.entries(p).filter(([k])=>!['file','status'].includes(k))),id:p.id+'-mine',author:'',status:undefined},null,1); hpPlan(); }
+async function hpPlan(){ const p=hpCur(), pur=$('#hpPur').value;
+  const r=await (await fetch('/api/hw-profiles/plan?'+new URLSearchParams({id:p.id,purpose:pur}))).json();
+  if(r.error){ $('#hpPlan').innerHTML=`<span class="err">${esc(r.error)}</span>`; return; }
+  const rep=(HP.reports[p.id]||{})[r.purpose];
+  $('#hpPlan').innerHTML=`<div><b>${esc(r.purpose)}</b>: ${esc(r.summary)}</div>`+
+    (p.examples&&p.examples.length?`<div class="note">For example: ${esc(p.examples.join(', '))}</div>`:'')+
+    (r.steps.length?'<ol>'+r.steps.map(s=>`<li>${esc(s.title)}<pre style="margin:.2rem 0">${esc(s.cmd.join(' '))}</pre></li>`).join('')+'</ol>':'<div class="note">Nothing to install.</div>')+
+    (Object.keys(r.engine).length?`<div class="note">Engine settings: <code>${esc(JSON.stringify(r.engine))}</code></div>`:'')+
+    (Object.keys(r.training).length?`<div class="note">Training: <code>${esc(JSON.stringify(r.training))}</code></div>`:'')+
+    (Object.keys(r.env).length?`<div class="note">Environment: ${Object.entries(r.env).map(([k,v])=>`<code>${esc(k)}</code> ${esc(v)}`).join('; ')}</div>`:'')+
+    r.notes.map(n=>`<div class="note">${esc(n)}</div>`).join('')+
+    (rep?`<div class="note">Community: ${rep.worked} worked, ${rep.failed} did not${rep.median_tok_s?`, median ${rep.median_tok_s} tok/s`:''} (${esc(rep.hardware.slice(0,6).join(', '))})</div>`:'');
+  $('#hpApply').href='/jobs#'+new URLSearchParams({kind:'hw_apply',id:p.id,purpose:r.purpose}); }
+async function hpPost(path,body){ const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); return [r.ok,await r.json()]; }
+$('#hpId').onchange=hpPick; $('#hpPur').onchange=hpPlan;
+$('#hpExport').onclick=async()=>{ const [ok,j]=await hpPost('/api/hw-profiles/export',{id:$('#hpId').value});
+  if(!ok){ $('#hpMsg').textContent=j.error; return; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(j,null,1)],{type:'application/json'})); a.download=j.id+'.json'; a.click(); };
+$('#hpSubmit').onclick=async()=>{ const [ok,j]=await hpPost('/api/hw-profiles/submit',{id:$('#hpId').value}); $('#hpMsg').innerHTML=ok?`Submitted: <a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>`:esc(j.error); };
+for(const [b,w] of [['#hpWorked',true],['#hpFailed',false]]) $(b).onclick=async()=>{ const note=w?'':prompt('What went wrong? (optional, sent with the report)')||'';
+  const [ok,j]=await hpPost('/api/hw-profiles/report',{id:$('#hpId').value,purpose:$('#hpPur').value,worked:w,note}); $('#hpMsg').innerHTML=ok?`Reported: <a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>`:esc(j.error); };
+$('#hpSave').onclick=async()=>{ let p; try{ p=JSON.parse($('#hpEdit').value); }catch(e){ $('#hpEditMsg').textContent='not valid JSON: '+e.message; return; }
+  const [ok,j]=await hpPost('/api/hw-profiles/save',{profile:p}); $('#hpEditMsg').textContent=ok?'Saved: '+j.saved:j.error; if(ok) hpLoad(); };
+hpLoad();
 </script>
 """
 

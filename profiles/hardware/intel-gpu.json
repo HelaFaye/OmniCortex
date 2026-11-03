@@ -1,0 +1,39 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "intel-gpu",
+ "title": "Intel Arc and Xe",
+ "era": "modern",
+ "examples": [
+  "Arc A380/A750/A770",
+  "Arc B580",
+  "Core Ultra iGPU"
+ ],
+ "match": {
+  "vendor": "intel"
+ },
+ "purposes": {
+  "inference": {
+   "summary": "llama.cpp with SYCL (oneAPI) or Vulkan.",
+   "llama": {
+    "backend": "vulkan",
+    "cmake": ""
+   },
+   "notes": "SYCL is usually faster but needs the oneAPI toolkit; Vulkan works out of the box."
+  },
+  "retraining": {
+   "summary": "PyTorch XPU wheels.",
+   "torch": {
+    "spec": "torch",
+    "index": "https://download.pytorch.org/whl/xpu"
+   },
+   "training": {
+    "dtype": "bfloat16",
+    "quantized_base": false,
+    "method": "lora"
+   }
+  }
+ },
+ "notes": "",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

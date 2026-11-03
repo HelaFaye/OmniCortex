@@ -518,6 +518,14 @@ SPECS.update({
                    U("ids_path", default="data/train_qids.json"), U("output_root", default="data/activations"),
                    U("locations", multi=True, choices=LOCS, default=["answer_tokens", "all_except_answer_tokens"]),
                    U("gpu_mem", help="e.g. 14GiB; empty = CPU"), U("cpu_mem", help="e.g. 40GiB"), TRUST]},
+    "hw_apply": {
+        "title": "Hardware: apply a support profile", "group": "Setup", "argv": [S / "hw_profiles.py", "apply"],
+        "help": "Build llama.cpp and install PyTorch the way a hardware support profile says, for one purpose "
+                "(Setup → Hardware support profiles shows which fit and what each step runs).",
+        "fields": [F("id", req=True, help="the profile id"), F("purpose", choices=["general", "inference", "retraining"]),
+                   F("llama_dir", help="where llama.cpp is built (default ~/llama.cpp)"),
+                   F("python", help="the Python whose environment gets PyTorch (default: OmniCortex's venv)"),
+                   F("dry_run", kind="bool", help="only list the commands")]},
     "attrib_saliency": {
         "title": "4 · Saliency instead of CETT (CPU, older GPUs)", "group": "H-Neurons",
         "argv": [S / "neuron_attrib.py", "saliency"],

@@ -38,6 +38,8 @@ ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 
 MARK = "<!-- neuronscope-card v1 -->"
+MARK_PROFILE = "<!-- omnicortex-hw-profile v1 -->"      # a hardware support profile, for review (public: no sealing)
+MARK_REPORT = "<!-- omnicortex-hw-report v1 -->"        # "this profile worked / did not work for me"
 INFO = b"neuronscope-board-v1"
 PART = 60000                         # GitHub issue bodies and comments hold 65536 characters
 CARD_MAX = 50000
@@ -128,6 +130,47 @@ def parse_issue(body: str, comments: list[str] = ()) -> tuple[dict, str]:
     return card, "".join(parts[i] for i in range(1, total + 1))
 
 
+def plain_issue(mark: str, title: str, doc: dict, intro: str) -> tuple[str, str]:
+    j = json.dumps(doc, indent=1)
+    if len(j) > CARD_MAX:
+        raise ValueError("too large for an issue")
+    return title, f"{mark}\n{intro}\n\n```json\n{j}\n```\n"
+
+
+def parse_plain(body: str, mark: str) -> dict:
+    if mark not in (body or ""):
+        raise ValueError("not this kind of submission")
+    m = re.search(r"```json\n(.*?)\n```", body, re.S)
+    if not m:
+        raise ValueError("no JSON in the issue")
+    return json.loads(m.group(1))
+
+
+def submit_profile(repo: str, profile: dict, token: str) -> dict:
+    import hw_profiles
+    doc = hw_profiles.submission(profile)
+    t, b = plain_issue(MARK_PROFILE, f"hardware profile: {doc['id']} ({doc['title']})"[:200], doc,
+                       "A hardware support profile submitted for review. The board's workflow checks it and adds it "
+                       "to profiles/pending/; a maintainer reviews it and moves it to profiles/accepted/.")
+    return _open(repo, t, b, token)
+
+
+def submit_report(repo: str, rep: dict, token: str) -> dict:
+    t, b = plain_issue(MARK_REPORT, f"profile report: {rep['profile']} {rep['purpose']} "
+                       f"{'worked' if rep['worked'] else 'did not work'}"[:200], rep,
+                       "How a hardware support profile did on someone's hardware.")
+    return _open(repo, t, b, token)
+
+
+def _open(repo: str, title: str, body: str, token: str) -> dict:
+    if not REPO_RE.fullmatch(repo):
+        raise ValueError("a board is owner/repo")
+    if not token:
+        raise ValueError("submitting to GitHub needs a token that may open issues (Settings → Sharing results)")
+    iss = _gh("POST", f"/repos/{repo}/issues", token, {"title": title, "body": body})
+    return {"status": "submitted", "url": iss.get("html_url"), "number": iss.get("number")}
+
+
 def _gh(method: str, path: str, token: str | None, body=None, timeout: float = 30):
     req = urllib.request.Request(API + path, method=method, data=None if body is None else json.dumps(body).encode(),
                                  headers={"Accept": "application/vnd.github+json", "User-Agent": "neuronscope",
@@ -195,12 +238,63 @@ def rebuild(board: Path) -> dict:
         out["measure_weights"] = measure_weights.from_board(rows)
     except Exception as e:
         out["measure_weights_error"] = str(e)[:200]
+    try:
+        import hw_profiles
+
+        def docs(d):
+            return [json.loads(f.read_text()) for f in sorted((board / "profiles" / d).glob("*.json"))] \
+                if (board / "profiles" / d).is_dir() else []
+        reps = [json.loads(f.read_text()) for f in sorted((board / "reports" / "hw").glob("*.json"))] \
+            if (board / "reports" / "hw").is_dir() else []
+        out["hw_profiles"] = {"accepted": docs("accepted"),
+                              "pending": [{"id": p.get("id"), "title": p.get("title"), "issue": p.get("_issue")}
+                                          for p in docs("pending")],
+                              "reports": hw_profiles.aggregate_reports(reps)}
+    except Exception as e:
+        out["hw_profiles_error"] = str(e)[:200]
     (board / "board.json").write_text(json.dumps(out, indent=1))
     return out
 
 
+def accept_profile(board: Path, number: int, body: str) -> dict:
+    import hw_profiles
+    try:
+        p = hw_profiles.validate(parse_plain(body, MARK_PROFILE))
+    except (ValueError, KeyError) as e:
+        return {"status": "rejected", "note": f"not a valid profile: {e}"[:300]}
+    p = {k: v for k, v in p.items() if k not in ("file",)}
+    p["status"], p["_issue"] = "community-pending", int(number)
+    exists = (board / "profiles" / "accepted" / f"{p['id']}.json").exists()
+    path = board / "profiles" / "pending" / (f"{p['id']}@{int(number)}.json" if exists else f"{p['id']}.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(p, indent=1))
+    rebuild(board)
+    return {"status": "verified", "note": ("an update to an accepted profile, " if exists else "") +
+            "waiting for a maintainer's review in profiles/pending/", "path": str(path.relative_to(board))}
+
+
+def accept_report(board: Path, number: int, body: str) -> dict:
+    try:
+        r = parse_plain(body, MARK_REPORT)
+    except ValueError as e:
+        return {"status": "rejected", "note": str(e)}
+    if r.get("schema") != "omnicortex-hw-report/1" or not isinstance(r.get("profile"), str):
+        return {"status": "rejected", "note": "not a version 1 profile report"}
+    keep = {k: r.get(k) for k in ("schema", "profile", "purpose", "worked", "hardware", "os", "machine", "note", "gen_tok_s")}
+    path = board / "reports" / "hw" / f"{int(number)}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(keep, indent=1))
+    rebuild(board)
+    return {"status": "verified", "note": "report counted", "path": str(path.relative_to(board))}
+
+
 def accept(board: Path, number: int, body: str, comments: list[str], priv: str, tasks=None) -> dict:
-    """Verify one issue's card; commit-ready files on success. -> {"status", "note", "path"?}."""
+    """Verify one issue (a score card, a hardware profile or a profile report); commit-ready files on success.
+    -> {"status", "note", "path"?}."""
+    if MARK_PROFILE in (body or ""):
+        return accept_profile(board, number, body)
+    if MARK_REPORT in (body or ""):
+        return accept_report(board, number, body)
     import scoreboard_server as sb
     import testqa as tq
     try:
@@ -231,10 +325,13 @@ def accept(board: Path, number: int, body: str, comments: list[str], priv: str, 
 def action(board: Path, number: int, out: Path) -> int:
     """In the board's workflow: read the issue through the API, accept or reject, write the outcome."""
     repo, token, priv = os.environ["GITHUB_REPOSITORY"], os.environ.get("GITHUB_TOKEN"), os.environ.get("BOARD_KEY")
-    if not priv:
+    iss = _gh("GET", f"/repos/{repo}/issues/{number}", token)
+    body = iss.get("body") or ""
+    if MARK_PROFILE in body or MARK_REPORT in body:
+        res = accept(board, number, body, [], "")               # public submissions: nothing sealed
+    elif not priv:
         res = {"status": "rejected", "note": "the board has no BOARD_KEY secret"}
     else:
-        iss = _gh("GET", f"/repos/{repo}/issues/{number}", token)
         comments, page = [], 1
         while True:
             got = _gh("GET", f"/repos/{repo}/issues/{number}/comments?per_page=100&page={page}", token)
@@ -242,7 +339,7 @@ def action(board: Path, number: int, out: Path) -> int:
             if len(got) < 100 or page >= 5:
                 break
             page += 1
-        res = accept(board, number, iss.get("body") or "", comments, priv)
+        res = accept(board, number, body, comments, priv)
     out.write_text(json.dumps(res))
     print(json.dumps(res))
     return 0
@@ -260,7 +357,7 @@ permissions:
 concurrency: board
 jobs:
   accept:
-    if: contains(github.event.issue.body, '<!-- neuronscope-card v1 -->') && github.event.issue.state == 'open'
+    if: (contains(github.event.issue.body, '<!-- neuronscope-card v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-hw-profile v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-hw-report v1 -->')) && github.event.issue.state == 'open'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -276,7 +373,7 @@ jobs:
         run: |
           if [ "$(python -c "import json;print(json.load(open('/tmp/result.json'))['status'])")" = verified ]; then
             git config user.name "board" && git config user.email "board@users.noreply.github.com"
-            git add cards board.json && git commit -m "card from #${{ github.event.issue.number }}" && git push
+            git add -A cards profiles reports board.json && git commit -m "submission #${{ github.event.issue.number }}" && git push
           fi
       - name: answer
         env: {GH_TOKEN: '${{ github.token }}'}
@@ -303,8 +400,9 @@ def init(board: Path, ns_repo: str, ns_ref: str = "main") -> dict:
     wf = board / ".github" / "workflows"
     wf.mkdir(parents=True, exist_ok=True)
     (wf / "accept.yml").write_text(WORKFLOW.replace("__NS_REPO__", ns_repo).replace("__NS_REF__", ns_ref))
-    (board / "cards").mkdir(exist_ok=True)
-    (board / "cards" / ".keep").write_text("")
+    for sub in ("cards", "profiles/pending", "profiles/accepted", "reports/hw"):
+        (board / sub).mkdir(parents=True, exist_ok=True)
+        (board / sub / ".keep").write_text("")
     (board / "README.md").write_text(
         "# OmniCortex scoreboard\n\nScore cards arrive as issues and are verified by the workflow in "
         "`.github/workflows/accept.yml`: replies are regraded with the TestQA bank of "

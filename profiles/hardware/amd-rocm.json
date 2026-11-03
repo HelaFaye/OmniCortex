@@ -1,0 +1,58 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "amd-rocm",
+ "title": "AMD with ROCm (RDNA 2\u20134, CDNA)",
+ "era": "modern",
+ "examples": [
+  "RX 6800/6900",
+  "RX 7600\u20137900 XTX",
+  "RX 9060/9070",
+  "Radeon Pro W6800/W7900",
+  "MI100",
+  "MI210/MI250",
+  "MI300"
+ ],
+ "match": {
+  "vendor": "amd",
+  "gfx_prefix": [
+   "gfx103",
+   "gfx110",
+   "gfx115",
+   "gfx120",
+   "gfx908",
+   "gfx90a",
+   "gfx94"
+  ]
+ },
+ "purposes": {
+  "inference": {
+   "summary": "llama.cpp with HIP (ROCm); Vulkan is a good second choice and sometimes faster for generation.",
+   "llama": {
+    "backend": "hip",
+    "cmake": ""
+   },
+   "engine": {
+    "flash_attn": "auto"
+   },
+   "env": {
+    "HSA_OVERRIDE_GFX_VERSION": "set only for a card ROCm does not list (e.g. 10.3.0 for gfx1031/1032)"
+   }
+  },
+  "retraining": {
+   "summary": "PyTorch from the ROCm wheels; bfloat16 on RDNA 3 and CDNA 2+.",
+   "torch": {
+    "spec": "torch",
+    "index": "https://download.pytorch.org/whl/rocm6.4"
+   },
+   "training": {
+    "dtype": "bfloat16",
+    "quantized_base": false,
+    "method": "lora"
+   },
+   "notes": "bitsandbytes on ROCm needs its ROCm build; plain LoRA is the safe default."
+  }
+ },
+ "notes": "",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

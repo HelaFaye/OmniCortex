@@ -1,5 +1,8 @@
 # Hardware notes
 
+OmniCortex supports legacy and modern hardware alike. For a ready-made setup per hardware family and
+purpose (inference, retraining), see [HARDWARE_PROFILES.md](HARDWARE_PROFILES.md).
+
 OmniCortex does two very different kinds of work, and they want different
 hardware:
 

@@ -3038,6 +3038,22 @@ def job_suggestions(ws: dict) -> dict:
             "subjects": sorted(__import__("subject_classifier").SUBJECTS)}
 
 
+def hw_board() -> dict:
+    """The board's hardware profile section: accepted profiles, pending ones and reports (cached an hour)."""
+    sh = sharing()
+    ep = str(sh.get("endpoint") or "")
+    if not (sh.get("enabled") and ep.startswith("github:")):
+        return {}
+    c = STATE.setdefault("hw_board_cache", {})
+    if c.get("ep") != ep or time.time() - c.get("t", 0) > 3600:
+        try:
+            import github_board
+            c.update(ep=ep, t=time.time(), data=github_board.fetch(ep[7:]).get("hw_profiles") or {})
+        except Exception as e:
+            c.update(ep=ep, t=time.time(), data={}, error=str(e)[:200])
+    return c.get("data") or {}
+
+
 def shared_board_rows() -> list[dict]:
     """The scoreboard's public rows (cached for an hour), whose speed measurements train the predictions.
     Empty unless sharing is on."""
@@ -4987,6 +5003,63 @@ class Handler(BaseHTTPRequestHandler):
 
     # ------------------------------------------------ settings: workspaces, subject defaults, tool rules
 
+    def _hw_profiles(self, req):
+        """Hardware support profiles (scripts/hw_profiles.py): what fits here, plans, your own, sharing, reports."""
+        if not self._owner_only():
+            return
+        import hw_profiles as HP
+        u = urllib.parse.urlsplit(self.path)
+        q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
+        board = hw_board()
+        community = [{**p, "status": "community"} for p in board.get("accepted", [])]
+        try:
+            if req is None:
+                cat = HP.catalogue() + [p for p in community if p.get("id") not in {x["id"] for x in HP.catalogue()}]
+                if u.path == "/api/hw-profiles":
+                    devs = HP.facts()
+                    return self._json(200, {"devices": devs, "profiles": cat,
+                                            "matches": [{"id": m["profile"]["id"], "devices": m["devices"]}
+                                                        for m in HP.match(cat, devs)],
+                                            "reports": board.get("reports", {}), "pending": board.get("pending", []),
+                                            "board": sharing().get("endpoint") or None})
+                if u.path == "/api/hw-profiles/plan":
+                    p = next((x for x in cat if x.get("id") == q.get("id")), None)
+                    if p is None:
+                        return self._json(404, {"error": "no such profile"})
+                    venv = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+                    return self._json(200, HP.plan(p, q.get("purpose"), str(venv) if venv.exists() else None,
+                                                   (STATE.get("workspace") or {}).get("llama_dir")))
+                return self._json(404, {"error": "not found"})
+            if u.path == "/api/hw-profiles/save":
+                f = HP.save_user(req.get("profile") or {})
+                return self._json(200, {"saved": str(f)})
+            sh = sharing()
+            if u.path == "/api/hw-profiles/export":
+                p = next((x for x in HP.catalogue() if x["id"] == req.get("id")), None)
+                if p is None:
+                    return self._json(404, {"error": "no such profile"})
+                return self._json(200, HP.submission(p))
+            if u.path in ("/api/hw-profiles/submit", "/api/hw-profiles/report"):
+                if not str(sh.get("endpoint") or "").startswith("github:"):
+                    return self._json(400, {"error": "sharing profiles needs a GitHub board: Settings → Sharing results, "
+                                                     "scoreboard github:owner/repo (or use Export and share the file)"})
+                import github_board
+                import score_cards
+                repo = sh["endpoint"][7:]
+                if u.path.endswith("/submit"):
+                    p = next((x for x in HP.catalogue() if x["id"] == req.get("id")), None)
+                    if p is None:
+                        return self._json(404, {"error": "no such profile"})
+                    return self._json(200, github_board.submit_profile(repo, p, score_cards.github_token()))
+                rep = HP.report(str(req.get("id") or ""), str(req.get("purpose") or "general"), bool(req.get("worked")),
+                                HP.facts(), str(req.get("note") or ""), req.get("gen_tok_s"))
+                return self._json(200, github_board.submit_report(repo, rep, score_cards.github_token()))
+        except (HP.ProfileError, ValueError) as e:
+            return self._json(400, {"error": str(e)})
+        except OSError as e:
+            return self._json(502, {"error": f"{type(e).__name__}: {e}"})
+        return self._json(404, {"error": "not found"})
+
     def _settings(self):
         if not self._owner_only():
             return
@@ -5416,6 +5489,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._review_get()
         if self.path.startswith("/api/requirements"):
             return self._requirements()
+        if self.path.startswith("/api/hw-profiles"):
+            return self._hw_profiles(None)
         if self.path in ("/settings", "/api/workspaces", "/api/settings", "/api/settings/sharing", "/api/settings/permissions",
                          "/api/settings/activations"):
             return self._settings()
@@ -5734,6 +5809,9 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
 
             if self.path.startswith("/api/requirements/"):
                 return self._requirements()
+
+            if self.path.startswith("/api/hw-profiles/"):
+                return self._hw_profiles(self._read())
 
             if self.path.startswith("/api/workspaces/") or self.path.startswith("/api/settings/"):
                 return self._settings()

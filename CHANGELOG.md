@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added (hardware support profiles)
+
+- Profiles per hardware family, legacy and modern alike, with setups stored per purpose (inference, retraining, or general): `scripts/hw_profiles.py`, `profiles/hardware/`, Setup → Hardware support profiles, the `hw_apply` job.
+- Share them through the review board: submit a profile for community review, report whether one worked; reports are aggregated in `board.json`. See docs/HARDWARE_PROFILES.md.
+
 ### Changed (the name)
 
 - NeuronScope is now **OmniCortex**, because [RudrenduPaul/NeuronScope](https://github.com/RudrenduPaul/NeuronScope)
