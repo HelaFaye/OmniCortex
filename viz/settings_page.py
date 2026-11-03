@@ -56,7 +56,7 @@ dialog.dlg::backdrop{background:rgba(0,0,0,.5)}dialog.dlg form{padding:1rem 1.1r
 </style>
 <header><h1>Studio · Settings</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/lab">Lab</a><a href="/review">Review</a><a href="/projects">Projects</a><a href="/workers">Workers</a><a href="/jobs">Jobs</a><a href="/connect">Connect</a></header>
 <main>
-<nav class="toc"><a href="#appearance">Appearance</a><a href="#workspaces">Workspaces</a><a href="#subjects">Models per subject</a><a href="#connectors">Connectors</a><a href="#tools">Tool approval</a><a href="#permissions">Permissions</a><a href="#sharing">Sharing results</a><a href="#plugins">Plugins</a><span class="note">Behaviour (unloading, routing thresholds, workers) and building llama.cpp are on <a href="/setup">Setup</a>.</span></nav>
+<nav class="toc"><a href="#appearance">Appearance</a><a href="#workspaces">Workspaces</a><a href="#subjects">Models per subject</a><a href="#connectors">Connectors</a><a href="#tools">Tool approval</a><a href="#permissions">Permissions</a><a href="#activations">Activations</a><a href="#sharing">Sharing results</a><a href="#plugins">Plugins</a><span class="note">Behaviour (unloading, routing thresholds, workers) and building llama.cpp are on <a href="/setup">Setup</a>.</span></nav>
 
 <section class="card" id="appearance"><h2>Appearance</h2>
 <div class="note">A theme colours Studio's pages, its charts (the model radar) and the 3D views of activations and hallucination risk. Your choice is kept in this browser; <b>Make default</b> sets it for browsers that have not chosen one, and for the Godot client's 3D view.</div>
@@ -140,6 +140,23 @@ dialog.dlg::backdrop{background:rgba(0,0,0,.5)}dialog.dlg form{padding:1rem 1.1r
 <section class="card" id="plugins"><h2>Plugins</h2><div class="note">Install packages from a file or a repository, and remove parts of Studio you do not use, under <a href="/addons">Add-ons</a>.</div>
 <div class="note">A plugin is a folder with a <code>plugin.json</code>. It can add jobs, checks under chat replies, a page of its own and MCP tools. <b>Plugins run code on this computer</b>, so none is used until you turn it on. If a plugin's files change after that, it turns itself off until you look at it again. See docs/PLUGINS.md to write one.</div>
 <div id="plDirs" class="note"></div><div style="overflow-x:auto"><table id="plList"></table></div><div id="plMsg" class="note"></div></section>
+
+<section class="card" id="activations"><h2>Activations</h2>
+<div class="note">Every reply's activations are recorded by default: one profile per reply (how strongly each layer's neurons fired), read with a method that works for the model. They feed Neuron review, the Distribution page's plots and, when you choose to share, the review system. They stay on this computer unless you send them somewhere else below.</div>
+<div id="acStatus" class="note" style="margin:.4rem 0"></div>
+<label title="Turn off to stop recording activations of new replies; what was recorded stays"><input type="checkbox" id="acOn"> Record the activations of every reply</label>
+<label title="1 records every reply; 5 records one reply in five, for busy servers">Record one reply in <input id="acEvery" type="number" min="1" max="1000" style="width:5rem"></label>
+<label>Store them
+<select id="acStore" data-locked="Where activations are written. Changing it does not move what is already stored, and Neuron review on this computer then shows only what stays here. 'Another Studio' sends every profile over the network to that Studio; 'memory only' keeps them until Studio restarts and then they are gone.">
+<option value="local">on this computer</option><option value="folder">in another folder (a second disk, a network share, a mounted bucket)</option>
+<option value="studio">on another OmniCortex Studio</option><option value="memory">in memory only (no persistent storage here)</option></select></label>
+<div id="acFolderRow"><label>Folder <input id="acFolder" data-pick="dir" placeholder="/mnt/storage/omnicortex-review"></label></div>
+<div id="acStudioRow"><label>Studio address <input id="acUrl" placeholder="https://server:7870"></label>
+<label title="That Studio's access token; stored on this computer only">Its token <input id="acTok" type="password" autocomplete="off"></label></div>
+<label title="The oldest observations are removed when the store grows past this (0: no limit)">Keep at most <input id="acMax" type="number" min="0" step="1" style="width:6rem" data-locked="The size cap removes the oldest recorded activations for good when the store grows past it. Lowering it can delete months of history at once; 0 lets the store grow until the disk is full."> GB</label>
+<label title="While the destination cannot be reached, keep waiting profiles in a file too"><input type="checkbox" id="acSpool"> Keep waiting profiles in a file while the destination is unreachable</label>
+<div class="row" style="margin-top:.4rem"><button class="pri" id="acSave">Save</button><button id="acRetry" title="deliver waiting profiles now">Send waiting now</button><span id="acMsg" class="note"></span></div>
+</section>
 
 <section class="card" id="sharing"><h2>Sharing results</h2>
 <div class="note"><b>Off unless you turn it on.</b> When on, TestQA results can be sent to a scoreboard you name, so models can be compared across machines and setups. OmniCortex runs no scoreboard of its own; anyone can host <code>scripts/scoreboard_server.py</code>, or keep one in a GitHub repository (<code>scripts/github_board.py init</code>).</div>
@@ -436,6 +453,23 @@ async function shAct(kind){ const [results,label]=($('#shRes').value||'|').split
   const j=await r.json(); $('#shOut').textContent=r.ok?JSON.stringify(j,null,1):'error: '+j.error; if(kind==='submit') shLoad(); }
 $('#shPrev').onclick=()=>shAct('preview'); $('#shSend').onclick=()=>shAct('submit');
 shLoad();
+async function acLoad(){ const j=await (await fetch('/api/settings/activations')).json(), c=j.settings, st=j.status;
+  $('#acOn').checked=c.collect; $('#acEvery').value=c.every; $('#acStore').value=c.store; $('#acFolder').value=c.folder||'';
+  $('#acUrl').value=c.studio_url||''; $('#acTok').value=''; $('#acTok').placeholder=c.studio_token?'saved (leave empty to keep)':'';
+  $('#acMax').value=c.max_gb; $('#acSpool').checked=c.spool_file; acRows();
+  const gb=x=>x==null?'?':(x/2**30).toFixed(2)+' GB';
+  $('#acStatus').innerHTML=(st.method?`<span class="okm">Recording with ${esc(st.method)}.</span>`:`<span class="err">${esc(st.why_not)}</span>`)+
+    ` ${st.recorded} recorded since Studio started, ${st.delivered} stored`+(st.spooled_now?`, <b>${st.spooled_now} waiting</b> (${esc(st.last_error||'')})`:'')+
+    (st.root?` · ${esc(st.root)}: ${gb(st.bytes)} used`+(st.free_gb!=null?`, ${st.free_gb.toFixed(1)} GB free`:''):'')+(st.in_memory?` · ${st.in_memory} in memory`:'')+
+    (st.skipped_busy?` · ${st.skipped_busy} skipped while busy`:'')+(st.pruned?` · ${st.pruned} removed by the size cap`:''); }
+function acRows(){ const v=$('#acStore').value; $('#acFolderRow').style.display=v==='folder'?'':'none'; $('#acStudioRow').style.display=v==='studio'?'':'none'; }
+$('#acStore').onchange=acRows;
+$('#acSave').onclick=async()=>{ const body={collect:$('#acOn').checked,every:+$('#acEvery').value||1,store:$('#acStore').value,folder:$('#acFolder').value,
+    studio_url:$('#acUrl').value,max_gb:+$('#acMax').value,spool_file:$('#acSpool').checked}; if($('#acTok').value.trim()) body.studio_token=$('#acTok').value.trim();
+  const r=await fetch('/api/settings/activations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  $('#acMsg').textContent=r.ok?'Saved.':(await r.json()).error; if(r.ok) acLoad(); };
+$('#acRetry').onclick=async()=>{ const r=await (await fetch('/api/settings/activations/retry',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json(); $('#acMsg').textContent=`${r.delivered} delivered.`; acLoad(); };
+acLoad();
 async function plLoad(){ let r; try{ r=await api('/api/plugins'); }catch(e){ $('#plList').innerHTML=`<tr><td class="err">${esc(e.message)}</td></tr>`; return; }
   $('#plDirs').innerHTML='Looked in: '+r.dirs.map(d=>'<code>'+esc(d)+'</code>').join(', ');
   const st={on:'<span style="color:var(--ok)">on</span>',off:'off',changed:'<span class="err">changed since you turned it on: off</span>',broken:'<span class="err">broken</span>'};

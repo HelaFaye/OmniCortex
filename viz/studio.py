@@ -2122,11 +2122,18 @@ def note_reply(model, messages, text):
                           abstained=model_stats.looks_abstained(text), chars=len(text or ""))
     clf = load_settings().get(_key(model["path"]), {}).get("classifier")
     _REPLIES["n"] += 1
-    if clf and STATE["cett"] and text and _REPLIES["n"] % max(1, STATE["score_every"]) == 0:
+    ac = activation_settings()
+    # Every reply's activations are collected by default (Settings -> Activations turns it off); with a
+    # classifier the same pass also scores the reply's risk.
+    want = (clf and _REPLIES["n"] % max(1, STATE["score_every"]) == 0) or \
+        (ac["collect"] and _REPLIES["n"] % max(1, int(ac["every"] or 1)) == 0)
+    if want and STATE["cett"] and text:
         try:
             SCORE_JOBS.put_nowait((model, clf, messages, text, subject))
         except queue.Full:
-            pass        # never queue behind scoring; the next reply matters more
+            ACT_STATE["skipped_busy"] += 1   # never queue behind scoring; the next reply matters more
+    elif want and text:
+        ACT_STATE["no_method"] += 1
 
 
 def score_worker():
@@ -2138,19 +2145,20 @@ def score_worker():
         try:
             sc = _scorer(model, clf)
             msgs = [m for m in messages if m.get("role") != "system"] or messages
-            prof = getattr(sc, "profile", None)
+            prof = getattr(sc, "profile", None)   # with a classifier, profile() also scores the reply
             res = prof(msgs, text) if prof else sc.score(msgs, text)
-            if "cett" in res:
+            if "cett" in res and activation_settings()["collect"]:
                 try:
                     import neuron_review
-                    review_store().record(model["id"], neuron_review.bin_profile(res["cett"]), source="live",
-                                          kind="observed", subjects=[subject] if subject else None,
-                                          risk=res.get("prob"))
+                    activation_sink().record(model["id"], neuron_review.bin_profile(res["cett"]), source="live",
+                                             kind="observed", subjects=[subject] if subject else None,
+                                             risk=res.get("prob"))
                 except Exception as e:
-                    print(f"[studio] review record failed: {e}", file=sys.stderr)
-            STATE["stats"].record(model["id"], "activation", size=model["size"], subject=subject,
-                                  h_score=res["score"], prob=res["prob"], n_tokens=res["n_tokens"],
-                                  threshold=0.0)
+                    print(f"[studio] activation record failed: {e}", file=sys.stderr)
+            if clf and res.get("score") is not None:
+                STATE["stats"].record(model["id"], "activation", size=model["size"], subject=subject,
+                                      h_score=res["score"], prob=res["prob"], n_tokens=res["n_tokens"],
+                                      threshold=0.0)
         except Exception as e:
             print(f"[studio] activation scoring failed for {model['name']}: {e}", file=sys.stderr)
 
@@ -2172,6 +2180,41 @@ def _scorer(model, clf):
 
 def _configured_bins():
     return {"llama-server": STATE.get("server_bin"), "llama-cett-dump": STATE.get("cett")}
+
+
+ACT_STATE = {"skipped_busy": 0, "no_method": 0}
+
+
+def activation_settings() -> dict:
+    """Settings -> Activations (scripts/activation_store.py): collected by default, stored where the owner says."""
+    import activation_store
+    return {**activation_store.DEFAULTS, **(load_studio_config().get("activations") or {})}
+
+
+def activation_sink():
+    sink = STATE.get("act_sink")
+    if sink is None:
+        import activation_store
+        home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
+        sink = STATE["act_sink"] = activation_store.Sink(activation_settings(), STATE.get("review_dir"), home)
+        if sink.cfg["store"] in ("local",):
+            sink._store = review_store()          # the same store the Review page reads
+    return sink
+
+
+def activation_status() -> dict:
+    import activation_store
+    ac = activation_settings()
+    sink = activation_sink()
+    st = sink.status()
+    st["method"] = ("llama-cett-dump (llama.cpp)" if STATE.get("cett") else None)
+    st["why_not"] = None if STATE.get("cett") else (
+        "no compatible method on this computer yet: activations of GGUF models are read with llama-cett-dump "
+        "(Setup -> Build llama.cpp). Until then replies are not profiled.")
+    st.update(ACT_STATE)
+    if st.get("root"):
+        st["free_gb"] = activation_store.disk_free(st["root"] if os.path.isdir(st["root"]) else os.path.dirname(st["root"]))
+    return {"settings": {**ac, "studio_token": "set" if ac.get("studio_token") else ""}, "status": st}
 
 
 def review_store():
@@ -2777,6 +2820,28 @@ def chat_off_machine(wid, msgs, usage):
 # editable from the web: those stay in the config file and on the command line.
 # key: (kind, applies without a restart, help, group). Kinds: dirs, file (an executable), readfile (a file
 # that must exist), path (may not exist yet), dir, int, float, bool, str, duration, durations, url.
+# Settings that can lock the owner out, expose Studio, or lose data: the Setup page shows them locked, with this
+# warning, behind an Unlock button.
+SENSITIVE_FIELDS = {
+    "host": "Which network address Studio listens on. Anything other than 127.0.0.1 makes it reachable from other "
+            "computers: it then needs a token and TLS, and a wrong address can make Studio unreachable after a restart.",
+    "port": "Studio's own port. Bookmarks, the Godot client, paired devices, Cline/Claude settings and other "
+            "Studios linked to this one all use it; they stop connecting until they are told the new port.",
+    "backend_port": "The port of the llama-server Studio starts. If another program already uses it, models fail to load.",
+    "token_file": "The file holding Studio's access token. Pointing it elsewhere replaces the token: every paired "
+                  "device, linked Studio and app using the old one is locked out.",
+    "tls_cert": "The HTTPS certificate. Paired devices and linked Studios pin its fingerprint; a new one makes them "
+                "refuse to connect until they are paired again.",
+    "tls_key": "The private key for the HTTPS certificate; a mismatch with the certificate stops HTTPS from starting.",
+    "allow_plaintext": "Serves Studio over plain HTTP on a network address: the token and every chat travel unencrypted.",
+    "allow_remote_jobs": "Lets jobs (which train models and run model-written code) start while Studio is reachable "
+                         "from the network. Anyone with the token could then run code on this computer.",
+    "no_jobs": "Turns the jobs runner off: evaluation, retraining and every pipeline stage stop being available.",
+    "no_persistent_pairing": "Paired devices are then forgotten on every restart and must pair again.",
+    "mcp_config": "The MCP servers Studio connects to and lets models call. A different file changes which tools "
+                  "models can use, and what they can reach.",
+}
+
 SETUP_FIELDS = {
     "models_dir": ("dirs", True, "Folders searched for .gguf models", "Models and engines"),
     "server": ("file", True, "llama-server binary", "Models and engines"),
@@ -3254,7 +3319,7 @@ def setup_state():
             if root and os.path.isfile(pth):
                 found.setdefault(key, pth)
     return {"fields": {k: {"kind": v[0], "live": v[1], "help": v[2], "group": v[3], "value": eff.get(k),
-                           "advanced": v[3] in ADVANCED_GROUPS}
+                           "advanced": v[3] in ADVANCED_GROUPS, "sensitive": SENSITIVE_FIELDS.get(k)}
                        for k, v in SETUP_FIELDS.items()},
             "config_path": os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"),
             "found": found, "models": len(scan_models()),
@@ -4870,6 +4935,14 @@ class Handler(BaseHTTPRequestHandler):
         req = self._read()
         st = review_store()
         model = str(req.get("model") or "")
+        if self.path == "/api/review/ingest":
+            # observations forwarded by another Studio whose activations are stored here
+            import activation_store
+            items = req.get("items") if isinstance(req.get("items"), list) else []
+            try:
+                return self._json(200, {"stored": activation_store.ingest(st, items)})
+            except (KeyError, ValueError, TypeError) as e:
+                return self._json(400, {"error": f"bad item: {e}"})
         if self.path == "/api/review/label":
             try:
                 st.label(model, str(req.get("id") or ""), str(req.get("verdict") or ""))
@@ -4924,6 +4997,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._html(settings_page.PAGE)
             if self.path == "/api/workspaces":
                 return self._json(200, workspaces_state())
+            if self.path == "/api/settings/activations":
+                return self._json(200, activation_status())
             if self.path == "/api/settings/sharing":
                 import score_cards
                 cache = STATE.get("hf_checks", {})
@@ -4974,6 +5049,38 @@ class Handler(BaseHTTPRequestHandler):
             save_studio_config({"subject_models": clean})
             STATE["subject_models"] = clean
             return self._json(200, {"subjects": subject_defaults()})
+        if self.path == "/api/settings/activations":
+            import activation_store
+            cur = activation_settings()
+            for k in ("collect", "spool_file"):
+                if k in req:
+                    cur[k] = bool(req[k])
+            if "every" in req:
+                cur["every"] = max(1, min(1000, int(req["every"] or 1)))
+            if "max_gb" in req:
+                cur["max_gb"] = max(0.0, float(req["max_gb"] or 0))
+            if "store" in req:
+                if req["store"] not in activation_store.MODES:
+                    return self._json(400, {"error": f"store: one of {', '.join(activation_store.MODES)}"})
+                cur["store"] = req["store"]
+            if "folder" in req:
+                cur["folder"] = os.path.expanduser(str(req["folder"]).strip())
+            if "studio_url" in req:
+                u = str(req["studio_url"]).strip().rstrip("/")
+                if u and not re.match(r"https?://[\w.\-\[\]:]+(/[\w./-]*)?$", u):
+                    return self._json(400, {"error": "the Studio address is a URL like https://server:7870"})
+                cur["studio_url"] = u
+            if req.get("studio_token") not in (None, "set"):
+                cur["studio_token"] = str(req["studio_token"]).strip()
+            if cur["store"] == "folder" and not cur["folder"]:
+                return self._json(400, {"error": "store 'folder' needs a folder"})
+            if cur["store"] == "studio" and not cur["studio_url"]:
+                return self._json(400, {"error": "store 'studio' needs the other Studio's address"})
+            save_studio_config({"activations": cur})
+            STATE["act_sink"] = None                     # rebuilt with the new settings on the next reply
+            return self._json(200, activation_status())
+        if self.path == "/api/settings/activations/retry":
+            return self._json(200, {"delivered": activation_sink().retry(), **activation_status()})
         if self.path == "/api/settings/sharing":
             cur = sharing()
             for k in ("enabled", "auto_listed", "auto_unlisted"):
@@ -5309,7 +5416,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._review_get()
         if self.path.startswith("/api/requirements"):
             return self._requirements()
-        if self.path in ("/settings", "/api/workspaces", "/api/settings", "/api/settings/sharing", "/api/settings/permissions"):
+        if self.path in ("/settings", "/api/workspaces", "/api/settings", "/api/settings/sharing", "/api/settings/permissions",
+                         "/api/settings/activations"):
             return self._settings()
         if self.path.startswith("/api/fs/"):
             # The folder browser: the owner's own files on Studio's computer.

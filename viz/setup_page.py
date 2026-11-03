@@ -93,6 +93,10 @@ function renderStatus(s){
   $('#next').innerHTML=`<div class="next">${nx}</div>`;
 }
 function fieldHTML(s,k,f){
+    const h=_fieldHTML(s,k,f);
+    // sensitive settings start locked, with what changing them can break (studio.py SENSITIVE_FIELDS)
+    return f.sensitive?h.replace('<div>',`<div data-locked="${esc(f.sensitive)}">`):h; }
+function _fieldHTML(s,k,f){
     const v=f.value; let inp;
     if(f.kind==='bool') return `<div><label style="margin-top:1.4rem"><input type="checkbox" data-k="${k}" ${v?'checked':''}>${esc(f.help)}${f.live?'':' <span class="note">(after restart)</span>'}</label><div class="err" data-err="${k}"></div></div>`;
     const val=f.kind==='dirs'?(v||[]).join('\n'):(v??'');

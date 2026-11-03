@@ -416,6 +416,25 @@ function nsEnhancePickers(root){ (root||document).querySelectorAll('input[data-p
       onchange:v=>{ t.value=v.join('\n'); t.dispatchEvent(new Event('input',{bubbles:true})); }}); }); }
 (function(){ const start=()=>{ nsEnhancePickers(document); try{ new MutationObserver(ms=>{ for(const m of ms) for(const n of m.addedNodes) if(n.nodeType===1){ if(n.matches&&n.matches('input[data-pick]')) nsEnhancePickers(n.parentNode); else nsEnhancePickers(n); } }).observe(document.body,{childList:true,subtree:true}); }catch(e){} };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start(); })();
+// ---- sensitive settings: a control marked data-locked="what it does and what changing it can break" starts
+// locked; Unlock shows the warning and asks for a confirmation before it can be edited. nsLockAll(root) applies it.
+function nsLockAll(root){ (root||document).querySelectorAll('[data-locked]').forEach(el=>{
+  if(el.dataset.nsLock) return; el.dataset.nsLock='1';
+  const ctl=el.matches('input,select,textarea,button')?[el]:[...el.querySelectorAll('input,select,textarea,button:not(.ns-unlock)')];
+  ctl.forEach(c=>c.disabled=true);
+  const b=document.createElement('button'); b.type='button'; b.className='ns-unlock'; b.textContent='🔒 Unlock';
+  b.title='This setting is locked because changing it can break things. Click to read why and unlock it.';
+  b.style.cssText='margin-left:.4rem;font-size:12px;padding:.1rem .45rem';
+  b.onclick=()=>{ if(b.dataset.open){ ctl.forEach(c=>c.disabled=true); b.textContent='🔒 Unlock'; delete b.dataset.open; const w=b.nextElementSibling; if(w&&w.classList.contains('ns-warn')) w.remove(); return; }
+    if(b.nextElementSibling&&b.nextElementSibling.classList.contains('ns-warn')) return;
+    const w=document.createElement('div'); w.className='ns-warn';
+    w.style.cssText='border:1px solid var(--warn,#e7b65c);border-radius:6px;padding:.4rem .6rem;margin:.3rem 0;font-size:12.5px';
+    w.innerHTML='<b>⚠ Before you change this</b><div style="margin:.2rem 0">'+nsEsc(el.dataset.locked)+'</div><label style="display:inline-flex;gap:.3rem;align-items:center"><input type="checkbox"> I know what I am doing</label>';
+    b.after(w); const cb=w.querySelector('input');
+    cb.onchange=()=>{ ctl.forEach(c=>c.disabled=!cb.checked); b.textContent=cb.checked?'🔓 Lock again':'🔒 Unlock'; if(cb.checked) b.dataset.open='1'; }; };
+  (el.matches('input,select,textarea')?el:el.lastElementChild||el).after(b); }); }
+(function(){ const go=()=>{ nsLockAll(document); try{ new MutationObserver(()=>nsLockAll(document)).observe(document.body,{childList:true,subtree:true}); }catch(e){} };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go(); })();
 // ---- text that does not fit: long unbroken text (paths, ids, hashes) in a cell is cut with … and every cut
 // text, cell or field gets a tooltip with all of it, also for what pages add later
 function nsFit(root){
