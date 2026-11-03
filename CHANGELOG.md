@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added (unified review and browser extension)
+
+- `scripts/unified_review.py` and Studio's `/api/lookup`: everything known about a model in one record, from review boards (verified accuracy, speed per hardware), hardware-profile reports, SAELens's catalogue and this Studio's observations. Re-packagings (GGUF, AWQ, …) are marked related.
+- Cards may carry self-reported emotion and feature summaries (`score_cards.py --extras`); boards average them and every viewer marks them as not re-checked.
+- `extension/`: a browser extension for Chromium browsers (Chrome, Edge, Opera, Brave, Vivaldi) and Firefox (desktop and Android). Its icon glows blue on model pages with data, and it has a filterable popup. CI packages it. Studio's `/#hub=org/name` opens a repo's files.
+
 ### Added (hardware support profiles)
 
 - Profiles per hardware family, legacy and modern alike, with setups stored per purpose (inference, retraining, or general): `scripts/hw_profiles.py`, `profiles/hardware/`, Setup → Hardware support profiles, the `hw_apply` job.

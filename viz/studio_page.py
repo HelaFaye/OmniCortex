@@ -475,11 +475,12 @@ function showTab(name){ $$('.tabs button').forEach(x=>x.classList.toggle('pri',x
   ['chats','local','hub','docs','tools'].forEach(t=>$('#tab-'+t).style.display=t===name?'block':'none'); }
 $$('.tabs button').forEach(b=>b.onclick=()=>{ showTab(b.dataset.tab); history.replaceState(null,'','#'+(b.dataset.tab==='local'?'models':b.dataset.tab)); });
 // Links from other pages: /#tools, /#models, /#hub, /#docs, /#chats, or
-// /#model=<id>&field=classifier to open a model's settings at that field.
+// /#model=<id>&field=classifier to open a model's settings at that field, /#hub=<org/name> to list a repo's files.
 const TAB_ALIAS={models:'local',local:'local',chats:'chats',hub:'hub',docs:'docs',tools:'tools'};
 function applyHash(){ const h=location.hash.slice(1); if(!h) return;
   if(TAB_ALIAS[h]) return showTab(TAB_ALIAS[h]);
   const q=new URLSearchParams(h), id=q.get('model');
+  if(q.get('hub')){ showTab('hub'); $('#q').value=q.get('hub'); return files(q.get('hub')); }
   if(id){ showTab('local'); const i=models.findIndex(m=>m.id===id); if(i<0) return;
     pick(i); const f=q.get('field'); const el=f&&document.getElementById(f);
     if(el){ el.scrollIntoView({block:'center'}); el.focus(); el.style.outline='2px solid var(--acc)'; setTimeout(()=>el.style.outline='',2500); } } }

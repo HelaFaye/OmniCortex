@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OmniCortex</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+<header>
+  <img id="glow" src="icons/idle-32.png" alt="" width="20" height="20">
+  <div class="h"><b id="model">No model on this page</b><span id="sub" class="dim"></span></div>
+  <button id="refresh" title="Ask every source again">↻</button>
+  <button id="opts" title="Sources and settings">⚙</button>
+</header>
+<div id="bar">
+  <input id="q" type="search" placeholder="filter statistics" aria-label="filter statistics">
+  <select id="group" aria-label="group"><option value="">all groups</option></select>
+  <select id="sort" aria-label="sort"><option value="group">by group</option><option value="value">by value</option><option value="n">by sample size</option><option value="label">by name</option></select>
+  <label title="Include values measured on re-packagings of this model (GGUF, AWQ, … uploads of the same name)"><input id="related" type="checkbox" checked> related</label>
+  <label title="Include self-reported extras (emotion and feature summaries) that a board cannot re-check"><input id="selfrep" type="checkbox" checked> self-reported</label>
+</div>
+<details id="srcbox"><summary>Sources <span id="srccount" class="dim"></span></summary><div id="sources"></div></details>
+<main id="stats"></main>
+<footer id="actions"></footer>
+<script src="sites.js"></script>
+<script src="popup.js"></script>
+</body></html>

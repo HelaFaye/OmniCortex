@@ -1,5 +1,6 @@
 # Binaries for every platform: the llama.cpp tools OmniCortex drives (llama-cett-dump, llama-server,
-# llama-quantize, llama-eval-callback) and the remote agent as one executable (omnicortex-remote).
+# llama-quantize, llama-eval-callback), the remote agent as one executable (omnicortex-remote), and the
+# browser extension packages (docs/BROWSER_EXTENSION.md).
 # docs/BINARIES.md lists what each package holds and how to use it.
 #
 # Runs on tags v*, by hand (Actions -> binaries -> Run workflow, optionally pinning a llama.cpp ref), and on
@@ -10,7 +11,7 @@ on:
     tags: ["v*"]
   pull_request:
     paths: [".github/workflows/binaries.yml", "scripts/ci/**", "scripts/build_llama_tools.sh",
-            "llama-tools/**", "remote/**"]
+            "llama-tools/**", "remote/**", "extension/**"]
   workflow_dispatch:
     inputs:
       llama_ref:
@@ -117,9 +118,23 @@ jobs:
           name: omnicortex-${{ matrix.target }}
           path: dist/omnicortex-${{ matrix.target }}.zip
 
+  extension:
+    name: browser extension
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: package
+        run: python extension/build.py --out dist --version "$(echo "${GITHUB_REF_NAME#v}" | grep -E '^[0-9]+(\.[0-9]+){0,3}$' || echo 0.1.0)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omnicortex-extension
+          path: dist/omnicortex-extension-*.zip
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [native, container, windows]
+    needs: [native, container, windows, extension]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4

@@ -1,0 +1,19 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OmniCortex: sources</title><link rel="stylesheet" href="popup.css">
+<style>body{width:auto;max-width:640px;margin:0 auto;padding:12px;font-size:13px}textarea{width:100%;font:12px monospace}
+.row{margin:10px 0}.ok{color:var(--acc)}.err{color:var(--bad)}</style></head>
+<body>
+<h2>OmniCortex review sources</h2>
+<p class="dim">The extension never sends anything about you. A review board is downloaded whole, so it never learns
+which model you looked at. A Studio is asked about the model on the page, with your Studio's token.</p>
+<div class="row"><b>Review boards</b>, one per line: <code>github:owner/repo</code>, <code>owner/repo</code>, or a scoreboard server's URL
+<textarea id="boards" rows="4" placeholder="github:owner/omnicortex-board"></textarea></div>
+<div class="row"><b>Studios</b>, one per line: <code>URL token</code> (the token is optional when Studio runs without one)
+<textarea id="studios" rows="3" placeholder="https://my-box:7870 0123abcd…"></textarea>
+<div class="dim">Open the Studio once in this browser and accept its certificate if it uses its own. The token is stored in this
+browser's extension storage; anyone who can use this browser profile can read it.</div></div>
+<div class="row"><label>Keep answers for <input id="ttl" type="number" min="1" max="1440" style="width:5em"> minutes</label></div>
+<button id="save">Save</button> <span id="msg"></span>
+<script src="options.js"></script>
+</body></html>

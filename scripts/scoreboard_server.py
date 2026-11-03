@@ -169,8 +169,19 @@ def aggregate(cards: list[dict]) -> list[dict]:
                                         c["hardware"].get("cpu", "cpu") for c in cs}),
                     "performance": [dict(p, hardware=c["hardware"], model_bytes=m.get("size"), quant=m.get("quant"))
                                     for c in cs for p in (c.get("performance") or [])]})
+        ex = _extras(cs)
+        if ex:
+            out[-1]["extras"] = ex
     out.sort(key=lambda e: -(e["accuracy"] or 0))
     return out
+
+
+def _extras(cards):
+    try:
+        import unified_review
+    except ImportError:
+        return {}
+    return unified_review.aggregate_extras(cards)
 
 
 def _hf_has(repo: str, sha: str) -> bool:

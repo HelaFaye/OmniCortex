@@ -3054,6 +3054,57 @@ def hw_board() -> dict:
     return c.get("data") or {}
 
 
+def lookup_board():
+    """(source id, the whole board.json or the error) for the sharing board, cached an hour; None if off."""
+    sh = sharing()
+    ep = str(sh.get("endpoint") or "")
+    if not (sh.get("enabled") and ep):
+        return None
+    c = STATE.setdefault("lookup_board_cache", {})
+    if c.get("ep") != ep or time.time() - c.get("t", 0) > 3600:
+        import unified_review
+        try:
+            data = unified_review.fetch_json(unified_review.board_url(ep), timeout=15)
+        except Exception as e:
+            data = e
+        c.update(ep=ep, t=time.time(), data=data)
+    return (f"board:{ep[7:] if ep.startswith('github:') else ep}", c["data"])
+
+
+def unified_lookup(model: str) -> dict:
+    """Everything this Studio knows about a Hugging Face model (docs/UNIFIED_REVIEW.md): the sharing board,
+    SAELens's catalogue (cached a week) and this Studio's own observations."""
+    import unified_review
+    b = lookup_board()
+    cached = Path(os.environ.get("NS_HOME") or Path.home() / ".neuronscope") / "saelens" / "pretrained_saes.yaml"
+    if not cached.exists() or time.time() - cached.stat().st_mtime > 7 * 86400:
+        if not STATE.get("saelens_fetching"):      # never make a lookup wait for a download (or for PyTorch)
+            STATE["saelens_fetching"] = True
+
+            def fetch():
+                try:
+                    import sae
+                    sae.saelens_registry()
+                except Exception:
+                    pass
+                STATE["saelens_fetching"] = False
+            threading.Thread(target=fetch, daemon=True).start()
+    if cached.exists():
+        c = STATE.setdefault("saelens_cache", {})
+        try:
+            if c.get("mtime") != cached.stat().st_mtime:
+                import yaml
+                c.update(mtime=cached.stat().st_mtime, reg=yaml.safe_load(cached.read_text()) or {})
+            reg = c["reg"]
+        except Exception as e:
+            reg = e
+    else:
+        reg = RuntimeError("fetching SAELens's catalogue; ask again in a minute")
+    rec = unified_review.lookup(model, [b] if b else [], reg, review_store())
+    rec["open"] = {"hub": "/#hub=" + urllib.parse.quote(rec["model"]), "review": "/review"}
+    return rec
+
+
 def shared_board_rows() -> list[dict]:
     """The scoreboard's public rows (cached for an hour), whose speed measurements train the predictions.
     Empty unless sharing is on."""
@@ -5491,6 +5542,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._requirements()
         if self.path.startswith("/api/hw-profiles"):
             return self._hw_profiles(None)
+        if self.path.split("?")[0] == "/api/lookup":
+            q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            try:
+                return self._json(200, unified_lookup(q.get("model", [""])[0]))
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
         if self.path in ("/settings", "/api/workspaces", "/api/settings", "/api/settings/sharing", "/api/settings/permissions",
                          "/api/settings/activations"):
             return self._settings()

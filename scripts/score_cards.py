@@ -224,7 +224,7 @@ def hf_check(model_path: str, repo: str | None = None, timeout: float = 15) -> d
 
 def build(results_path: str, label: str | None, model_path: str, settings: dict | None = None,
           engine_bin: str | None = None, cache_dir: str | None = None, tasks_paths=None,
-          listed: dict | None = None, public_by_hand: bool = False) -> tuple[dict, dict]:
+          listed: dict | None = None, public_by_hand: bool = False, extras: dict | None = None) -> tuple[dict, dict]:
     """-> (card, verification log)."""
     sys.path.insert(0, str(HERE))
     import testqa as tq
@@ -264,6 +264,11 @@ def build(results_path: str, label: str | None, model_path: str, settings: dict 
     perf = performance(d, label, settings or {})
     if perf:
         card["performance"] = perf
+    if extras:
+        import unified_review
+        ex = unified_review.sanitize_extras(extras)
+        if ex:
+            card["extras"] = ex                 # self-reported: the board cannot re-check these
     cache = {}
     if cache_dir:
         cp = Path(cache_dir) / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', label)}.jsonl"
@@ -362,6 +367,8 @@ def main(argv=None) -> int:
         s.add_argument("--repo", help="Hugging Face repo to verify the file against")
         s.add_argument("--public", action="store_true", help="list this model publicly although it is unlisted")
         s.add_argument("--offline", action="store_true", help="do not check Hugging Face")
+        s.add_argument("--extras", help="JSON of self-reported summaries to add (emotions, features; "
+                                        "docs/UNIFIED_REVIEW.md); the board shows them as not re-checked")
         if name == "submit":
             s.add_argument("--endpoint", required=True)
     c = sub.add_parser("check", help="is this file the one in its Hugging Face repo?")
@@ -378,7 +385,8 @@ def main(argv=None) -> int:
     settings = json.loads(Path(a.settings).read_text()) if a.settings else {}
     listed = {"listed": False} if a.offline else hf_check(a.model, a.repo)
     card, log = build(a.results, a.label, a.model, settings, a.server, a.cache, listed=listed,
-                      public_by_hand=a.public)
+                      public_by_hand=a.public,
+                      extras=json.loads(Path(a.extras).read_text()) if a.extras else None)
     if a.cmd == "preview":
         print(json.dumps({"card": card, "log": {"items": log["items"][:3], "total_items": len(log["items"]),
                                                 "note": "private: used only to verify the card"}}, indent=1))
