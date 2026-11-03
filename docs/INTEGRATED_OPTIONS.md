@@ -16,7 +16,11 @@ are locked; unlock one to edit it, after reading its warning.
 | Core shunt | in Studio's jobs, on by default | `scripts/core_shunt.py` |
 | Dependency garbage collector | job + command | `scripts/dep_gc.py` |
 | Dependency snapshots and sandboxes | API + job + command | `scripts/dep_snapshot.py` |
-| Speculative quantization mask rescaling, layer-wise token jitter, attention hijacking, neuron aging and decay, neuro-fuzzing | next | |
+| Speculative quantization mask rescaling | job + command | `scripts/quant_mask.py` |
+| Layer-wise token jitter | job + command (Hugging Face weights) | `scripts/model_lab.py jitter` |
+| Cross-layer attention hijacking | job + command (Hugging Face weights) | `scripts/model_lab.py hijack` |
+| Neuron aging and decay | in Studio, off by default | `scripts/neuron_decay.py` |
+| Neuro-fuzzing | job + command | `scripts/neuro_fuzz.py` |
 | Layer streaming, expert sharding, backend hot-swap, morphing, KV compaction, feature exchange | after that | |
 
 ## Fix This Mistake
@@ -135,3 +139,89 @@ computer with a linked Studio before you send it a model or a graph.
 
 **Not done:** installing anything on the other computer by itself. The diff and plan tell you what is
 needed. Running it there is a job you start on that host.
+
+## Speculative quantization mask rescaling
+
+`quant_mask.py plan` quantizes with more precision where the model makes confident mistakes, and less where
+it is safe. It ranks layers by risk, taken from one of:
+- the share of `classifier.py`'s H-neurons in each layer;
+- a neuron review summary;
+- a list you give.
+
+The riskiest layers' MLP and attention weights get `--high` (q8_0), the safest get `--low` (q3_k), and the
+rest get your base quant. It writes a `llama-quantize --tensor-type-file` and runs it with `--run`.
+
+Quant types are per tensor, so precision cannot be set per neuron. The per-neuron part is the importance
+matrix. `quant_mask.py contexts` writes the mistake contexts (TestQA failures, Fix This Mistake pairs).
+`llama-imatrix -f` on that file weighs exactly the neurons those contexts use, and `--imatrix` spends
+precision on them inside every tensor.
+
+Compare the result with a uniform quant of the same size on TestQA before using it. A mixed quant is not
+better by construction.
+
+## Layer-wise token jitter
+
+`model_lab.py jitter` finds the layers that break under small noise. For each item (a prompt and its answer),
+it adds Gaussian noise (`--sigma` × the residual stream's RMS) at one layer at a time and measures:
+- how far the answer's log-probability falls;
+- how often the first answer token flips.
+
+Items come from a JSONL file, TestQA results or Fix This Mistake pairs. Layers where small noise flips answers
+are listed as *brittle*: a focus list for `finetune.py --layers` or the H-neuron pipeline. The flipped items
+become DPO pairs (`--dpo-out`), with the answer chosen and what the jittered model said rejected.
+
+It runs on Hugging Face weights through PyTorch hooks. A GGUF served by llama.cpp cannot take injected noise.
+
+## Cross-layer attention hijacking
+
+`model_lab.py hijack` is the version of this idea that can be built: back-patching. A later layer's state
+cannot feed an earlier layer within one forward pass, because it has not been computed yet. So it takes two
+passes:
+1. Pass 1 records the residual stream at `--source` (say layer 28).
+2. Pass 2 mixes it into `--at` (say layer 12) with weight `--mix`.
+
+The mix applies at the positions you choose. It can be limited to where a trigger direction (an SAE feature
+or emotion vector, `.npy`) is active above `--threshold`. The source state is rescaled to the target layer's
+norm. The output shows the next-token prediction before and after, and the KL divergence between them.
+
+**Not done:** rerouting attention heads during live serving. This is a lab tool for finding whether a layer's
+breakdown can be bypassed, and it runs on Hugging Face weights only.
+
+## Neuron aging and decay
+
+Studio's live correction strength is the scale of the LoRA adapter a model is served with (the slider on the
+model, `/lora-adapters`). With decay on, two things happen:
+- After `grace days` with no trigger, the live scale moves toward `floor` × the configured scale, halving the
+  remaining distance every `half life days`.
+- A trigger sets it straight back to full strength.
+
+A trigger is either:
+- a reply whose H-neuron risk is at least `risk`, from the model's classifier;
+- a Fix This Mistake correction for the model.
+
+Every change is logged in `decay.json` beside Studio's settings. The latest events appear in
+`/api/settings/options`. Decay is off by default, and turning it on is a locked setting: it changes how a model
+answers without asking.
+
+**Not done:** ageing inside the weights. A suppressed or concept-edited GGUF has its scales baked in, and only
+an adapter can be eased live. For a baked edit, the log shows when the correction stopped being needed, so you
+can rebuild it at a smaller scale.
+
+## Neuro-fuzzing
+
+`neuro_fuzz.py` writes new test items aimed at the model's known weak spots. The seeds are:
+- the TestQA items it got wrong, or got right with a high activation risk;
+- Fix This Mistake corrections;
+- risky replies in the neuron review.
+
+A fuzzer model writes new items for each seed, in TestQA's own format: `qa` with aliases, or `reasoning` with
+an answer. They test the same skill with new names, numbers, false premises and edge cases. Each item is then:
+- deduplicated against the bank and against the others (word overlap of 0.9 or more);
+- with `--verify`, answered by a second model and graded by TestQA's grader.
+
+Verified items go to `fuzz.jsonl`, a bank folder `testqa.py --tasks DIR` reads. The rest go to
+`unverified.jsonl.txt` for you to look at. Item ids start with `fz-` and record their seed, so a result can be
+traced back to the weakness that produced it.
+
+**Not done:** reading "neural coordinates" straight off the model to aim the fuzzer. Seeds are behaviours
+(wrong or risky answers). Which neurons they involve is what the neuron review and the classifier work out.

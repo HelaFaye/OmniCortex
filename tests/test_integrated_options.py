@@ -164,7 +164,8 @@ def test_studio_neural_reset_harvest_and_settings(tmp_path):
         assert lst["unused"] == 1 and lst["pairs"][0]["question"] == "2+2?"
         assert test_studio.call(base, "/api/harvest", {"messages": [], "reply": "a", "correction": "b"})[0] == 400
         code, g = test_studio.call(base, "/api/settings/options")
-        assert code == 200 and "core_shunt" in g and g["options"]["harvest"]["values"]["enabled"]
+        assert code == 200 and "core_shunt" in g and "decay" in g and g["options"]["harvest"]["values"]["enabled"]
+        assert g["options"]["decay"]["values"]["enabled"] is False and studio.decay_step() is None
         assert test_studio.call(base, "/api/settings/options", {"name": "core_shunt", "values": {"cores": "x"}})[0] == 400
         code, snap = test_studio.call(base, "/api/env/snapshot")
         assert code == 200 and snap["schema"] == "omnicortex-env/1"

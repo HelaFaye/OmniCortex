@@ -526,6 +526,44 @@ SPECS.update({
         "fields": [F("model", req=True, help="HF id or path of the base model the chat model came from"),
                    F("out", req=True), F("steps", kind="int", default=40), F("min", kind="int", default=1,
                    help="do nothing unless this many new pairs wait"), F("method", choices=["qlora", "lora"], default="qlora")]},
+    "quant_mask": {
+        "title": "Quantize with more precision where the model errs", "group": "Retrain",
+        "argv": [S / "quant_mask.py", "plan"],
+        "help": "Higher precision for the layers with the most H-neurons, lower for the safest, your base quant for "
+                "the rest; optionally an importance matrix from mistake contexts. Compare it with a uniform quant "
+                "of the same size before using it.",
+        "fields": [F("gguf", req=True, help="F16/BF16 GGUF to quantize from"), F("out", req=True),
+                   F("base", default="Q4_K_M"), F("h_neurons", help="h_neurons.json from classifier.py"),
+                   F("review", help="a neuron review summary JSON"), F("risk_layers", help="or layers by hand: 12,20-24"),
+                   F("high", default="q8_0"), F("low", default="q3_k"),
+                   F("high_fraction", kind="float", default=0.2), F("low_fraction", kind="float", default=0.3),
+                   F("imatrix", help="llama-imatrix output"), F("quantize", help="llama-quantize binary"),
+                   F("run", kind="bool", help="quantize (otherwise only show the plan)")]},
+    "lab_jitter": {
+        "title": "Layer-wise token jitter: find brittle layers", "group": "Interpret",
+        "argv": [S / "model_lab.py", "jitter"],
+        "help": "Noise at one layer at a time; layers where small noise flips answers are brittle. Flipped items "
+                "become DPO pairs. Hugging Face weights.",
+        "fields": [F("model", req=True), F("items", help="JSONL of prompt/answer"), F("from_results", repeat=True,
+                   help="TestQA results"), F("from_harvest", kind="bool"), F("sigma", kind="float", default=0.05),
+                   F("samples", kind="int", default=4), F("layers"), F("limit", kind="int", default=50),
+                   F("out", req=True), F("dpo_out", help="folder for dpo.jsonl"), F("device", default="auto")]},
+    "lab_hijack": {
+        "title": "Cross-layer hijack (back-patching)", "group": "Interpret",
+        "argv": [S / "model_lab.py", "hijack"],
+        "help": "Mix a later layer's state into an earlier layer (two passes) and see how the prediction changes; "
+                "optionally only where a feature direction is active.",
+        "fields": [F("model", req=True), F("prompt", req=True), F("at", kind="int", req=True),
+                   F("source", kind="int", req=True), F("mix", kind="float", default=0.5), F("positions", default="last"),
+                   F("trigger", help=".npy direction"), F("threshold", kind="float", default=0.0), F("out", req=True)]},
+    "neuro_fuzz": {
+        "title": "Neuro-fuzzing: new test items aimed at weak spots", "group": "Evaluate",
+        "argv": [S / "neuro_fuzz.py"],
+        "help": "A fuzzer model writes new TestQA items from the model's failures, corrections and risky replies; "
+                "a second model verifies them. Writes a bank folder for TestQA.",
+        "fields": [F("results", repeat=True), F("harvest", kind="bool"), F("review", help="a model in the neuron review"),
+                   F("fuzzer", req=True, help="URL@model"), F("verify", help="URL@model"), F("per_seed", kind="int", default=5),
+                   F("max_seeds", kind="int", default=40), F("near", kind="float", default=0.4), F("out", req=True)]},
     "dep_gc": {
         "title": "Clean up build and download leftovers", "group": "Setup", "argv": [S / "dep_gc.py"],
         "help": "Interrupted downloads, Hugging Face cache blobs nothing uses, failed llama.cpp builds, __pycache__, "

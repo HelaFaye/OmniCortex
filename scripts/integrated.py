@@ -33,6 +33,16 @@ OPTIONS: dict[str, dict] = {
                    "min_pairs": ("int", 20, 1, 100000), "idle_minutes": ("int", 20, 1, 1440), "steps": ("int", 40, 1, 5000)},
         "sensitive": {"auto_train": "Starts GPU-heavy training on its own when the computer is idle. It never "
                                     "replaces a model, but it can keep a GPU busy for a long time."}},
+    "decay": {
+        "title": "Neuron aging and decay",
+        "help": "A served LoRA correction that has not been needed for a while eases off toward a floor, and returns "
+                "to full strength the moment a risky reply or a correction shows it is needed again.",
+        "fields": {"enabled": ("bool", False), "grace_days": ("float", 7.0, 0.0, 365.0),
+                   "half_life_days": ("float", 14.0, 0.1, 3650.0), "floor": ("float", 0.5, 0.0, 1.0),
+                   "risk": ("float", 0.5, 0.0, 1.0)},
+        "sensitive": {"enabled": "Changes how strongly a model's correction adapter is applied without asking. "
+                                 "With a low floor a corrected model can drift back toward its old mistakes.",
+                      "floor": "0 lets an unused correction fade away entirely."}},
     "core_shunt": {
         "title": "Core shunt (background job priority)",
         "help": "Run jobs at low priority, on the CPU's efficiency cores when it has them, so the computer stays "

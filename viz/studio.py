@@ -1886,6 +1886,8 @@ def harvest_add(req: dict) -> dict:
             SCORE_JOBS.put_nowait((m, clf, item["context"], reply, None, "wrong"))
         except queue.Full:
             pass
+    if options()["decay"]["enabled"] and model_id:
+        decay_log().trigger(model_id, "Fix This Mistake correction")
     pend = len(harvest.unused(home=os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))))
     return {"id": item["id"], "pending": pend, "auto_train": opt["auto_train"] and bool(opt["train_model"]),
             "min_pairs": opt["min_pairs"]}
@@ -1893,6 +1895,36 @@ def harvest_add(req: dict) -> dict:
 
 def _harvest_home():
     return os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
+
+
+def decay_log():
+    if STATE.get("decay_log") is None:
+        import neuron_decay
+        STATE["decay_log"] = neuron_decay.Log(os.path.join(_harvest_home(), "decay.json"))
+    return STATE["decay_log"]
+
+
+def decay_step(now=None):
+    """Neuron aging: ease the loaded model's live LoRA scale toward its floor when its corrections go unused."""
+    dc = options()["decay"]
+    m = PROC.get("model")
+    if not (dc["enabled"] and m and PROC.get("lora") and server_running()):
+        return None
+    full = float(load_settings().get(_key(m["path"]), {}).get("lora_scale", 1.0) or 0)
+    s = decay_log().decide(m["id"], full, dc, now)
+    if s is not None and abs(s - float(PROC.get("lora_scale") or 0)) >= 0.01:
+        proxy("/lora-adapters", [{"id": 0, "scale": s}], record=False)
+        PROC["lora_scale"] = s
+    return s
+
+
+def decay_loop():
+    while True:
+        time.sleep(3600)
+        try:
+            decay_step()
+        except Exception as e:
+            print(f"[studio] decay: {e}", file=sys.stderr)
 
 
 def harvest_autotrain_loop():
@@ -2321,6 +2353,9 @@ def score_worker():
                                              risk=res.get("prob"))
                 except Exception as e:
                     print(f"[studio] activation record failed: {e}", file=sys.stderr)
+            dc = options()["decay"]
+            if dc["enabled"] and isinstance(res.get("prob"), (int, float)) and res["prob"] >= dc["risk"]:
+                decay_log().trigger(model["id"], f"risky reply ({res['prob']:.2f})")
             if clf and res.get("score") is not None:
                 STATE["stats"].record(model["id"], "activation", size=model["size"], subject=subject,
                                       h_score=res["score"], prob=res["prob"], n_tokens=res["n_tokens"],
@@ -5293,7 +5328,10 @@ class Handler(BaseHTTPRequestHandler):
                 import integrated
                 import core_shunt
                 return self._json(200, {"options": integrated.describe(load_studio_config().get("options")),
-                                        "core_shunt": core_shunt.describe(options()["core_shunt"])})
+                                        "core_shunt": core_shunt.describe(options()["core_shunt"]),
+                                        "decay": {k: {"scale": v.get("scale"), "last_trigger": v.get("last_trigger"),
+                                                      "events": v.get("events", [])[-5:]}
+                                                  for k, v in decay_log().d["models"].items()}})
             if self.path == "/api/settings/sharing":
                 import score_cards
                 cache = STATE.get("hf_checks", {})
@@ -6747,6 +6785,7 @@ def main(argv=None):
         STATE["jobs"].on_finish = job_finished
         apply_options()
         threading.Thread(target=harvest_autotrain_loop, daemon=True).start()
+    threading.Thread(target=decay_loop, daemon=True).start()
 
     scheme = "https" if tls else "http"
     print(f"OmniCortex Studio on {scheme}://{a.host}:{a.port}")

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added (integrated options, second batch)
+
+- `quant_mask.py`: more precision for the layers with the most H-neurons, less for the safest, plus an importance matrix from mistake contexts.
+- `model_lab.py jitter` (brittle layers under noise, DPO pairs from flipped items) and `model_lab.py hijack` (cross-layer back-patching, optionally gated by a feature direction).
+- Neuron aging and decay: a served LoRA correction eases off when unused and returns at full strength when needed (off by default).
+- `neuro_fuzz.py`: new, verified, deduplicated TestQA items aimed at the model's failures and risky replies.
+
 ### Added (integrated options, first batch)
 
 - Fix This Mistake: a **fix** button under each reply keeps your correction as a training pair (and the reply's activations as a known mistake); an optional idle-time DPO micro-tune.
