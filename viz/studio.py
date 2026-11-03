@@ -1610,7 +1610,7 @@ def chat_with_tools(wfile, payload: dict, msgs: list, hub, upstream=None) -> dic
     out = {"text": ""}
     for _ in range(MAX_TOOL_ROUNDS):
         payload["messages"] = msgs
-        out = proxy("/v1/chat/completions", payload, stream_to=wfile, hold_done=True, upstream=upstream)
+        out = proxy("/v1/chat/completions", payload, stream_to=wfile, hold_done=True, upstream=upstream, guard=True)
         calls = out.get("tool_calls") or []
         if not calls:
             break
@@ -1857,11 +1857,76 @@ def context_usage(req: dict, role: str) -> dict:
 CHAT_PATHS = ("/v1/chat/completions", "/v1/completions")
 
 
-def proxy(path, payload, stream_to=None, hold_done=False, upstream=None, record=True, source="api"):
+def options() -> dict:
+    """Settings → Integrated options (scripts/integrated.py)."""
+    import integrated
+    return integrated.merged(load_studio_config().get("options"))
+
+
+def apply_options() -> None:
+    """Push settings that live outside a request: the job runner's priority and cores (core shunt)."""
+    if STATE.get("jobs") is not None:
+        STATE["jobs"].shunt = options()["core_shunt"]
+
+
+def harvest_add(req: dict) -> dict:
+    import harvest
+    opt = options()["harvest"]
+    if not opt["enabled"]:
+        raise ValueError("Fix This Mistake is turned off (Settings → Integrated options)")
+    model_id = str(req.get("model") or "")
+    msgs = req.get("messages") if isinstance(req.get("messages"), list) else []
+    reply = str(req.get("reply") or "")
+    item = harvest.add(model_id, msgs, reply, str(req.get("correction") or ""), str(req.get("note") or ""),
+                       home=os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json")))
+    m = find_model(model_id) if model_id else None
+    if m is not None and STATE.get("cett") and activation_settings()["collect"]:
+        clf = load_settings().get(_key(m["path"]), {}).get("classifier")
+        try:                         # the reply's activations, as a known mistake, for the neuron review
+            SCORE_JOBS.put_nowait((m, clf, item["context"], reply, None, "wrong"))
+        except queue.Full:
+            pass
+    pend = len(harvest.unused(home=os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))))
+    return {"id": item["id"], "pending": pend, "auto_train": opt["auto_train"] and bool(opt["train_model"]),
+            "min_pairs": opt["min_pairs"]}
+
+
+def _harvest_home():
+    return os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
+
+
+def harvest_autotrain_loop():
+    """Fix This Mistake's micro-tune: when enough new pairs wait and the computer has been idle long enough."""
+    from neuronscope_remote import presence as ns_presence
+    while True:
+        time.sleep(300)
+        try:
+            opt = options()["harvest"]
+            if not (opt["enabled"] and opt["auto_train"] and opt["train_model"]) or STATE.get("jobs") is None:
+                continue
+            import harvest
+            if len(harvest.unused(home=_harvest_home())) < opt["min_pairs"]:
+                continue
+            idle = ns_presence.snapshot().get("idle_s")
+            if idle is None or idle < opt["idle_minutes"] * 60 or ACTIVITY["active"] > 0:
+                continue
+            if any(j.get("kind") == "harvest_train" and j.get("status") == "running" for j in STATE["jobs"].list()):
+                continue
+            STATE["jobs"].start("harvest_train", {"model": opt["train_model"], "steps": opt["steps"],
+                                                  "min": opt["min_pairs"],
+                                                  "out": f"runs/harvest/{time.strftime('%Y%m%d-%H%M%S')}"})
+        except Exception as e:
+            print(f"[studio] harvest auto-train: {e}", file=sys.stderr)
+
+
+def proxy(path, payload, stream_to=None, hold_done=False, upstream=None, record=True, source="api", guard=False):
     """_proxy, with each chat reply written to the work log (who answered, on what, its tokens and time).
-    record=False for a call its caller logs itself (a project task)."""
+    record=False for a call its caller logs itself (a project task). guard: Studio's own chat, which can be
+    told to trim text it already shows, so Neural Reset may cut a looping reply and resume it."""
+    if upstream is not None and path in CHAT_PATHS and options()["sanitizer"]["enabled"]:
+        return _sanitized(path, payload, stream_to, hold_done, upstream, record, source, guard)
     if not record or path not in CHAT_PATHS:
-        return _proxy(path, payload, stream_to, hold_done, upstream)
+        return _proxy(path, payload, stream_to, hold_done, upstream, guard=guard)
     t0, meas, err = time.time(), {}, None
     worker = model = host = device = None
     if upstream is not None:
@@ -1872,7 +1937,7 @@ def proxy(path, payload, stream_to=None, hold_done=False, upstream=None, record=
         worker = model = PROC["model"]["id"]
         device = chat_device()
     try:
-        out = _proxy(path, payload, stream_to, hold_done, upstream, meas)
+        out = _proxy(path, payload, stream_to, hold_done, upstream, meas, guard=guard)
         if isinstance(out, dict) and ("usage" in out or "timings" in out):
             meas.update(ns_work.llama_timings(out))
         return out
@@ -1884,7 +1949,75 @@ def proxy(path, payload, stream_to=None, hold_done=False, upstream=None, record=
                  seconds=time.time() - t0, source=source, **meas)
 
 
-def _proxy(path, payload, stream_to=None, hold_done=False, upstream=None, meas=None):
+class _RestoringWriter:
+    """Wraps the client's stream: puts the sanitizer's placeholders back into each SSE delta."""
+
+    def __init__(self, w, sess):
+        import sanitizer
+        self.w, self.r = w, sanitizer.StreamRestorer(sess)
+
+    def write(self, raw):
+        line = raw.decode(errors="replace")
+        if line.startswith("data:") and "[DONE]" not in line:
+            try:
+                d = json.loads(line[5:])
+                for ch in d.get("choices") or []:
+                    dl = ch.get("delta") or {}
+                    if isinstance(dl.get("content"), str):
+                        dl["content"] = self.r.feed(dl["content"])
+                        if ch.get("finish_reason"):
+                            dl["content"] += self.r.flush()
+                raw = f"data: {json.dumps(d)}\n".encode()
+            except (ValueError, TypeError):
+                pass
+        elif "[DONE]" in line:
+            rest = self.r.flush()
+            if rest:
+                self.w.write(f"data: {json.dumps({'choices': [{'index': 0, 'delta': {'content': rest}}]})}\n\n".encode())
+        self.w.write(raw)
+
+    def flush(self):
+        self.w.flush()
+
+
+def _sanitized(path, payload, stream_to, hold_done, upstream, record, source, guard):
+    """A chat for a linked host: placeholders out, real values back in (scripts/sanitizer.py)."""
+    import sanitizer
+    sess = sanitizer.Session(options()["sanitizer"])
+    clean = {**payload, "messages": sess.clean_messages(payload.get("messages") or [])}
+    w = _RestoringWriter(stream_to, sess) if stream_to is not None else None
+    out = _proxy_logged(path, clean, w, hold_done, upstream, record, source, guard)
+    if isinstance(out, dict):
+        if isinstance(out.get("text"), str):
+            out["text"] = sess.restore(out["text"])
+        for ch in out.get("choices") or []:
+            msg = ch.get("message") or {}
+            if isinstance(msg.get("content"), str):
+                msg["content"] = sess.restore(msg["content"])
+        out["sanitized"] = {k: n for k, n in sess.counts.items()}
+    return out
+
+
+def _proxy_logged(path, payload, stream_to, hold_done, upstream, record, source, guard):
+    if not record:
+        return _proxy(path, payload, stream_to, hold_done, upstream, guard=guard)
+    t0, meas, err = time.time(), {}, None
+    host = upstream.get("name") or "linked host"
+    model = payload.get("model")
+    try:
+        out = _proxy(path, payload, stream_to, hold_done, upstream, meas, guard=guard)
+        if isinstance(out, dict) and ("usage" in out or "timings" in out):
+            meas.update(ns_work.llama_timings(out))
+        return out
+    except Exception as e:
+        err = f"{type(e).__name__}: {e}"
+        raise
+    finally:
+        log_work("chat", f"{host}{LINK_SEP}{model}" if model else host, model=model, host=host, error=err,
+                 seconds=time.time() - t0, source=source, **meas)
+
+
+def _proxy(path, payload, stream_to=None, hold_done=False, upstream=None, meas=None, guard=False):
     """Forward to the running llama-server. Streams SSE when asked.
 
     Streaming matters here: on an iGPU at a few tokens per second, a
@@ -1913,31 +2046,61 @@ def _proxy(path, payload, stream_to=None, hold_done=False, upstream=None, meas=N
         opener = lambda: urllib.request.urlopen(req, timeout=900)  # noqa: E731
     # Stream through untouched, keeping a copy of the text for stats.
     text, calls, finish = [], {}, None
-    r = opener()
-    with r:
-        for raw in r:
-            line = raw.decode(errors="replace").strip()
-            if hold_done and line.startswith("data:") and line[5:].strip() == "[DONE]":
-                continue
-            stream_to.write(raw)
-            stream_to.flush()
-            if line.startswith("data:") and "[DONE]" not in line:
-                try:
-                    d = json.loads(line[5:])
-                    if meas is not None and ("usage" in d or "timings" in d):
-                        meas.update(ns_work.llama_timings(d))
-                    ch = d["choices"][0]
-                    delta = ch.get("delta") or {}
-                    text.append(delta.get("content") or "")
-                    finish = ch.get("finish_reason") or finish
-                    for tc in delta.get("tool_calls") or []:
-                        c = calls.setdefault(tc.get("index", 0), {"id": "", "name": "", "arguments": ""})
-                        c["id"] = tc.get("id") or c["id"]
-                        fn = tc.get("function") or {}
-                        c["name"] += fn.get("name") or ""
-                        c["arguments"] += fn.get("arguments") or ""
-                except (ValueError, KeyError, IndexError, TypeError):
-                    pass
+    lg = None
+    if guard and path == "/v1/chat/completions":
+        nr = options()["neural_reset"]
+        if nr["enabled"] and nr["max_resets"] > 0:
+            import loopguard
+            lg = loopguard.Guard(max_resets=nr["max_resets"], min_repeats=nr["min_repeats"], min_span=nr["min_span"])
+    while True:
+        hit = None
+        r = opener()
+        with r:
+            for raw in r:
+                line = raw.decode(errors="replace").strip()
+                if hold_done and line.startswith("data:") and line[5:].strip() == "[DONE]":
+                    continue
+                stream_to.write(raw)
+                stream_to.flush()
+                if line.startswith("data:") and "[DONE]" not in line:
+                    try:
+                        d = json.loads(line[5:])
+                        if meas is not None and ("usage" in d or "timings" in d):
+                            meas.update(ns_work.llama_timings(d))
+                        ch = d["choices"][0]
+                        delta = ch.get("delta") or {}
+                        text.append(delta.get("content") or "")
+                        finish = ch.get("finish_reason") or finish
+                        for tc in delta.get("tool_calls") or []:
+                            c = calls.setdefault(tc.get("index", 0), {"id": "", "name": "", "arguments": ""})
+                            c["id"] = tc.get("id") or c["id"]
+                            fn = tc.get("function") or {}
+                            c["name"] += fn.get("name") or ""
+                            c["arguments"] += fn.get("arguments") or ""
+                    except (ValueError, KeyError, IndexError, TypeError):
+                        pass
+                    if lg is not None and not calls and delta.get("content"):
+                        hit = lg.check("".join(text))
+                        if hit:
+                            break
+        if not hit:
+            break
+        # Neural Reset: keep the reply up to the loop, tell the page to trim, resume past it
+        import loopguard
+        full = "".join(text)
+        kept = loopguard.keep_upto(full, hit)
+        text, finish = [kept], None
+        stream_to.write(f"data: {json.dumps({'neural_reset': {'drop': len(full) - len(kept), 'unit': hit['unit'][:120], 'repeats': hit['repeats']}})}\n\n".encode())
+        stream_to.flush()
+        payload = loopguard.resume_payload(payload, kept, hit)
+        if upstream is not None:
+            opener = lambda p=payload: _upstream_stream(upstream, path, p)  # noqa: E731
+        else:
+            req2 = urllib.request.Request(f"http://127.0.0.1:{PROC['port']}{path}", method="POST",
+                                          data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
+            opener = lambda q=req2: urllib.request.urlopen(q, timeout=900)  # noqa: E731
+        if meas is not None:
+            meas["neural_resets"] = meas.get("neural_resets", 0) + 1
     return {"text": "".join(text), "tool_calls": [calls[k] for k in sorted(calls)], "finish_reason": finish}
 
 
@@ -2138,7 +2301,8 @@ def note_reply(model, messages, text):
 
 def score_worker():
     while True:
-        model, clf, messages, text, subject = SCORE_JOBS.get()
+        model, clf, messages, text, subject, *extra = SCORE_JOBS.get()
+        verdict = extra[0] if extra else "unknown"          # "wrong" for a reply fixed with Fix This Mistake
         # Activation scoring is an extra prefill; wait for a quiet moment.
         while ACTIVITY["active"] > 0:
             time.sleep(1)
@@ -2150,8 +2314,10 @@ def score_worker():
             if "cett" in res and activation_settings()["collect"]:
                 try:
                     import neuron_review
-                    activation_sink().record(model["id"], neuron_review.bin_profile(res["cett"]), source="live",
-                                             kind="observed", subjects=[subject] if subject else None,
+                    activation_sink().record(model["id"], neuron_review.bin_profile(res["cett"]),
+                                             source="harvest" if verdict != "unknown" else "live",
+                                             kind="labelled" if verdict != "unknown" else "observed",
+                                             subjects=[subject] if subject else None, verdict=verdict,
                                              risk=res.get("prob"))
                 except Exception as e:
                     print(f"[studio] activation record failed: {e}", file=sys.stderr)
@@ -5123,6 +5289,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, workspaces_state())
             if self.path == "/api/settings/activations":
                 return self._json(200, activation_status())
+            if self.path == "/api/settings/options":
+                import integrated
+                import core_shunt
+                return self._json(200, {"options": integrated.describe(load_studio_config().get("options")),
+                                        "core_shunt": core_shunt.describe(options()["core_shunt"])})
             if self.path == "/api/settings/sharing":
                 import score_cards
                 cache = STATE.get("hf_checks", {})
@@ -5173,6 +5344,17 @@ class Handler(BaseHTTPRequestHandler):
             save_studio_config({"subject_models": clean})
             STATE["subject_models"] = clean
             return self._json(200, {"subjects": subject_defaults()})
+        if self.path == "/api/settings/options":
+            import integrated
+            saved = load_studio_config().get("options") or {}
+            try:
+                vals = integrated.validate(str(req.get("name") or ""), req.get("values") or {}, integrated.merged(saved))
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+            saved[req["name"]] = vals
+            save_studio_config({"options": saved})
+            apply_options()
+            return self._json(200, integrated.describe(saved))
         if self.path == "/api/settings/activations":
             import activation_store
             cur = activation_settings()
@@ -5542,6 +5724,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._requirements()
         if self.path.startswith("/api/hw-profiles"):
             return self._hw_profiles(None)
+        if self.path == "/api/harvest":
+            import harvest
+            its = harvest.items(home=_harvest_home())
+            return self._json(200, {"settings": options()["harvest"], "pairs": [
+                {k: it.get(k) for k in ("id", "t", "model", "note", "used_in")} | {"question": it["context"][-1]["content"][:200]}
+                for it in its[-200:]], "unused": sum(1 for i in its if not i.get("used_in"))})
+        if self.path == "/api/env/snapshot":
+            import dep_snapshot
+            return self._json(200, dep_snapshot.snapshot([os.path.dirname(STATE["cett"])] if STATE.get("cett") else None))
         if self.path.split("?")[0] == "/api/lookup":
             q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             try:
@@ -5549,7 +5740,7 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 return self._json(400, {"error": str(e)})
         if self.path in ("/settings", "/api/workspaces", "/api/settings", "/api/settings/sharing", "/api/settings/permissions",
-                         "/api/settings/activations"):
+                         "/api/settings/activations", "/api/settings/options"):
             return self._settings()
         if self.path.startswith("/api/fs/"):
             # The folder browser: the owner's own files on Studio's computer.
@@ -5869,6 +6060,34 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
 
             if self.path.startswith("/api/hw-profiles/"):
                 return self._hw_profiles(self._read())
+
+            if self.path in ("/api/harvest", "/api/harvest/delete"):
+                if not self._owner_only():
+                    return
+                req = self._read(MAX_BODY)
+                if self.path == "/api/harvest/delete":
+                    import harvest
+                    return self._json(200, {"removed": harvest.remove(str(req.get("id") or ""), home=_harvest_home())})
+                try:
+                    return self._json(200, harvest_add(req))
+                except ValueError as e:
+                    return self._json(400, {"error": str(e)})
+
+            if self.path == "/api/env/compare":
+                # this computer's dependencies against a linked host's (scripts/dep_snapshot.py)
+                import dep_snapshot
+                req = self._read()
+                ln = next((x for x in load_links() if x["name"] == req.get("link") and x.get("kind") != "agent"), None)
+                if ln is None:
+                    return self._json(404, {"error": "no such linked Studio"})
+                try:
+                    there = ns_pairing.request(ln["url"], "GET", "/api/env/snapshot", None, token=ln["token"],
+                                               fingerprint=ln.get("fingerprint", ""), timeout=30)
+                except Exception as e:
+                    return self._json(502, {"error": f"{ln['name']}: {e}"})
+                here = dep_snapshot.snapshot([os.path.dirname(STATE["cett"])] if STATE.get("cett") else None)
+                d = dep_snapshot.diff(here, there)
+                return self._json(200, {**d, "plan": dep_snapshot.plan(d), "there": ln["name"]})
 
             if self.path.startswith("/api/workspaces/") or self.path.startswith("/api/settings/"):
                 return self._settings()
@@ -6316,7 +6535,8 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                     if hub is not None and hub.openai_tools():
                         out = chat_with_tools(self.wfile, payload, msgs, hub, upstream=upstream)
                     else:
-                        out = proxy("/v1/chat/completions", payload, stream_to=self.wfile, upstream=upstream)
+                        out = proxy("/v1/chat/completions", payload, stream_to=self.wfile, upstream=upstream,
+                                    source="chat", guard=True)
                     if target is not None:
                         note_reply(target, msgs, out["text"])
                 except Exception as e:
@@ -6525,6 +6745,8 @@ def main(argv=None):
     else:
         STATE["jobs"] = ns_jobs.JobRunner(a.jobs_dir, a.max_jobs, cwd=ws["root"])
         STATE["jobs"].on_finish = job_finished
+        apply_options()
+        threading.Thread(target=harvest_autotrain_loop, daemon=True).start()
 
     scheme = "https" if tls else "http"
     print(f"OmniCortex Studio on {scheme}://{a.host}:{a.port}")

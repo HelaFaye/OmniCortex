@@ -518,6 +518,25 @@ SPECS.update({
                    U("ids_path", default="data/train_qids.json"), U("output_root", default="data/activations"),
                    U("locations", multi=True, choices=LOCS, default=["answer_tokens", "all_except_answer_tokens"]),
                    U("gpu_mem", help="e.g. 14GiB; empty = CPU"), U("cpu_mem", help="e.g. 40GiB"), TRUST]},
+    "harvest_train": {
+        "title": "Fix This Mistake: micro-tune on the kept pairs", "group": "Retrain",
+        "argv": [S / "harvest.py", "train"],
+        "help": "A short SFT + DPO run (finetune.py) on the corrections kept with Fix this mistake that no earlier "
+                "run used. Writes an adapter; nothing is installed.",
+        "fields": [F("model", req=True, help="HF id or path of the base model the chat model came from"),
+                   F("out", req=True), F("steps", kind="int", default=40), F("min", kind="int", default=1,
+                   help="do nothing unless this many new pairs wait"), F("method", choices=["qlora", "lora"], default="qlora")]},
+    "dep_gc": {
+        "title": "Clean up build and download leftovers", "group": "Setup", "argv": [S / "dep_gc.py"],
+        "help": "Interrupted downloads, Hugging Face cache blobs nothing uses, failed llama.cpp builds, __pycache__, "
+                "pip's cache, add-on packages no longer installed. Lists them; deletes only with apply. Models, "
+                "workspaces and settings are never touched.",
+        "fields": [F("models", repeat=True, help="a model folder to check"), F("llama", repeat=True, help="a llama.cpp checkout"),
+                   F("apply", kind="bool", help="delete what is listed")]},
+    "dep_snapshot": {
+        "title": "Environment snapshot", "group": "Setup", "argv": [S / "dep_snapshot.py", "snapshot"],
+        "help": "Every package, the PyTorch build and the llama.cpp tools on this computer, as JSON to compare with "
+                "another (dep_snapshot.py diff).", "fields": [F("out", req=True)]},
     "hw_apply": {
         "title": "Hardware: apply a support profile", "group": "Setup", "argv": [S / "hw_profiles.py", "apply"],
         "help": "Build llama.cpp and install PyTorch the way a hardware support profile says, for one purpose "
@@ -998,6 +1017,7 @@ def explain_failure(text: str) -> dict | None:
 
 class JobRunner:
     on_finish = None          # callable(job meta), run when a job ends (Studio: automatic score submission)
+    shunt = None              # core_shunt settings: priority and cores for every job
 
     def __init__(self, root: str | Path, max_running: int = 2, cwd: str | Path | None = None):
         """cwd: where jobs run, so the pipeline's relative data/, models/ and runs/
@@ -1031,12 +1051,17 @@ class JobRunner:
             d.mkdir(parents=True)
             log = open(d / "log.txt", "wb")
             env = dict(os.environ, PYTHONUNBUFFERED="1")
+            if str(S) not in sys.path:
+                sys.path.insert(0, str(S))
+            import core_shunt
             proc = subprocess.Popen(argv, stdout=log, stderr=subprocess.STDOUT, cwd=str(self.cwd if self.cwd.is_dir() else ROOT), env=env,
-                                    start_new_session=True)
+                                    start_new_session=True, **core_shunt.popen_kwargs(self.shunt))
+            shunted = core_shunt.apply(proc.pid, self.shunt)    # low priority, efficiency cores (Integrated options)
             log.close()
             self.procs[jid] = proc
             meta = {"id": jid, "kind": kind, "title": all_specs()[kind]["title"], "values": values, "argv": argv[1:],
-                    "status": "running", "pid": proc.pid, "started": time.time(), "ended": None, "returncode": None}
+                    "status": "running", "pid": proc.pid, "started": time.time(), "ended": None, "returncode": None,
+                    "shunt": shunted}
             self._write(meta)
         threading.Thread(target=self._wait, args=(jid, proc), daemon=True).start()
         return meta

@@ -645,11 +645,12 @@ function bubble(role,content,extra={}){
   if(extra.sources) showSources(d.querySelector('.src'),extra.sources);
   for(const t of extra.tools||[]) toolCard(d.querySelector('.tools'),t);
   if(role==='assistant'){ const a=d.querySelector('.acts');
-    a.innerHTML='<button data-a="copy">copy</button><button data-a="regen">regenerate</button><button data-a="check" title="score each token of this reply for hallucination risk">check</button><button data-a="explain" title="every way to look inside this reply: which can run here, and what each answers">explain</button>';
+    a.innerHTML='<button data-a="copy">copy</button><button data-a="regen">regenerate</button><button data-a="check" title="score each token of this reply for hallucination risk">check</button><button data-a="explain" title="every way to look inside this reply: which can run here, and what each answers">explain</button><button data-a="fix" title="Fix this mistake: write what it should have said; the pair is kept for training (Settings → Integrated options)">fix</button>';
     a.querySelector('[data-a=copy]').onclick=()=>navigator.clipboard.writeText(d.querySelector('.body').textContent);
     a.querySelector('[data-a=regen]').onclick=regenerate;
     a.querySelector('[data-a=check]').onclick=()=>checkReply(d);
     a.querySelector('[data-a=explain]').onclick=()=>explainReply(d);
+    a.querySelector('[data-a=fix]').onclick=()=>fixMistake(d);
     if(PLUGIN_CHECKS.length){ const b=document.createElement('button'); b.textContent='plugins'; b.title='run the checks from your plugins: '+PLUGIN_CHECKS.map(c=>c.title).join(', '); b.onclick=()=>pluginChecks(d,false); a.appendChild(b); }
     if(extra.check) showRisk(d.querySelector('.risk'),extra.check);
     if(extra.plugin_checks) showPluginChecks(d,extra.plugin_checks);
@@ -774,6 +775,24 @@ function showConfidence(d,c){ let el=d.querySelector('.conf'); if(!el){ el=docum
   el.querySelector('[data-a=ctog]').onclick=e=>{ e.preventDefault(); const rt=el.querySelector('.rt');
     if(!rt.innerHTML) rt.innerHTML=c.pieces.map((t,i)=>`<span class="${set.has(i)?'fl':''}" title="spread ${(c.u[i]*100).toFixed(0)}% · p ${(c.p[i]*100).toFixed(0)}%" style="background:color-mix(in srgb,var(--warn,#a8701c) ${Math.round(Math.min(1,c.u[i]/CONF_U)*(set.has(i)?45:20))}%,transparent)">${esc(t)}</span>`).join('');
     rt.hidden=!rt.hidden; e.target.textContent=(rt.hidden?'show':'hide')+' tokens'; }; }
+// Fix This Mistake: the correction and the reply become a training pair (scripts/harvest.py)
+function fixMistake(d){
+  const box=d.querySelector('.pchk'); if(box.querySelector('.fixbox')) return box.querySelector('.fixbox textarea').focus();
+  const msg=d._msg; const reply=msg?textOf(msg.content):d.querySelector('.body').textContent;
+  const f=document.createElement('div'); f.className='fixbox note';
+  f.innerHTML=`<b>Fix this mistake</b> · write the reply it should have given. The pair (this reply rejected, yours chosen) is kept for training.
+    <textarea rows="6" style="width:100%;margin:.3rem 0"></textarea><input placeholder="what was wrong (optional)" style="width:100%">
+    <div style="margin-top:.3rem"><button data-f="save">Save the pair</button> <button data-f="cancel">Cancel</button> <span class="k"></span></div>`;
+  f.querySelector('textarea').value=reply; box.appendChild(f); f.querySelector('textarea').focus();
+  f.querySelector('[data-f=cancel]').onclick=()=>f.remove();
+  f.querySelector('[data-f=save]').onclick=async()=>{
+    const i=chat.messages.indexOf(msg); const ctx=(i>=0?chat.messages.slice(0,i):chat.messages).map(m=>({role:m.role,content:textOf(m.content)}));
+    const r=await fetch('/api/harvest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:(msg&&msg.model)||$('#model')?.value||'',
+      messages:ctx,reply,correction:f.querySelector('textarea').value,note:f.querySelector('input').value})});
+    const j=await r.json(); const k=f.querySelector('.k');
+    if(!r.ok){ k.textContent=j.error||'not saved'; k.className='k bad'; return; }
+    f.innerHTML=`✓ kept for training (${j.pending} pair${j.pending===1?'':'s'} waiting${j.auto_train?`; a micro-tune runs after ${j.min_pairs}, when idle`:''}). <a href="/settings#options">Settings</a>`; };
+}
 async function checkReply(d){
   const m=d._msg; if(!m) return;
   const idx=chat.messages.indexOf(m), el=d.querySelector('.risk');
@@ -811,7 +830,7 @@ $('#f').onsubmit=async e=>{
 async function regenerate(){ if(busy) return; while(chat.messages.length && chat.messages.at(-1).role==='assistant') chat.messages.pop(); renderChat(); await stream(); }
 async function stream(){
   busy=true; $('#send').textContent='Stop'; ctrl=new AbortController();
-  const out=bubble('assistant','',{think:''}); const lp=[]; let acc='', think='', t0=performance.now(), tFirst=0, usage=null, timings=null, routeNote='', sources=null, tools=[], servedBy=null, compressed=null;
+  const out=bubble('assistant','',{think:''}); const lp=[]; let acc='', resets=0, think='', t0=performance.now(), tFirst=0, usage=null, timings=null, routeNote='', sources=null, tools=[], servedBy=null, compressed=null;
   try{
     const r=await fetch('/api/chat',{method:'POST',signal:ctrl.signal,headers:{'Content-Type':'application/json'},
       body:JSON.stringify({messages:chat.messages.map(m=>({role:m.role,content:m.content})),preset:$('#preset').value,model:$('#modelPick').value,
@@ -836,6 +855,8 @@ async function stream(){
         if(j.compressed){ compressed=j.compressed; const h=j.compressed.history;
           if(h&&h.history==='summarized') chat.summary={upto:h.upto,text:h.summary};
           out.stats.textContent=cmpNote(j.compressed); continue; }
+        if(j.neural_reset){ acc=acc.slice(0,Math.max(0,acc.length-j.neural_reset.drop)); resets++;
+          out.body.innerHTML=render(acc); out.stats.textContent=`↺ Neural Reset: a ${j.neural_reset.repeats}× loop was cut and the reply resumed`; continue; }
         if(j.tool_call){ tools.push(j.tool_call); toolCard(out.tools,j.tool_call); $('#log').scrollTop=1e9; continue; }
         if(j.tool_result){ const t=tools.find(x=>x.key===j.tool_result.key); if(t){ t.result=j.tool_result; t.decided=true; toolCard(out.tools,t); } continue; }
         if(j.usage) usage=j.usage; if(j.timings) timings=j.timings;
@@ -852,7 +873,7 @@ async function stream(){
   const secs=(performance.now()-(tFirst||t0))/1000;
   const ntok=usage?.completion_tokens ?? timings?.predicted_n;
   const tps=timings?.predicted_per_second ?? (ntok?ntok/secs:null);
-  const stats=[ntok?`${ntok} tokens`:null, tps?`${tps.toFixed(1)} tok/s`:null, tFirst?`first token ${((tFirst-t0)/1000).toFixed(2)}s`:null].filter(Boolean).join(' · ');
+  const stats=[resets?`↺ ${resets} loop${resets>1?'s':''} cut (Neural Reset)`:null, ntok?`${ntok} tokens`:null, tps?`${tps.toFixed(1)} tok/s`:null, tFirst?`first token ${((tFirst-t0)/1000).toFixed(2)}s`:null].filter(Boolean).join(' · ');
   const fullStats=[routeNote,stats,compressed?cmpNote(compressed):''].filter(Boolean).join(' · ');
   out.stats.textContent=fullStats;
   let msg=null;

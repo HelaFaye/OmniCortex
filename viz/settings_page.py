@@ -56,7 +56,7 @@ dialog.dlg::backdrop{background:rgba(0,0,0,.5)}dialog.dlg form{padding:1rem 1.1r
 </style>
 <header><h1>Studio · Settings</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/lab">Lab</a><a href="/review">Review</a><a href="/projects">Projects</a><a href="/workers">Workers</a><a href="/jobs">Jobs</a><a href="/connect">Connect</a></header>
 <main>
-<nav class="toc"><a href="#appearance">Appearance</a><a href="#workspaces">Workspaces</a><a href="#subjects">Models per subject</a><a href="#connectors">Connectors</a><a href="#tools">Tool approval</a><a href="#permissions">Permissions</a><a href="#activations">Activations</a><a href="#sharing">Sharing results</a><a href="#plugins">Plugins</a><span class="note">Behaviour (unloading, routing thresholds, workers) and building llama.cpp are on <a href="/setup">Setup</a>.</span></nav>
+<nav class="toc"><a href="#appearance">Appearance</a><a href="#workspaces">Workspaces</a><a href="#subjects">Models per subject</a><a href="#connectors">Connectors</a><a href="#tools">Tool approval</a><a href="#permissions">Permissions</a><a href="#activations">Activations</a><a href="#options">Integrated options</a><a href="#sharing">Sharing results</a><a href="#plugins">Plugins</a><span class="note">Behaviour (unloading, routing thresholds, workers) and building llama.cpp are on <a href="/setup">Setup</a>.</span></nav>
 
 <section class="card" id="appearance"><h2>Appearance</h2>
 <div class="note">A theme colours Studio's pages, its charts (the model radar) and the 3D views of activations and hallucination risk. Your choice is kept in this browser; <b>Make default</b> sets it for browsers that have not chosen one, and for the Godot client's 3D view.</div>
@@ -156,6 +156,12 @@ dialog.dlg::backdrop{background:rgba(0,0,0,.5)}dialog.dlg form{padding:1rem 1.1r
 <label title="The oldest observations are removed when the store grows past this (0: no limit)">Keep at most <input id="acMax" type="number" min="0" step="1" style="width:6rem" data-locked="The size cap removes the oldest recorded activations for good when the store grows past it. Lowering it can delete months of history at once; 0 lets the store grow until the disk is full."> GB</label>
 <label title="While the destination cannot be reached, keep waiting profiles in a file too"><input type="checkbox" id="acSpool"> Keep waiting profiles in a file while the destination is unreachable</label>
 <div class="row" style="margin-top:.4rem"><button class="pri" id="acSave">Save</button><button id="acRetry" title="deliver waiting profiles now">Send waiting now</button><span id="acMsg" class="note"></span></div>
+</section>
+
+<section class="card" id="options"><h2>Integrated options</h2>
+<div class="note">Built-in behaviours you can tune or turn off: what each does, and where it stops short of the idea behind it, is in <code>docs/INTEGRATED_OPTIONS.md</code>. Settings marked with a lock can break things; unlock them to edit.</div>
+<div id="opCore" class="note" style="margin:.4rem 0"></div>
+<div id="opList"></div><span id="opMsg" class="note"></span>
 </section>
 
 <section class="card" id="sharing"><h2>Sharing results</h2>
@@ -470,6 +476,25 @@ $('#acSave').onclick=async()=>{ const body={collect:$('#acOn').checked,every:+$(
   $('#acMsg').textContent=r.ok?'Saved.':(await r.json()).error; if(r.ok) acLoad(); };
 $('#acRetry').onclick=async()=>{ const r=await (await fetch('/api/settings/activations/retry',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).json(); $('#acMsg').textContent=`${r.delivered} delivered.`; acLoad(); };
 acLoad();
+async function opLoad(){ let j; try{ j=await (await fetch('/api/settings/options')).json(); }catch(e){ return; }
+  const cs=j.core_shunt; $('#opCore').textContent=`Core shunt here: ${cs.system}`+(cs.efficiency_cores.length?`, efficiency cores ${cs.efficiency_cores.join(',')}`:', no efficiency cores found')+
+    (cs.macos_background_qos?', jobs get macOS background QoS':'');
+  $('#opList').innerHTML=Object.entries(j.options).map(([name,o])=>`<details class="opt" data-op="${esc(name)}" style="margin:.4rem 0"><summary><b>${esc(o.title)}</b>
+    <span class="note">${'enabled' in o.values?(o.values.enabled?'on':'off'):''}</span></summary><div class="note">${esc(o.help)}</div>
+    ${Object.entries(o.fields).map(([f,spec])=>{ const v=o.values[f], lock=o.sensitive[f]?` data-locked="${esc(o.sensitive[f])}"`:'', id=`op-${name}-${f}`;
+      const lab=f.replace(/_/g,' ');
+      if(spec.kind==='bool') return `<label><input type="checkbox" id="${id}" ${v?'checked':''}${lock}> ${esc(lab)}</label>`;
+      if(spec.kind==='choice') return `<label>${esc(lab)} <select id="${id}"${lock}>${spec.choices.map(c=>`<option ${c===v?'selected':''}>${esc(c)}</option>`).join('')}</select></label>`;
+      if(spec.kind==='list') return `<label>${esc(lab)} <textarea id="${id}" rows="2" style="width:100%" placeholder="one per line"${lock}>${esc((v||[]).join('\n'))}</textarea></label>`;
+      const num=spec.kind==='int'||spec.kind==='float';
+      return `<label>${esc(lab)} <input id="${id}" ${num?`type="number" min="${spec.min}" max="${spec.max}" style="width:7rem"`:''} value="${esc(v)}"${lock}></label>`; }).join(' ')}
+    <div class="row" style="margin-top:.3rem"><button class="pri" data-opsave="${esc(name)}">Save</button></div></details>`).join('');
+  document.querySelectorAll('[data-opsave]').forEach(b=>b.onclick=async()=>{ const name=b.dataset.opsave, o=j.options[name], values={};
+    for(const [f,spec] of Object.entries(o.fields)){ const el=document.getElementById(`op-${name}-${f}`);
+      values[f]=spec.kind==='bool'?el.checked:spec.kind==='list'?el.value.split('\n'):(spec.kind==='int'||spec.kind==='float')?+el.value:el.value; }
+    const r=await fetch('/api/settings/options',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,values})});
+    $('#opMsg').textContent=r.ok?`${o.title}: saved.`:(await r.json()).error; if(r.ok) opLoad(); }); }
+opLoad();
 async function plLoad(){ let r; try{ r=await api('/api/plugins'); }catch(e){ $('#plList').innerHTML=`<tr><td class="err">${esc(e.message)}</td></tr>`; return; }
   $('#plDirs').innerHTML='Looked in: '+r.dirs.map(d=>'<code>'+esc(d)+'</code>').join(', ');
   const st={on:'<span style="color:var(--ok)">on</span>',off:'off',changed:'<span class="err">changed since you turned it on: off</span>',broken:'<span class="err">broken</span>'};

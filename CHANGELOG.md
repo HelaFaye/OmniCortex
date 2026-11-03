@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added (integrated options, first batch)
+
+- Fix This Mistake: a **fix** button under each reply keeps your correction as a training pair (and the reply's activations as a known mistake); an optional idle-time DPO micro-tune.
+- Neural Reset: a reply caught repeating itself is cut at the loop and resumed with the loop pushed down.
+- Prompt sanitizer for chats sent to linked hosts: secrets and listed names become placeholders and are restored in the reply.
+- Core shunt: jobs run at low priority, on efficiency cores where the CPU has them.
+- Dependency GC and dependency snapshots (diff, pip plan, sandbox venv; `/api/env/snapshot`, `/api/env/compare`).
+- Settings → Integrated options; docs/INTEGRATED_OPTIONS.md says what each does and does not do.
+
 ### Added (unified review and browser extension)
 
 - `scripts/unified_review.py` and Studio's `/api/lookup`: everything known about a model in one record, from review boards (verified accuracy, speed per hardware), hardware-profile reports, SAELens's catalogue and this Studio's observations. Re-packagings (GGUF, AWQ, …) are marked related.

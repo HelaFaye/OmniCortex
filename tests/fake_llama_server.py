@@ -68,6 +68,19 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(f"data: {json.dumps({'choices': [{'delta': {'content': text}}]})}\n\ndata: [DONE]\n\n".encode())
             return
+        user_last = next((m.get("content") for m in reversed(msgs) if m.get("role") == "user"), "")
+        if user_last == "loop please" and body.get("stream"):
+            # a reply that loops; resumed (a trailing assistant message), it finishes and shows what it was sent
+            resumed = msgs and msgs[-1].get("role") == "assistant"
+            pieces = ([f" Done. bias={json.dumps(body.get('logit_bias'))} dry={body.get('dry_multiplier')}"] if resumed
+                      else ["Start. "] + ["again and again. "] * 12)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for piece in pieces:
+                self.wfile.write(f"data: {json.dumps({'choices': [{'delta': {'content': piece}}]})}\n\n".encode())
+            self.wfile.write(b"data: [DONE]\n\n")
+            return
         has_img = any(isinstance(m.get("content"), list) for m in msgs)
         ctx = any(m.get("role") == "system" and "[1] (" in str(m.get("content")) for m in body.get("messages", []))
         text = f"model={a.alias} mmproj={'yes' if a.mmproj else 'no'} image={'yes' if has_img else 'no'}"
