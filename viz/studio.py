@@ -5238,6 +5238,22 @@ class Handler(BaseHTTPRequestHandler):
                 import draft_pick
                 c.update(t=time.time(), bin=STATE["server_bin"], list=draft_pick.list_devices(STATE["server_bin"]))
             return self._json(200, {"devices": c["list"]})
+        if self.path.startswith("/api/explain/plan"):
+            # every way to explain a reply of this model, which can run here, and how to start each (scripts/explain.py)
+            import explain
+            import features_api as FA
+            q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            m = find_model((q.get("model") or [""])[0]) or (PROC["model"] if PROC.get("model") else None)
+            if m is None:
+                return self._json(404, {"error": "no such model"})
+            root, extra = self._features_ws()
+            try:
+                inv = FA.list_all(root, extra)
+            except OSError:
+                inv = {}
+            caps = explain.capabilities(m, load_settings().get(_key(m["path"]), {}), STATE.get("cett"), inv)
+            return self._json(200, {"model": m["id"], "capabilities": caps,
+                                    "plan": explain.plan(caps, (q.get("prompt") or [""])[0], (q.get("reply") or [""])[0])})
         if self.path.startswith("/api/models/draft"):
             # compatible draft models for speculative decoding, and a device for the draft
             import draft_pick

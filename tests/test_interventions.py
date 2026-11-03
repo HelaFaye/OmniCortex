@@ -130,3 +130,36 @@ def test_saelens_release_download(tmp_path):
         S.from_release("org-scope-res", "layer_9", reg, fake_download)
     with pytest.raises(ValueError, match="no SAELens release"):
         S.from_release("other", "x", reg, fake_download)
+
+
+def test_explain_plan_orders_what_can_run():
+    import explain
+    none = {"model": "m", "gguf": "/m.gguf", "hf": None, "cett": False, "classifier": False, "torch": False,
+            "transformers": False, "saes": 0, "transcoders": 0, "emotions": 0}
+    p = {r["id"]: r for r in explain.plan(none)}
+    assert p["weights"]["available"] and p["weights"]["recommended"] and not p["risk"]["available"]
+    assert "Build llama.cpp" in p["risk"]["why"] and "PyTorch" in p["trace"]["why"]
+    full = {**none, "hf": "org/m", "cett": True, "classifier": True, "torch": True, "transformers": True, "transcoders": 2}
+    p = {r["id"]: r for r in explain.plan(full, "the capital of", " Paris")}
+    assert p["risk"]["recommended"] and p["graph"]["available"] and "kind=iv_circuit" in p["trace"]["action"]["href"]
+    inv = {"dicts": [{"model": "org/m", "target_site": None}, {"model": "org/m", "target_site": "mlp_out"},
+                     {"model": "other/x"}], "emotions": [{"model": "other/n"}]}
+    c = explain.capabilities({"id": "m", "path": "/x/m.gguf"}, {"hf_model": "org/m"}, None, inv)
+    assert (c["saes"], c["transcoders"], c["emotions"], c["gguf"]) == (1, 1, 0, "/x/m.gguf")
+
+
+def test_explain_api(tmp_path):
+    import test_studio
+    gen = test_studio.studio_srv.__wrapped__(tmp_path)
+    base = next(gen)
+    try:
+        code, r = test_studio.call(base, "/api/explain/plan?model=coder-gguf/coder-7b-q4_k_m&prompt=hi")
+        assert code == 200 and r["capabilities"]["gguf"].endswith(".gguf")
+        assert {p["id"] for p in r["plan"]} >= {"risk", "trace", "weights"}
+        assert test_studio.call(base, "/api/explain/plan?model=nope")[0] == 404
+        assert "explainReply" in test_studio.call(base, "/")[1]
+    finally:
+        try:
+            next(gen)
+        except StopIteration:
+            pass

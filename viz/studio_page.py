@@ -615,6 +615,22 @@ function render(text){
     else out+=esc(p).replace(/`([^`\n]+)`/g,'<code>$1</code>'); });
   return out;
 }
+// ---------- explain: one entry point to every way of looking inside a reply (scripts/explain.py)
+async function explainReply(d){
+  let box=d.querySelector('.explain'); if(box){ box.remove(); return; }
+  box=document.createElement('div'); box.className='explain note'; box.textContent='finding what can run here…'; d.appendChild(box);
+  const prompt=_last_user_prompt(d), reply=(d.querySelector('.body')||{}).textContent||'';
+  const model=(status_&&(status_.id||status_.model))||'';
+  try{ const r=await (await fetch('/api/explain/plan?'+new URLSearchParams({model,prompt:prompt.slice(-1500),reply:reply.slice(0,500)}))).json();
+    if(r.error){ box.innerHTML=`<span class="bad">${esc(r.error)}</span>`; return; }
+    box.innerHTML=`<div style="margin:.3rem 0"><b>Explain this reply</b> · ${esc(r.model)}</div>`+r.plan.map(p=>`<div class="exrow" style="display:flex;gap:.5rem;align-items:baseline;margin:.15rem 0;${p.available?'':'opacity:.55'}">
+      ${p.available?(p.action.type==='check'?`<button data-ex="check">${esc(p.question)}</button>`:`<a href="${esc(p.action.href)}" target="_blank" rel="noopener">${esc(p.question)}</a>`):`<span>${esc(p.question)}</span>`}
+      ${p.recommended?'<b class="okc" title="the first that can run here">start here</b>':''}
+      <span title="${esc(p.method+' · cost: '+p.cost)}">${esc(p.available?p.method:p.why)}</span></div>`).join('');
+    const b=box.querySelector('[data-ex=check]'); if(b) b.onclick=()=>checkReply(d);
+  }catch(e){ box.innerHTML=`<span class="bad">${esc(String(e))}</span>`; } }
+function _last_user_prompt(d){ const all=[...document.querySelectorAll('#log .msg')]; const i=all.indexOf(d);
+  for(let j=i-1;j>=0;j--){ if(((all[j].querySelector('.who')||{}).textContent||'').startsWith('you')) return (all[j].querySelector('.body')||all[j]).textContent||''; } return ''; }
 function bubble(role,content,extra={}){
   if(!$('#log .msg')) $('#log').innerHTML='';
   const d=document.createElement('div'); d.className='msg';
@@ -628,10 +644,11 @@ function bubble(role,content,extra={}){
   if(extra.sources) showSources(d.querySelector('.src'),extra.sources);
   for(const t of extra.tools||[]) toolCard(d.querySelector('.tools'),t);
   if(role==='assistant'){ const a=d.querySelector('.acts');
-    a.innerHTML='<button data-a="copy">copy</button><button data-a="regen">regenerate</button><button data-a="check" title="score each token of this reply for hallucination risk">check</button>';
+    a.innerHTML='<button data-a="copy">copy</button><button data-a="regen">regenerate</button><button data-a="check" title="score each token of this reply for hallucination risk">check</button><button data-a="explain" title="every way to look inside this reply: which can run here, and what each answers">explain</button>';
     a.querySelector('[data-a=copy]').onclick=()=>navigator.clipboard.writeText(d.querySelector('.body').textContent);
     a.querySelector('[data-a=regen]').onclick=regenerate;
     a.querySelector('[data-a=check]').onclick=()=>checkReply(d);
+    a.querySelector('[data-a=explain]').onclick=()=>explainReply(d);
     if(PLUGIN_CHECKS.length){ const b=document.createElement('button'); b.textContent='plugins'; b.title='run the checks from your plugins: '+PLUGIN_CHECKS.map(c=>c.title).join(', '); b.onclick=()=>pluginChecks(d,false); a.appendChild(b); }
     if(extra.check) showRisk(d.querySelector('.risk'),extra.check);
     if(extra.plugin_checks) showPluginChecks(d,extra.plugin_checks);
