@@ -21,7 +21,12 @@ are locked; unlock one to edit it, after reading its warning.
 | Cross-layer attention hijacking | job + command (Hugging Face weights) | `scripts/model_lab.py hijack` |
 | Neuron aging and decay | in Studio, off by default | `scripts/neuron_decay.py` |
 | Neuro-fuzzing | job + command | `scripts/neuro_fuzz.py` |
-| Layer streaming, expert sharding, backend hot-swap, morphing, KV compaction, feature exchange | after that | |
+| Backend hot-swap | in Studio, on by default | `scripts/backend_swap.py` |
+| Layer streaming across computers | per-model setting + job | `scripts/layer_stream.py` (llama.cpp RPC) |
+| Feature-interlocked KV compression | chat option "summarize by topic" | `scripts/semantic_compact.py` |
+| Morphing architecture | in Studio, off by default | `scripts/morph_router.py` |
+| Neuron-granular expert sharding | job + command | `scripts/expert_shards.py` |
+| P2P feature exchange | jobs + board submissions | `scripts/feature_pack.py` |
 
 ## Fix This Mistake
 
@@ -225,3 +230,101 @@ traced back to the weakness that produced it.
 
 **Not done:** reading "neural coordinates" straight off the model to aim the fuzzer. Seeds are behaviours
 (wrong or risky answers). Which neurons they involve is what the neuron review and the classifier work out.
+
+## Backend hot-swap
+
+Sometimes llama-server cannot load a model because it runs out of memory, an allocation fails, the device is
+lost or the server crashes. Studio then retries down a ladder:
+1. the same backend with half, then a quarter, of the GPU layers;
+2. each alternate llama-server you list, for example a Vulkan build beside the CUDA one;
+3. CPU only.
+
+The first setup that starts is used, and what failed before it is recorded (`PROC.fallback`, the model's
+status). A failure caused by a bad setting, such as an unknown flag or a missing file, fails as before, since
+no fallback would fix it.
+
+If the server dies mid-chat, Studio reloads it the same way and sends the request once more.
+
+**Not done:** moving a generation between backends mid-token. A reply in flight when the server dies is sent
+again from the start.
+
+## Layer streaming across computers
+
+This uses llama.cpp's RPC backend:
+1. Each helper computer runs `rpc-server`. Use the **Layer streaming: lend this computer's memory** job
+   there, or `layer_stream.py serve`; build it with `build_llama_tools.sh --rpc`.
+2. On the computer serving the model, set the model's **RPC servers** to `helper:50052,helper2:50052`.
+
+llama-server then places a share of the layers on each helper and passes activations between them as it
+computes. A model too large for any one computer can run across several. `layer_stream.py check` tests that
+each helper is reachable. `split` turns each device's free memory into a tensor split.
+
+**Security:** rpc-server has no authentication and no encryption. Anyone who reaches its port can allocate
+memory and run computations there. Bind it to a trusted network address, and across networks put it behind
+WireGuard, Tailscale or an SSH tunnel. It does not use OmniCortex's WebRTC channel, because this traffic is
+large and latency-bound and needs a direct path.
+
+**Speed:** every token crosses the network once per helper. Use it for models that cannot fit otherwise,
+not to speed up one that fits.
+
+## Feature-interlocked KV compression
+
+In the chat's compression settings, choose **When the chat no longer fits → summarize them by topic
+(anchors)**.
+
+The oldest turns are grouped by topic: TF-IDF vectors merged by cosine similarity, so a plot point or a
+module discussed in turns 3, 9 and 14 becomes one group. The model writes one short anchor note per topic,
+keeping every name, number, path and decision. The notes stand in for all the turns they cover, so a detail
+mentioned many times costs context once.
+
+**Not done:** compressing the KV cache itself. llama-server has no way to merge cache entries, so this works
+on the text that goes back into the context.
+
+## Morphing architecture
+
+Set a **full model** and a **small model**. Requests for the full model that score as simple go to the small
+one. The score, 0 to 1, comes from:
+- length;
+- code;
+- maths;
+- several questions or constraints at once;
+- reasoning words;
+- a long conversation;
+- images.
+
+Each part is reported in the request's route (`X-NeuronScope-Route`, the reply's route note).
+
+**Not done:** skipping layers inside one model. llama.cpp runs every layer it loads, and early exit only works
+for models trained for it, so two real models are used instead. Keep the small one where it does not evict the
+large one: a worker, a linked host, or both in memory. A local model swap costs a reload each time.
+
+## Neuron-granular expert sharding
+
+`expert_shards.py` builds one suppressed variant of a model per subject. Each variant has only that
+subject's H-neurons scaled down, made with `suppress_gguf.py`. `--apply` then sets them as Studio's
+**Models per subject**, so the subject classifier sends each prompt to its subject's variant. One subject's
+correction then never bleeds into another's answers.
+
+To get each subject's H-neurons, train a classifier on that subject's TestQA items.
+
+**Not done:** one model with a router inside. Each shard is a whole model of the original's size, so this
+is not a speed-up, and switching subjects on one GPU reloads the model.
+
+## P2P feature exchange
+
+A feature pack shares what you found inside a model without sharing the model: a small zip of
+- H-neuron sets;
+- emotion vectors and steering directions (`.npy`);
+- SAE feature picks;
+- small control vectors;
+- steering and graph presets.
+
+Its manifest names the base model it was made on (repo, architecture, layer count, width) and the SHA-256 of
+every file. Build one with the **Feature pack** job or `feature_pack.py pack`. Share it either:
+- over Connect's encrypted transfer, like any file;
+- through a review board: an issue marked `omnicortex-feature-pack`, with the pack inline up to about 45 KB.
+  The board files it under `features/pending/` and lists it in `board.json`.
+
+Installing checks every hash. A pack made on a model of another shape is refused, because neuron indices and
+directions mean nothing in a different network. A pack made on another repo of the same shape installs with a
+warning that it is probably a fine-tune of the same base, and to check it.

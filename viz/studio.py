@@ -494,7 +494,10 @@ DEFAULTS = {"ngl": 99, "ctx": 8192, "batch": 2048, "threads": 0,
             # Several GPUs (a Tesla M10 is four): which ones this model may use
             # (CUDA_VISIBLE_DEVICES), how llama-server splits it (layer | row |
             # none), the per-GPU proportions ("1,1,1,1") and the main GPU.
-            "gpus": "", "split_mode": "", "tensor_split": "", "main_gpu": -1}
+            "gpus": "", "split_mode": "", "tensor_split": "", "main_gpu": -1,
+            # Layer streaming (docs/INTEGRATED_OPTIONS.md): llama.cpp rpc-servers on other computers that hold
+            # and run a share of the layers ("host:50052,host2:50052"); -ts then splits across them too.
+            "rpc": ""}
 
 # A named config is a complete, reusable setup: model, load settings, preset,
 # visualizer and hardware limits, under a name. The name is also what the model
@@ -698,6 +701,33 @@ def wait_healthy(port, proc, timeout=600):
 
 
 def start_server(model, settings, port):
+    """Start llama-server; when it cannot load for lack of memory or a driver fault, walk the backend hot-swap
+    ladder (scripts/backend_swap.py): fewer GPU layers, the alternate servers you listed, then CPU only."""
+    ok, why = _start_server_once(model, settings, port)
+    hs = options()["hot_swap"]
+    if ok or not hs["enabled"] or (settings.get("engine") or "llama") != "llama":
+        PROC["fallback"] = None
+        return ok, why
+    import backend_swap
+    if not backend_swap.is_resource_failure(why):
+        return ok, why
+    def brief(w):
+        lines = [x.strip() for x in str(w).splitlines() if x.strip()]
+        return (lines[0] + (f": {lines[-1]}" if len(lines) > 1 else ""))[:240] if lines else ""
+    tried = [brief(why)]
+    for alt, srv, label in backend_swap.ladder(settings, hs["servers"], STATE.get("server_bin")):
+        if srv and not os.path.exists(srv):
+            continue
+        ok2, why2 = _start_server_once(model, {**alt, **({"_server_bin": srv} if srv else {})}, port)
+        if ok2:
+            PROC["fallback"] = {"setup": label, "after": tried, "settings": {k: alt.get(k) for k in ("ngl", "split_mode")}, "server": srv}
+            print(f"[studio] backend hot-swap: {model['id']} loaded on {label} after: {tried[0]}", file=sys.stderr)
+            return True, f"ready (fallback: {label})"
+        tried.append(f"{label}: {brief(why2)}")
+    return False, why + "\nbackend hot-swap tried: " + "; ".join(tried[1:])
+
+
+def _start_server_once(model, settings, port):
     if (settings.get("engine") or "llama") == "llama" and not STATE["server_bin"]:
         return False, "no llama-server set: Setup -> Build llama.cpp, or point Settings -> Workspaces at one"
     stop_server()
@@ -763,7 +793,7 @@ def server_cmd(model, settings, port):
         if model.get("format") == "hf":
             raise ValueError("llama-server needs a GGUF. Serve this checkpoint with the vLLM engine, or convert it "
                              "(Jobs → Merge and convert)")
-        cmd = [STATE["server_bin"], "-m", model["path"],
+        cmd = [settings.get("_server_bin") or STATE["server_bin"], "-m", model["path"],
                "-ngl", str(settings["ngl"]), "-c", str(settings["ctx"]),
                "-b", str(settings["batch"]),
                "--port", str(port), "--host", "127.0.0.1"]
@@ -804,6 +834,11 @@ def server_cmd(model, settings, port):
         mg = settings.get("main_gpu")
         if mg not in (None, "") and int(mg) >= 0:
             cmd += ["-mg", str(int(mg))]
+        rpc = str(settings.get("rpc") or "").replace(" ", "")
+        if rpc:
+            if not re.fullmatch(r"[\w.\-\[\]:]+:\d{2,5}(,[\w.\-\[\]:]+:\d{2,5})*", rpc):
+                raise ValueError("rpc servers look like host:50052,other-host:50052")
+            cmd += ["--rpc", rpc]
     env = None
     extra_env = eo.build_env(settings)
     gpus = str(settings.get("gpus") or "").replace(" ", "")
@@ -1782,8 +1817,11 @@ def compress_history(msgs: list, req: dict, reserve: int, upstream=None) -> tupl
     req["summary"] = {upto, text}, so earlier turns are summarized once. -> (messages, what was done)"""
     mode = (req.get("compress") or {}).get("history") or "off"
     n_ctx = _ctx_size()
-    if mode not in ("cut", "summarize") or not n_ctx:
+    if mode not in ("cut", "summarize", "anchor") or not n_ctx:
         return msgs, None
+    anchor = mode == "anchor"                 # summarize, grouped by topic (scripts/semantic_compact.py)
+    if anchor:
+        mode = "summarize"
     head = 0
     while head < len(msgs) and msgs[head].get("role") == "system":
         head += 1
@@ -1802,9 +1840,13 @@ def compress_history(msgs: list, req: dict, reserve: int, upstream=None) -> tupl
     if mode == "cut":
         return cur[:lead] + cur[lead + cut:], {"history": "cut", "dropped": upto + cut, "upto": upto + cut}
     folded = conv[upto:upto + cut]
-    prompt = ns_compress.summary_prompt(folded, text)
-    r = proxy("/v1/chat/completions", {"messages": prompt, "max_tokens": 500, "temperature": 0.2, "stream": False},
-              upstream=upstream)
+    if anchor:
+        import semantic_compact
+        prompt = semantic_compact.anchor_prompt(folded, text)
+    else:
+        prompt = ns_compress.summary_prompt(folded, text)
+    r = proxy("/v1/chat/completions", {"messages": prompt, "max_tokens": 900 if anchor else 500, "temperature": 0.2,
+                                       "stream": False}, upstream=upstream)
     new = ((r.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
     new = re.sub(r"(?s)<think>.*?</think>", "", new).strip()
     if not new:
@@ -1812,7 +1854,7 @@ def compress_history(msgs: list, req: dict, reserve: int, upstream=None) -> tupl
                                                "note": "the model gave no summary; the oldest turns were dropped"}
     upto += cut
     return fixed + [ns_compress.summary_message(new, upto)] + conv[upto:], \
-        {"history": "summarized", "upto": upto, "summary": new}
+        {"history": "summarized", "upto": upto, "summary": new, **({"anchored": True} if anchor else {})}
 
 
 def context_usage(req: dict, role: str) -> dict:
@@ -1834,7 +1876,7 @@ def context_usage(req: dict, role: str) -> dict:
                 tools = ""
     summarized = 0
     sm = req.get("summary") or {}
-    if ((req.get("compress") or {}).get("history") == "summarize" and isinstance(sm, dict) and sm.get("text")
+    if ((req.get("compress") or {}).get("history") in ("summarize", "anchor") and isinstance(sm, dict) and sm.get("text")
             and 0 < int(sm.get("upto") or 0) <= len(msgs)):
         summarized = int(sm["upto"])
         msgs = [ns_compress.summary_message(str(sm["text"]), summarized)] + msgs[summarized:]
@@ -2086,7 +2128,23 @@ def _proxy(path, payload, stream_to=None, hold_done=False, upstream=None, meas=N
             lg = loopguard.Guard(max_resets=nr["max_resets"], min_repeats=nr["min_repeats"], min_span=nr["min_span"])
     while True:
         hit = None
-        r = opener()
+        try:
+            r = opener()
+        except (urllib.error.URLError, ConnectionError) as e:
+            # backend hot-swap: the local server died; reload it on the fallback ladder and send this once more
+            m = PROC.get("model")
+            if upstream is not None or m is None or server_running() or not options()["hot_swap"]["retry_request"] \
+                    or (meas or {}).get("hot_swapped"):
+                raise
+            settings = {**DEFAULTS, **load_settings().get(_key(m["path"]), {})}
+            ok, why = start_server(m, settings, STATE["backend_port"])
+            if not ok:
+                raise RuntimeError(f"the model server stopped ({e}) and could not be restarted: {why[:300]}")
+            if meas is not None:
+                meas["hot_swapped"] = True
+            req3 = urllib.request.Request(f"http://127.0.0.1:{PROC['port']}{path}", method="POST",
+                                          data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
+            r = urllib.request.urlopen(req3, timeout=900)
         with r:
             for raw in r:
                 line = raw.decode(errors="replace").strip()
@@ -4244,6 +4302,10 @@ class Handler(BaseHTTPRequestHandler):
     def _v1(self, path):
         """OpenAI-compatible passthrough with JIT model loading."""
         body = self._read(MAX_BODY)
+        import morph_router
+        mm, morph = morph_router.route(body.get("model") or "", body.get("messages") or [], options()["morph"])
+        if morph:
+            body = {**body, "model": mm}
         touch(+1)
         try:
             lt = link_target(body.get("model"))
@@ -6500,6 +6562,8 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                 return self._json(200, context_usage(self._read(MAX_BODY), self._role))
             if self.path == "/api/chat":
                 req = self._read(MAX_BODY)
+                import morph_router
+                req["model"], morph = morph_router.route(req.get("model") or "", req.get("messages") or [], options()["morph"])
                 lt = link_target(req.get("model"))
                 upstream = None
                 if lt is not None:
@@ -6558,6 +6622,8 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                     payload["grammar"] = preset["grammar"]
                 if upstream is not None:
                     payload["model"] = rid
+                if morph:
+                    route = {**route, "morph": morph}
                 self._route = route
                 self._send_headers_sse()
                 if sources:

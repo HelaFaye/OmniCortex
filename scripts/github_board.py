@@ -40,6 +40,7 @@ sys.path.insert(0, str(HERE))
 MARK = "<!-- neuronscope-card v1 -->"
 MARK_PROFILE = "<!-- omnicortex-hw-profile v1 -->"      # a hardware support profile, for review (public: no sealing)
 MARK_REPORT = "<!-- omnicortex-hw-report v1 -->"        # "this profile worked / did not work for me"
+MARK_FEATURE = "<!-- omnicortex-feature-pack v1 -->"    # a feature pack (feature_pack.py), for review
 INFO = b"neuronscope-board-v1"
 PART = 60000                         # GitHub issue bodies and comments hold 65536 characters
 CARD_MAX = 50000
@@ -155,6 +156,35 @@ def submit_profile(repo: str, profile: dict, token: str) -> dict:
     return _open(repo, t, b, token)
 
 
+def submit_feature_pack(repo: str, data: bytes, token: str) -> dict:
+    import feature_pack
+    doc = feature_pack.board_doc(data)
+    m = doc["manifest"]
+    t, b = plain_issue(MARK_FEATURE, f"feature pack: {m['id']} ({m['kind']}, {m['base'].get('hf_repo') or 'model'})"[:200], doc,
+                       "A feature pack submitted for review. The board's workflow checks its hashes and adds it to "
+                       "features/pending/; a maintainer reviews it and moves it to features/accepted/.")
+    return _open(repo, t, b, token)
+
+
+def accept_feature(board: Path, number: int, body: str) -> dict:
+    import base64
+    import feature_pack
+    try:
+        doc = parse_plain(body, MARK_FEATURE)
+        data = base64.b64decode(doc["zip_b64"])
+        man, _ = feature_pack.read(data)
+    except (ValueError, KeyError, TypeError) as e:
+        return {"status": "rejected", "note": f"not a valid feature pack: {e}"[:300]}
+    d = board / "features" / "pending"
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{man['id']}@{int(number)}.zip"
+    path.write_bytes(data)
+    (d / f"{man['id']}@{int(number)}.json").write_text(json.dumps({**man, "_issue": int(number)}, indent=1))
+    rebuild(board)
+    return {"status": "verified", "note": "waiting for a maintainer's review in features/pending/",
+            "path": str(path.relative_to(board))}
+
+
 def submit_report(repo: str, rep: dict, token: str) -> dict:
     t, b = plain_issue(MARK_REPORT, f"profile report: {rep['profile']} {rep['purpose']} "
                        f"{'worked' if rep['worked'] else 'did not work'}"[:200], rep,
@@ -252,6 +282,12 @@ def rebuild(board: Path) -> dict:
                               "reports": hw_profiles.aggregate_reports(reps)}
     except Exception as e:
         out["hw_profiles_error"] = str(e)[:200]
+    feats = {}
+    for state in ("pending", "accepted"):
+        d = board / "features" / state
+        feats[state] = [json.loads(f.read_text()) for f in sorted(d.glob("*.json"))] if d.is_dir() else []
+    out["feature_packs"] = {k: [{x: m.get(x) for x in ("id", "title", "kind", "base", "_issue")} for m in v]
+                            for k, v in feats.items()}
     (board / "board.json").write_text(json.dumps(out, indent=1))
     return out
 
@@ -295,6 +331,8 @@ def accept(board: Path, number: int, body: str, comments: list[str], priv: str, 
         return accept_profile(board, number, body)
     if MARK_REPORT in (body or ""):
         return accept_report(board, number, body)
+    if MARK_FEATURE in (body or ""):
+        return accept_feature(board, number, body)
     import scoreboard_server as sb
     import testqa as tq
     try:
@@ -327,7 +365,7 @@ def action(board: Path, number: int, out: Path) -> int:
     repo, token, priv = os.environ["GITHUB_REPOSITORY"], os.environ.get("GITHUB_TOKEN"), os.environ.get("BOARD_KEY")
     iss = _gh("GET", f"/repos/{repo}/issues/{number}", token)
     body = iss.get("body") or ""
-    if MARK_PROFILE in body or MARK_REPORT in body:
+    if MARK_PROFILE in body or MARK_REPORT in body or MARK_FEATURE in body:
         res = accept(board, number, body, [], "")               # public submissions: nothing sealed
     elif not priv:
         res = {"status": "rejected", "note": "the board has no BOARD_KEY secret"}
@@ -357,7 +395,7 @@ permissions:
 concurrency: board
 jobs:
   accept:
-    if: (contains(github.event.issue.body, '<!-- neuronscope-card v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-hw-profile v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-hw-report v1 -->')) && github.event.issue.state == 'open'
+    if: (contains(github.event.issue.body, '<!-- neuronscope-card v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-hw-profile v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-hw-report v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-feature-pack v1 -->')) && github.event.issue.state == 'open'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -373,7 +411,7 @@ jobs:
         run: |
           if [ "$(python -c "import json;print(json.load(open('/tmp/result.json'))['status'])")" = verified ]; then
             git config user.name "board" && git config user.email "board@users.noreply.github.com"
-            git add -A cards profiles reports board.json && git commit -m "submission #${{ github.event.issue.number }}" && git push
+            git add -A cards profiles reports features board.json && git commit -m "submission #${{ github.event.issue.number }}" && git push
           fi
       - name: answer
         env: {GH_TOKEN: '${{ github.token }}'}

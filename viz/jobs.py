@@ -564,6 +564,36 @@ SPECS.update({
         "fields": [F("results", repeat=True), F("harvest", kind="bool"), F("review", help="a model in the neuron review"),
                    F("fuzzer", req=True, help="URL@model"), F("verify", help="URL@model"), F("per_seed", kind="int", default=5),
                    F("max_seeds", kind="int", default=40), F("near", kind="float", default=0.4), F("out", req=True)]},
+    "rpc_serve": {
+        "title": "Layer streaming: lend this computer's memory (rpc-server)", "group": "Setup",
+        "argv": [S / "layer_stream.py", "serve"],
+        "help": "Runs llama.cpp's rpc-server so another computer's llama-server can put a share of a model's layers "
+                "here (that model's RPC servers setting). No authentication or encryption: a trusted network or a "
+                "tunnel only. Build it with build_llama_tools.sh --rpc.",
+        "fields": [F("host", default="127.0.0.1", help="the interface to listen on"), F("port", kind="int", default=50052),
+                   F("cache", kind="bool", help="keep received weights on disk"), F("device"), F("threads", kind="int")]},
+    "expert_shards": {
+        "title": "Expert shards: one suppressed variant per subject", "group": "Retrain",
+        "argv": [S / "expert_shards.py"],
+        "help": "Each subject's H-neurons suppressed in its own copy of the model; Studio's per-subject routing then "
+                "sends each prompt to its subject's copy. Not faster: each shard is a whole model.",
+        "fields": [F("gguf", req=True), F("subject", repeat=True, req=True, help="subject=h_neurons.json"),
+                   F("scale", kind="float", default=0.3), F("out", req=True),
+                   F("apply", help="this Studio's URL, to set the shards as models per subject")]},
+    "feature_pack": {
+        "title": "Feature pack: share H-neurons, vectors or SAE picks", "group": "Interpret",
+        "argv": [S / "feature_pack.py", "pack"],
+        "help": "A small zip of what you found in a model (no weights), with the base model it fits; share it over "
+                "Connect or submit it to a review board.",
+        "fields": [F("files", flag="", multi=True, req=True, help="h_neurons.json, .npy vectors, feature JSON"),
+                   F("id", req=True), F("title"), F("kind", req=True, choices=["h_neurons", "emotion_vectors",
+                   "sae_features", "control_vector", "steering", "graph", "mixed"]), F("description"),
+                   F("hf_repo"), F("n_layers", kind="int", req=True), F("d_model", kind="int", req=True), F("out", req=True)]},
+    "feature_pack_install": {
+        "title": "Feature pack: install one", "group": "Interpret", "argv": [S / "feature_pack.py", "install"],
+        "help": "Checks every file's hash and that the pack was made on a model of this shape, then installs it.",
+        "fields": [F("zip", flag="", req=True), F("n_layers", kind="int", req=True), F("d_model", kind="int", req=True),
+                   F("hf_repo")]},
     "dep_gc": {
         "title": "Clean up build and download leftovers", "group": "Setup", "argv": [S / "dep_gc.py"],
         "help": "Interrupted downloads, Hugging Face cache blobs nothing uses, failed llama.cpp builds, __pycache__, "

@@ -276,6 +276,7 @@ section.chat{position:relative}
       </div>
       <div class="row2">
         <div><label>Tensor split</label><input id="tensor_split" placeholder="1,1,1,1"></div>
+        <div><label title="llama.cpp rpc-servers on other computers that hold and run a share of the layers (layer streaming). Unencrypted: trusted network or a tunnel only.">RPC servers</label><input id="rpc" placeholder="box2:50052,box3:50052"></div>
         <div><label>Main GPU (-1 = auto)</label><input id="main_gpu" value="-1"></div>
       </div>
     </div>
@@ -306,7 +307,7 @@ section.chat{position:relative}
     <section><h3>Context usage <span class="r" id="ctxPct"></span></h3>
       <div class="cbar" id="ctxBar" role="img" aria-label="context usage"></div><div class="cleg" id="ctxLeg"></div><div class="note" id="ctxNote"></div>
       <label style="margin-top:.5rem"><input type="checkbox" id="cmpPass"> Trim document passages to the sentences that match the question</label>
-      <label>When the chat no longer fits <select id="cmpHist" style="width:auto;margin-left:.3rem"><option value="off">do nothing</option><option value="summarize">summarize the oldest messages</option><option value="cut">drop the oldest messages</option></select></label></section>
+      <label>When the chat no longer fits <select id="cmpHist" style="width:auto;margin-left:.3rem"><option value="off">do nothing</option><option value="summarize">summarize the oldest messages</option><option value="anchor" title="the oldest messages grouped by topic, one note per topic: repeated details cost context once">summarize them by topic (anchors)</option><option value="cut">drop the oldest messages</option></select></label></section>
     <section><h3>Outputs <span class="r" id="outN"></span></h3><div class="outs" id="outList"></div>
       <button id="outExport" style="margin-top:.4rem;font-size:12px;padding:.25rem .6rem">Export chat as .md</button></section>
   </div>
@@ -338,8 +339,8 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let models=[], sel=null, busy=false, ctrl=null, status_={}, pendingImgs=[];
 let chat={id:null,title:'New chat',messages:[]};
-const F=["ngl","ctx","batch","threads","experts","served_name","lora","extra","classifier","gpus","split_mode","tensor_split","main_gpu"];
-const TEXT_FIELDS=["served_name","lora","extra","classifier","gpus","split_mode","tensor_split"];
+const F=["ngl","ctx","batch","threads","experts","served_name","lora","extra","classifier","gpus","split_mode","tensor_split","main_gpu","rpc"];
+const TEXT_FIELDS=["served_name","lora","extra","classifier","gpus","split_mode","tensor_split","rpc"];
 // ---------- engine options (scripts/engine_options.py: one table for the form, the flags and the optimizer)
 let EO=null;
 async function loadEO(engine, values){
@@ -942,7 +943,7 @@ $('#outExport').onclick=()=>$('#export').click();
 function cmpGet(){ try{ return JSON.parse(localStorage.getItem('ns-compress')||'{}'); }catch{ return {}; } }
 function cmpReq(){ const c=cmpGet(), o={};
   if(c.passages||(c.history&&c.history!=='off')) o.compress={passages:!!c.passages,history:c.history||'off'};
-  if(c.history==='summarize'&&chat.summary) o.summary=chat.summary; return o; }
+  if((c.history==='summarize'||c.history==='anchor')&&chat.summary) o.summary=chat.summary; return o; }
 function cmpNote(c){ const p=c.passages, h=c.history, out=[];
   if(p&&p.before) out.push(`passages ${p.before}→${p.after} tokens`);
   if(h&&h.history==='summarized') out.push(`summarized the first ${h.upto} messages`);

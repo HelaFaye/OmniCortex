@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added (integrated options, third batch)
+
+- Backend hot-swap: a model that cannot load for lack of memory or a driver fault loads again with fewer GPU layers, on an alternate llama-server, or on the CPU; a server that dies mid-chat is reloaded and the request sent once more.
+- Layer streaming over llama.cpp RPC: a per-model RPC servers setting, `build_llama_tools.sh --rpc`, `layer_stream.py` (serve, check, split) and its job.
+- Chat compression "summarize by topic": older turns grouped by topic into anchor notes.
+- Morphing: simple requests for the full model go to a small one (off by default).
+- `expert_shards.py`: one suppressed variant per subject, routed by subject.
+- Feature packs: share H-neuron sets, vectors and SAE picks with their base model and hashes; board submissions.
+
 ### Added (integrated options, second batch)
 
 - `quant_mask.py`: more precision for the layers with the most H-neurons, less for the safest, plus an importance matrix from mistake contexts.

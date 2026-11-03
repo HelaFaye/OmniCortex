@@ -43,6 +43,19 @@ OPTIONS: dict[str, dict] = {
         "sensitive": {"enabled": "Changes how strongly a model's correction adapter is applied without asking. "
                                  "With a low floor a corrected model can drift back toward its old mistakes.",
                       "floor": "0 lets an unused correction fade away entirely."}},
+    "hot_swap": {
+        "title": "Backend hot-swap",
+        "help": "When llama-server cannot load a model for lack of memory or a driver fault, or dies while serving, "
+                "load it again with fewer GPU layers, on an alternate llama-server build you list (say Vulkan beside "
+                "CUDA), or on the CPU, and send the request again once.",
+        "fields": {"enabled": ("bool", True), "servers": ("list", []), "retry_request": ("bool", True)}},
+    "morph": {
+        "title": "Morphing (small model for simple requests)",
+        "help": "Requests for the full model that score as simple (short, no code, maths or multi-step reasoning) "
+                "go to the small model instead. Best when the small model runs on another worker or host, so the "
+                "full one is not unloaded.",
+        "fields": {"enabled": ("bool", False), "full_model": ("str", ""), "small_model": ("str", ""),
+                   "threshold": ("float", 0.35, 0.0, 1.0)}},
     "core_shunt": {
         "title": "Core shunt (background job priority)",
         "help": "Run jobs at low priority, on the CPU's efficiency cores when it has them, so the computer stays "
