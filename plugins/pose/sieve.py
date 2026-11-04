@@ -221,6 +221,8 @@ def stage(frames: list[dict], anomalies: list[dict], out: Path, images: Path | N
             for x in subtree(a["joint"]):
                 chosen[x] = fixed[x]
             how.append(f"{a['joint']} {a['error']}: {h}")
+        if all(P.norm(P.sub(chosen[k], actor["joints"][k])) < 1e-4 for k in chosen):
+            continue                     # the "fix" changes nothing (e.g. a hand landing back where it belongs)
         iid = hashlib.sha1(f"{model}|{f['frame']}|{tid}|{json.dumps(actor['joints'], sort_keys=True)}".encode()).hexdigest()[:12]
         img = None
         if images is not None:

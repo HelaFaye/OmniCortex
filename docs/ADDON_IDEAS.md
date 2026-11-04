@@ -2,8 +2,8 @@
 
 This lists every idea from the add-on brainstorms that is not built yet. Each entry says what OmniCortex
 already has to build on, the realistic version, and what stands in the way. What *is* built is in
-[INTEGRATED_OPTIONS.md](INTEGRATED_OPTIONS.md) and [ADDONS.md](ADDONS.md). The pose pipeline is in progress
-in `plugins/pose/`.
+[INTEGRATED_OPTIONS.md](INTEGRATED_OPTIONS.md) and [ADDONS.md](ADDONS.md). The pose pipeline is in
+[POSE.md](POSE.md).
 
 Effort: **S** is a few days, **M** about two weeks, **L** a month or more, **R** a research problem with no
 known working method.
@@ -173,18 +173,7 @@ known working method.
 - **In the way:** consumer EEG is too noisy for this. Heart rate and gaze are usable, but they need consent,
   calibration, and care with the data.
 
-## Pose pipeline (in progress)
+## Pose
 
-The following are in `plugins/pose/`, work in progress:
-- extraction (MediaPipe, OpenPose import);
-- the kinematic sieve with DPO pairs;
-- the review page;
-- VMC and JSON streaming;
-- the refinement orchestrator.
-
-Still to do:
-- the Godot and Blender clients (stress shader, x-ray pass, vertex-colour baking to FBX);
-- tests and docs.
-
-UE5 support would be a separate C++ plugin. VMC4UE already receives the VMC stream, so it works with
-Unreal today.
+The pose pipeline is built ([POSE.md](POSE.md)). The remaining step there is a native UE5 C++ plugin: the
+vertex-factory shader inside Unreal. VMC4UE already receives the VMC stream.

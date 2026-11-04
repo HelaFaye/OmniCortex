@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added (pose add-on)
+
+- `plugins/pose`: video (MediaPipe) or OpenPose to tracked 3D poses; a kinematic sieve (hyperextension, inversion, velocity, bone length, floor clip, foot slip) that stages corrected and rejected pairs; a review page with skeleton overlays; a DPO refinement orchestrator; VMC and JSON-over-UDP streaming; Godot and Blender clients (stress shaders, x-ray pass, vertex-colour baking to FBX). See docs/POSE.md.
+
 ### Added (default add-ons)
 
 - `semantic-friction`: DRY sampling within replies and a small bias away from words earlier replies keep reusing.

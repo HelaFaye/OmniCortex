@@ -50,7 +50,7 @@ and installed elsewhere.
 | `audio-stem-map` | A frequency map of WAV stems. Each band is judged against the spectrum's own tilt, so the check finds harshness (2–5 kHz), sibilance, boom, mud and hiss that stand out, as well as clipping, DC offset and out-of-phase channels. A repair pass turns flagged bands down by the amount they stick out, or by gains you give. MIDI files get velocity-spike and stuck-note checks. This is signal analysis on the audio itself; OmniCortex has no generative-audio model whose layers it could scale. |
 | `cluster-offload` | Where something should run. A live page of free GPU memory on this computer and every connected host. A plan job places a model of a given size: one device when it fits, otherwise the fewest devices that together do, as RPC servers and a tensor split in llama-server's device order (layer streaming, [INTEGRATED_OPTIONS.md](INTEGRATED_OPTIONS.md)). A Proxmox job reads a cluster's nodes, guests (VMs and LXC containers) and GPUs with a read-only API token. |
 
-`comfyui` and `claim-spotter` also ship here, but stay off until you turn them on.
+`comfyui`, `claim-spotter` and `pose` ([POSE.md](POSE.md)) also ship here, but stay off until you turn them on.
 
 A package can also set sampler options for Studio's chat while it is on (`"sampling"`: DRY, repeat, presence
 and frequency penalties, XTC, within fixed limits; [PLUGINS.md](PLUGINS.md)). Its checks, nodes and jobs get

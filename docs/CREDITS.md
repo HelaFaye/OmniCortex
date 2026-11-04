@@ -106,6 +106,17 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 | [OpenCLIP](https://github.com/mlfoundations/open_clip) | `clip_bench.py` presents a transformers model through OpenCLIP's interface, which CLIP_benchmark expects |
 | [LAION-AI/CLIP_benchmark](https://github.com/LAION-AI/CLIP_benchmark) | Zero-shot image benchmarks ([VISION.md](VISION.md)) |
 
+## Pose
+
+| Work | Used for |
+|---|---|
+| Bazarevsky et al. (2020), *BlazePose: On-device Real-time Body Pose tracking*, [arXiv:2006.10204](https://arxiv.org/abs/2006.10204), and Google's [MediaPipe pose landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) | `plugins/pose/extract.py --video`: the 33-landmark model and its world coordinates |
+| Sandler et al. (2018), *MobileNetV2: Inverted Residuals and Linear Bottlenecks*, [arXiv:1801.04381](https://arxiv.org/abs/1801.04381) | The backbone family behind the on-device pose models |
+| Cao et al., [OpenPose](https://github.com/CMU-Perceptual-Computing-Lab/openpose) (BODY_25) | `extract.py --openpose`: its JSON output imported |
+| Shin et al. (2024), *WHAM: Reconstructing World-grounded Humans with Accurate 3D Motion*, and Xu et al. (2020), *GHUM & GHUML* | Pose sources whose full rotations can be passed through (`--frames-jsonl`) |
+| [toyxyz](https://github.com/toyxyz)'s RGB mocap workflows | The idea of driving engines from video-derived pose data |
+| The [VMC protocol](https://protocol.vmc.info/) | `stream.py --vmc`: how engines and avatar tools receive the poses |
+
 ## Datasets and benchmarks
 
 | Work | Used for |
