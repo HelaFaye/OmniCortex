@@ -1086,6 +1086,7 @@ def explain_failure(text: str) -> dict | None:
 class JobRunner:
     on_finish = None          # callable(job meta), run when a job ends (Studio: automatic score submission)
     shunt = None              # core_shunt settings: priority and cores for every job
+    plugin_env: dict = {}     # OMNICORTEX_URL / OMNICORTEX_TOKEN for plugin jobs
 
     def __init__(self, root: str | Path, max_running: int = 2, cwd: str | Path | None = None):
         """cwd: where jobs run, so the pipeline's relative data/, models/ and runs/
@@ -1119,6 +1120,8 @@ class JobRunner:
             d.mkdir(parents=True)
             log = open(d / "log.txt", "wb")
             env = dict(os.environ, PYTHONUNBUFFERED="1")
+            if kind.startswith("plugin:"):
+                env.update(self.plugin_env)          # Studio's address and token, for plugin jobs only
             if str(S) not in sys.path:
                 sys.path.insert(0, str(S))
             import core_shunt

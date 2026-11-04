@@ -105,7 +105,23 @@ def read_manifest(folder: Path) -> dict:
         _inside(folder, rel)
     if m.get("mcp") is not None and not (isinstance(m["mcp"], dict) and (m["mcp"].get("command") or m["mcp"].get("url"))):
         raise PluginError("mcp: needs a command (stdio) or a url")
+    smp = m.get("sampling")
+    if smp is not None:
+        if not isinstance(smp, dict) or any(k not in SAMPLING for k in smp if k != "friction"):
+            raise PluginError(f"sampling: an object of {', '.join(sorted(SAMPLING))} (and friction)")
+        for k, v in smp.items():
+            if k == "friction":
+                if not isinstance(v, dict):
+                    raise PluginError("sampling.friction: an object")
+            elif not isinstance(v, (int, float)) or isinstance(v, bool) or not SAMPLING[k][0] <= v <= SAMPLING[k][1]:
+                raise PluginError(f"sampling.{k}: a number from {SAMPLING[k][0]} to {SAMPLING[k][1]}")
     return m
+
+
+# Sampler settings a plugin may add to Studio's chat requests while it is on (llama-server names), with limits.
+SAMPLING = {"dry_multiplier": (0, 5), "dry_base": (1, 4), "dry_allowed_length": (1, 20), "dry_penalty_last_n": (-1, 32768),
+            "repeat_penalty": (1, 2), "repeat_last_n": (-1, 32768), "presence_penalty": (-2, 2),
+            "frequency_penalty": (-2, 2), "xtc_probability": (0, 1), "xtc_threshold": (0, 0.5)}
 
 
 class Plugins:
@@ -118,6 +134,8 @@ class Plugins:
         self.bundled = {Path(d).expanduser().resolve() for d in bundled or []}
         self.state_path = Path(state_path).expanduser()
         self.lock = threading.Lock()
+        self.env: dict = {}            # given to plugin scripts: OMNICORTEX_URL / OMNICORTEX_TOKEN, set by Studio
+        self._smp = (0.0, {})
 
     def _default_on(self, folder: Path, m: dict) -> bool:
         return bool(m.get("default")) and folder.resolve().parent in self.bundled
@@ -230,7 +248,7 @@ class Plugins:
         interp = c["interp"] if isinstance(c.get("interp"), list) else ([sys.executable] if script.suffix == ".py" else [])
         try:
             r = subprocess.run([*interp, str(script)], input=json.dumps(payload), capture_output=True, text=True,
-                               timeout=timeout, cwd=str(folder), env=dict(os.environ, PYTHONUNBUFFERED="1"))
+                               timeout=timeout, cwd=str(folder), env=dict(os.environ, PYTHONUNBUFFERED="1", **self.env))
         except subprocess.TimeoutExpired:
             raise PluginError(f"{plugin}/{check} took longer than {timeout:.0f}s") from None
         if r.returncode != 0:
@@ -253,6 +271,23 @@ class Plugins:
         res["spans"] = spans[:500]
         return res
 
+    def sampling(self, max_age: float = 10.0) -> dict:
+        """The sampling blocks of the plugins that are on, merged (cached a few seconds: chats call this)."""
+        import time as _t
+        t, cur = self._smp
+        if _t.time() - t < max_age:
+            return cur
+        out: dict = {}
+        for p in self.enabled():
+            smp = p["manifest"].get("sampling") or {}
+            for k, v in smp.items():
+                if k == "friction":
+                    out["friction"] = {**out.get("friction", {}), **v, "_plugin": p["name"]}
+                else:
+                    out[k] = max(out.get(k, v), v)       # the stronger setting wins when two plugins set one
+        self._smp = (_t.time(), out)
+        return out
+
     def graph_nodes(self) -> list[dict]:
         """Node types from enabled plugins, for graph_engine.py: one script per node type."""
         return [{"plugin": p["name"], **n} for p in self.enabled() for n in p["manifest"].get("nodes") or []]
@@ -269,7 +304,7 @@ class Plugins:
         interp = n["interp"] if isinstance(n.get("interp"), list) else ([sys.executable] if script.suffix == ".py" else [])
         try:
             r = subprocess.run([*interp, str(script)], input=json.dumps(payload, default=str), capture_output=True,
-                               text=True, timeout=timeout, cwd=str(folder), env=dict(os.environ, PYTHONUNBUFFERED="1"))
+                               text=True, timeout=timeout, cwd=str(folder), env=dict(os.environ, PYTHONUNBUFFERED="1", **self.env))
         except subprocess.TimeoutExpired:
             raise PluginError(f"{plugin}/{node_type} took longer than {timeout:.0f}s") from None
         if r.returncode != 0:

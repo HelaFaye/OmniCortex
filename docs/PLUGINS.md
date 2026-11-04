@@ -151,6 +151,21 @@ appears as `plugin:<plugin>:<type>` while the plugin is on.
 ([ADDONS.md](ADDONS.md)). A plugin with a `page` can also declare
 `"tab": {"label": "ComfyUI", "tip": "..."}` to get a sidebar tab while it is on.
 
+## Sampling and calling Studio
+
+`"sampling"` adds sampler settings to Studio's chat requests while the plugin is on. Allowed keys, within limits:
+- `dry_multiplier`, `dry_base`, `dry_allowed_length`, `dry_penalty_last_n`;
+- `repeat_penalty`, `repeat_last_n`;
+- `presence_penalty`, `frequency_penalty`;
+- `xtc_probability`, `xtc_threshold`.
+
+A value the request already sets is kept. When two plugins set the same key, the stronger value wins.
+`"friction": {"max_words", "bias", "min_replies"}` adds the semantic-friction logit bias (`scripts/friction.py`).
+
+Checks, graph nodes and the plugin's jobs run with `OMNICORTEX_URL` (Studio on this computer) and, when Studio
+has a token, `OMNICORTEX_TOKEN`. `scripts/plugin_api.py` uses them: `plugin_api.chat(model, messages)` and
+`plugin_api.call(path, body)`. Other jobs never see the token.
+
 ## Defaults, widgets, themes and downloads
 
 - `"default": true` marks a plugin that ships in the checkout's `plugins/` folder as on unless the owner turns it off ([ADDONS.md](ADDONS.md#default-packages)).

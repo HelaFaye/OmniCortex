@@ -1,0 +1,19 @@
+{
+  "name": "concept-translation",
+  "version": "1.0",
+  "author": "OmniCortex",
+  "default": true,
+  "description": "A bridge between two models' representations: fit a linear map from model A's layer to model B's on the same texts, then carry a concept direction (an emotion vector, an SAE feature, a steering vector) found in A over to B, with a held-out score that says how well the map holds.",
+  "jobs": [
+    {"kind": "fit", "title": "Concept translation: fit A → B", "script": "bridge.py",
+     "help": "Reads the same texts through both models (Hugging Face weights), pools each layer's residual stream per text, and fits a ridge map from A's layer to B's. Reports R² on held-out texts.",
+     "fields": [{"name": "model_a", "required": true}, {"name": "layer_a", "kind": "int", "required": true},
+                {"name": "model_b", "required": true}, {"name": "layer_b", "kind": "int", "required": true},
+                {"name": "texts", "required": true, "help": "a text file, one passage per line (a few hundred or more)"},
+                {"name": "alpha", "kind": "float", "default": 10.0}, {"name": "out", "required": true, "help": ".npz for the map"},
+                {"name": "device", "default": "auto"}]},
+    {"kind": "translate", "title": "Concept translation: carry a direction A → B", "script": "translate.py",
+     "help": "A direction in A's layer (.npy of A's width; an SAE decoder row, an emotion vector) mapped into B's layer, normalised, ready for B's steering.",
+     "fields": [{"name": "bridge", "required": true}, {"name": "vector", "required": true}, {"name": "out", "required": true}]}
+  ]
+}

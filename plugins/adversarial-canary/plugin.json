@@ -1,0 +1,20 @@
+{
+  "name": "adversarial-canary",
+  "version": "1.0",
+  "author": "OmniCortex",
+  "default": true,
+  "description": "A shadow test behind the chat: asks the model again with small perturbations to see if its answer holds, plants a canary instruction in pasted material to see if the model obeys text it should only read, and screens the prompt for injection attempts.",
+  "checks": [
+    {"name": "canary", "title": "Canary", "script": "canary.py", "auto": false,
+     "help": "re-asks with perturbations (answer stability) and plants a canary in pasted text (prompt-injection susceptibility); costs a few short extra model calls"},
+    {"name": "injection", "title": "Injection signs", "script": "screen.py", "auto": true,
+     "help": "signs in your message or pasted text that it tries to give the model instructions; no model call"}
+  ],
+  "nodes": [
+    {"type": "canary", "title": "Canary: stability and injection probe", "script": "node.py",
+     "inputs": [["prompt", "text", true]], "outputs": [["pass", "text"], ["fail", "text"], ["report", "list"]],
+     "params": [{"name": "model", "kind": "str", "default": "", "help": "model to probe (default: the one loaded)"},
+                {"name": "variants", "kind": "int", "default": 2}],
+     "help": "Runs the canary probes on a prompt before the main model answers it; fails when the answer is unstable or the planted canary is obeyed."}
+  ]
+}

@@ -1,0 +1,36 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cluster</title>
+<style>
+:root{--bg:#fafaf9;--fg:#1c1c1a;--mut:#6b6b66;--line:#e2e2de;--acc:#2d5bd7;--ok:#1f9d55}
+@media (prefers-color-scheme:dark){:root{--bg:#151514;--fg:#ececea;--mut:#9a9a94;--line:#2b2b29;--acc:#6f93ff;--ok:#3ccf7a}}
+body{margin:0;padding:12px 16px;font:14px/1.45 system-ui;background:var(--bg);color:var(--fg);max-width:900px}
+table{border-collapse:collapse;width:100%}td,th{padding:4px 8px;border-bottom:1px solid var(--line);text-align:left}
+.bar{height:6px;background:var(--line);border-radius:3px}.bar i{display:block;height:100%;background:var(--acc);border-radius:3px}
+small,.mut{color:var(--mut)}a{color:var(--acc)}input,button{font:inherit;color:inherit;background:transparent;border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+</style>
+<h2>Cluster</h2>
+<p class="mut">Free GPU memory on this computer and every connected host, live from Studio's system monitor. For a placement
+plan (one machine, or a layer split across several), give a model size below or run the job <b>Cluster: where does this
+model fit?</b>. <a href="/">← Studio</a> · <a href="/system">System</a></p>
+<table id="t"><tr><td class="mut">reading…</td></tr></table>
+<p><label>Model size <input id="gb" type="number" step="0.1" style="width:6rem"> GB</label>
+<label>+ cache <input id="ctx" type="number" step="0.1" value="1.5" style="width:5rem"> GB</label> <button id="go">Place it</button></p>
+<pre id="plan" class="mut" style="white-space:pre-wrap"></pre>
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let DEVS=[];
+async function load(){ const v=await (await fetch('/api/system/monitor')).json(); DEVS=[];
+  const add=(host,rows)=>{ const last=(rows||[]).slice(-1)[0]; for(const g of (last&&last.gpus)||[]){ if(!g.vram_total_mb) continue;
+    DEVS.push({host,gpu:g.name||g.id,free:(g.vram_total_mb-(g.vram_used_mb||0))/1024,total:g.vram_total_mb/1024,util:g.util}); } };
+  add('this computer',v.local); for(const [h,r] of Object.entries(v.hosts||{})) add(h,r);
+  $('#t').innerHTML=DEVS.length?'<tr><th>where</th><th>GPU</th><th>free</th><th></th><th>busy</th></tr>'+DEVS.map(d=>`<tr><td>${esc(d.host)}</td><td>${esc(d.gpu)}</td>
+    <td>${d.free.toFixed(1)} / ${d.total.toFixed(1)} GB</td><td style="width:30%"><div class="bar"><i style="width:${(100*(1-d.free/d.total)).toFixed(0)}%"></i></div></td><td>${d.util??'?'}%</td></tr>`).join('')
+    :'<tr><td class="mut">No GPU readings yet. Readings start when the System page is open or an automation rule is on.</td></tr>'; }
+$('#go').onclick=()=>{ const need=(+$('#gb').value||0)+(+$('#ctx').value||0); const u=[...DEVS].sort((a,b)=>b.free-a.free);
+  if(!u.length){ $('#plan').textContent='No readings.'; return; }
+  if(u[0].free*0.9>=need){ $('#plan').textContent=`Fits on ${u[0].host} (${u[0].gpu}): ${u[0].free.toFixed(1)} GB free.`; return; }
+  let tot=0,ch=[]; for(const d of u){ ch.push(d); tot+=d.free*0.9; if(tot>=need) break; }
+  $('#plan').textContent=tot<need?`Does not fit: ${tot.toFixed(1)} GB usable across every device, ${need.toFixed(1)} GB needed.`
+    :`Split across ${ch.length} devices: ${ch.map(d=>d.host+' '+d.gpu).join(', ')}.\nRun "Layer streaming: lend this computer's memory" on each other host, then set the model's RPC servers (the job "Cluster: where does this model fit?" writes the exact values).`; };
+load(); setInterval(load,5000);
+</script>

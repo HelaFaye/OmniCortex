@@ -44,8 +44,17 @@ and installed elsewhere.
 | `jewel-styles` | The icosphere and tesseract jewel styles, for the browser views (`styles.js`) and the Godot client (`styles.gd`, compiled by the client when it connects). Without it the jewel has the reactor core and off. |
 | `theme-pack` | The Arcade, Ember, Forest and Solar themes and the Ember, Cool, Arcade, Forest and Solar 3D palettes. The core keeps Midnight, Daylight, Contrast and Clinical. |
 | `graph-screens` | Graph nodes: a code security screen (shell injection, eval, disabled certificate checks, hard-coded secrets, destructive commands) and a prompt-injection screen for text a model is about to read. |
+| `semantic-friction` | Less repetition at the sampler, with no extra model pass. Inside each reply it turns on llama.cpp's DRY sampler. Across replies it applies a small negative logit bias to the distinctive words this chat's earlier replies keep reusing (the same opener, the same sign-off), never to words in your latest message. Its **Repetition** check shows what a reply repeats. |
+| `adversarial-canary` | A shadow test behind the chat. The **Canary** check asks the model again with small perturbations; an unstable answer is a hallucination risk. When your message carries pasted material, it plants an instruction there and flags the model if it obeys text it should only read. **Injection signs** (automatic, no model call) screens your message. The **Canary** graph node runs the same probes before the main model answers. The probes cost a few short extra model calls, so the Canary check runs when you click it. |
+| `concept-translation` | Maps one model's representations onto another's: a ridge map from model A's layer to model B's, fitted on the same texts and scored with held-out R². It then carries a concept direction (an emotion vector, an SAE decoder row, a steering vector) from A into B. Hugging Face weights. Below an R² of about 0.3 the map is mostly noise, and the job says so. |
+| `audio-stem-map` | A frequency map of WAV stems. Each band is judged against the spectrum's own tilt, so the check finds harshness (2–5 kHz), sibilance, boom, mud and hiss that stand out, as well as clipping, DC offset and out-of-phase channels. A repair pass turns flagged bands down by the amount they stick out, or by gains you give. MIDI files get velocity-spike and stuck-note checks. This is signal analysis on the audio itself; OmniCortex has no generative-audio model whose layers it could scale. |
+| `cluster-offload` | Where something should run. A live page of free GPU memory on this computer and every connected host. A plan job places a model of a given size: one device when it fits, otherwise the fewest devices that together do, as RPC servers and a tensor split in llama-server's device order (layer streaming, [INTEGRATED_OPTIONS.md](INTEGRATED_OPTIONS.md)). A Proxmox job reads a cluster's nodes, guests (VMs and LXC containers) and GPUs with a read-only API token. |
 
 `comfyui` and `claim-spotter` also ship here, but stay off until you turn them on.
+
+A package can also set sampler options for Studio's chat while it is on (`"sampling"`: DRY, repeat, presence
+and frequency penalties, XTC, within fixed limits; [PLUGINS.md](PLUGINS.md)). Its checks, nodes and jobs get
+`OMNICORTEX_URL` and `OMNICORTEX_TOKEN` to call Studio, through `scripts/plugin_api.py`.
 
 A package can add jewel styles (`"widgets": {"jewel_styles": [...], "js": "...", "gd": "..."}`
 inside its page folder) and themes (`"themes": "themes.json"`, the same shape as

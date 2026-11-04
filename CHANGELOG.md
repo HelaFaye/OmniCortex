@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added (default add-ons)
+
+- `semantic-friction`: DRY sampling within replies and a small bias away from words earlier replies keep reusing.
+- `adversarial-canary`: perturbation stability and planted-instruction probes, an automatic injection screen, and a graph node.
+- `concept-translation`: a ridge bridge between two models' layers, with held-out R², to carry concept directions across.
+- `audio-stem-map`: a tilt-aware frequency map of WAV stems (harshness, sibilance, boom, clipping, phase), a band repair, and MIDI checks.
+- `cluster-offload`: live free GPU memory across hosts, placement plans with RPC servers and a tensor split, and a Proxmox inventory.
+- Plugins can set sampler options for Studio's chat (`"sampling"`), and their scripts can call Studio (`scripts/plugin_api.py`).
+- docs/ADDON_IDEAS.md: every brainstormed idea not built yet, with a realistic path and what stands in the way.
+
 ### Added (integrated options, third batch)
 
 - Backend hot-swap: a model that cannot load for lack of memory or a driver fault loads again with fewer GPU layers, on an alternate llama-server, or on the CPU; a server that dies mid-chat is reloaded and the request sent once more.

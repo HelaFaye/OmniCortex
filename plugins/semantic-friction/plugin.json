@@ -1,0 +1,13 @@
+{
+  "name": "semantic-friction",
+  "version": "1.0",
+  "author": "OmniCortex",
+  "default": true,
+  "description": "Less repetition at the sampler, with no extra model pass: llama.cpp's DRY sampler inside each reply, and a small nudge away from the words this conversation's earlier replies keep reusing.",
+  "sampling": {"dry_multiplier": 0.8, "dry_base": 1.75, "dry_allowed_length": 2,
+               "friction": {"max_words": 8, "bias": -1.5, "min_replies": 2}},
+  "checks": [
+    {"name": "repetition", "title": "Repetition", "script": "check.py", "auto": false,
+     "help": "how much of this reply repeats itself, and the phrases it reuses from earlier replies"}
+  ]
+}

@@ -6620,6 +6620,13 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                     }
                 elif preset.get("grammar"):
                     payload["grammar"] = preset["grammar"]
+                try:                                  # sampling from add-ons that are on (semantic friction)
+                    smp = plugins().sampling()
+                    if smp:
+                        import friction
+                        payload = friction.apply(payload, smp)
+                except Exception as e:
+                    print(f"[studio] plugin sampling: {e}", file=sys.stderr)
                 if upstream is not None:
                     payload["model"] = rid
                 if morph:
@@ -6854,6 +6861,10 @@ def main(argv=None):
     threading.Thread(target=decay_loop, daemon=True).start()
 
     scheme = "https" if tls else "http"
+    penv = {"OMNICORTEX_URL": f"{scheme}://127.0.0.1:{a.port}", **({"OMNICORTEX_TOKEN": STATE["token"]} if STATE.get("token") else {})}
+    plugins().env = penv                      # plugin checks, nodes and jobs can call Studio's API
+    if STATE.get("jobs") is not None:
+        STATE["jobs"].plugin_env = penv
     print(f"OmniCortex Studio on {scheme}://{a.host}:{a.port}")
     notes = ["JIT " + ("on" if STATE["jit"] else "off")]
     if STATE["idle_ttl"]:
