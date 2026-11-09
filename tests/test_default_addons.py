@@ -17,6 +17,19 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "viz"))
 import friction  # noqa: E402
 
+
+@pytest.fixture(autouse=True, scope="module")
+def _isolate_modules():
+    """These add-ons' scripts have generic names (stream, plan, check, ...): forget them and their folders after
+    this file, so later tests import OmniCortex's own modules of the same names."""
+    paths = list(sys.path)
+    yield
+    for name, mod in list(sys.modules.items()):
+        f = getattr(mod, "__file__", "") or ""
+        if f and "plugins" in Path(f).parts:
+            del sys.modules[name]
+    sys.path[:] = paths
+
 NEW = ("semantic-friction", "adversarial-canary", "concept-translation", "audio-stem-map", "cluster-offload")
 
 

@@ -23,6 +23,19 @@ import staging as ST  # noqa: E402
 import stream as SM  # noqa: E402
 
 
+@pytest.fixture(autouse=True, scope="module")
+def _isolate_modules():
+    """These add-ons' scripts have generic names (stream, plan, check, ...): forget them and their folders after
+    this file, so later tests import OmniCortex's own modules of the same names."""
+    paths = list(sys.path)
+    yield
+    for name, mod in list(sys.modules.items()):
+        f = getattr(mod, "__file__", "") or ""
+        if f and "plugins" in Path(f).parts:
+            del sys.modules[name]
+    sys.path[:] = paths
+
+
 def standing(dx=0.0):
     return {"l_hip": [0.1 + dx, 0.9, 0], "r_hip": [-0.1 + dx, 0.9, 0], "l_knee": [0.1 + dx, 0.5, 0.04],
             "r_knee": [-0.1 + dx, 0.5, 0.04], "l_ankle": [0.1 + dx, 0.08, 0], "r_ankle": [-0.1 + dx, 0.08, 0],
