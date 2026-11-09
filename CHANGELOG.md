@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added (looped models: NVIDIA Dory)
+
+- Studio recognises looped models (`<arch>.num_loops`), tags them, and offers Loops and Recurrent KV cache settings (passed as `--override-kv`); Dory also gets `--jinja` and `--reasoning on` as its card recommends.
+- `build_llama_tools.sh --repo` (and the Build llama.cpp job) builds a fork, such as the one Dory's GGUF needs; `--ref` fetches from that repository.
+- `loop_sweep.py`: TestQA per loop count and KV mode, with confident mistakes, speed and paired changes.
+- `loop_lens.py`: a per-loop logit lens on Hugging Face weights, with the deciding loop and per-loop MLP and H-neuron activity.
+- NeMo Gym: `gym_bridge.py` exports TestQA, fuzzing banks and Fix This Mistake pairs as an environment's data, and `integrations/nemo_gym/omnicortex_testqa` rewards correct answers, pays a little for declining and charges for confident mistakes (optionally shaped by H-neuron risk).
+- docs/DORY.md; docs/MOBILE_CLIENTS.md, a plan for phone and cross-platform clients.
+
 ### Changed (the rest of the name)
 
 - Everything that still said NeuronScope now says OmniCortex: the launcher (`./omnicortex`), the data folders (`~/.omnicortex`, `~/.config/omnicortex`, moved on first start), environment variables (`OC_*`, `OCR_*`), the MCP server name, the route header, ComfyUI node ids, the remote agent and its package, cookies, and the `ns_*` modules (now `oc_*`, the CLI `scripts/oc.py`). No old names are kept as aliases; README.md lists what an existing install needs to change.

@@ -462,6 +462,9 @@ SPECS.update({
                      help="vulkan runs on AMD (incl. APUs), Intel and NVIDIA"),
                    F("dir", help="checkout folder (default ~/llama.cpp)"),
                    F("ref", help="llama.cpp tag or commit (default: tested)"),
+                   F("repo", help="clone this repository instead (a fork carrying a model llama.cpp has not merged, "
+                                   "e.g. NVIDIA's Dory: docs/DORY.md); use a new folder for it"),
+                   F("rpc", kind="bool", help="also build rpc-server (layer streaming across computers)"),
                    F("cuda_arch", help="CUDA architectures, e.g. 50-real;61-real (default: this machine's)"),
                    F("portable", kind="bool", help="no -march=native: the binaries run on other CPUs"),
                    F("server_activations", kind="bool", help="also patch llama-server to stream /activations")]},
@@ -594,6 +597,32 @@ SPECS.update({
         "help": "Checks every file's hash and that the pack was made on a model of this shape, then installs it.",
         "fields": [F("zip", flag="", req=True), F("n_layers", kind="int", req=True), F("d_model", kind="int", req=True),
                    F("hf_repo")]},
+    "loop_sweep": {
+        "title": "Looped model: sweep the loop count", "group": "Evaluate", "argv": [S / "loop_sweep.py"],
+        "help": "For a looped model (NVIDIA Dory): TestQA at each loop count, with accuracy, confident mistakes, "
+                "declines, speed and the paired changes. Needs a llama-server built with the model's support "
+                "(docs/DORY.md).",
+        "fields": [F("gguf", req=True), F("server", req=True, help="that llama-server"),
+                   F("tasks", default="qa/bank", help="a TestQA bank folder or JSONL"),
+                   F("loops", multi=True, default="1 2 3 4"), F("kv_mode", multi=True, default="per_loop",
+                   help="per_loop and/or last_loop"), F("ctx", kind="int", default=8192), F("ngl", kind="int", default=999),
+                   F("out", req=True)]},
+    "loop_lens": {
+        "title": "Looped model: what each loop adds (per-loop lens)", "group": "Interpret", "argv": [S / "loop_lens.py"],
+        "help": "Hugging Face weights. After each pass through the recurrent block: the answer the model would give, "
+                "its probability and the expected answer's rank, which loop decides, and each recurrent layer's MLP "
+                "and H-neuron activity per loop.",
+        "fields": [F("model", req=True), F("prompt", req=True), F("target", help="expected answer, e.g. ' Canberra'"),
+                   F("loops", kind="int"), F("h_neurons", help="h_neurons.json for this model"),
+                   F("device", default="auto"), F("trust_remote_code", kind="bool"), F("out", req=True)]},
+    "gym_export": {
+        "title": "NeMo Gym: export TestQA as an RL environment's data", "group": "Retrain",
+        "argv": [S / "gym_bridge.py", "export"],
+        "help": "TestQA items (and fuzzing banks, Fix This Mistake pairs) as a NeMo Gym dataset for the "
+                "omnicortex_testqa environment (integrations/nemo_gym), which rewards correct answers, pays a little "
+                "for declining and charges for confident mistakes.",
+        "fields": [F("bank", repeat=True, help="bank folder (default qa/bank)"), F("fuzz", repeat=True),
+                   F("harvest", kind="bool"), F("subject", repeat=True), F("out", req=True)]},
     "dep_gc": {
         "title": "Clean up build and download leftovers", "group": "Setup", "argv": [S / "dep_gc.py"],
         "help": "Interrupted downloads, Hugging Face cache blobs nothing uses, failed llama.cpp builds, __pycache__, "

@@ -276,6 +276,8 @@ section.chat{position:relative}
       </div>
       <div class="row2">
         <div><label>Tensor split</label><input id="tensor_split" placeholder="1,1,1,1"></div>
+        <div class="looped"><label title="Looped models (NVIDIA Dory): how many times the recurrent block runs per token. More loops, more computation per token and usually better answers; Dory takes 1 to 4 (2 by default). Empty: the model's default.">Loops</label><input id="loops" type="number" min="1" max="4" placeholder="model default"></div>
+        <div class="looped"><label title="per_loop: each loop keeps its own KV cache (memory grows with loops). last_loop: one cache, the memory of a single loop.">Recurrent KV cache</label><select id="loop_kv"><option value="">model default</option><option>per_loop</option><option>last_loop</option></select></div>
         <div><label title="llama.cpp rpc-servers on other computers that hold and run a share of the layers (layer streaming). Unencrypted: trusted network or a tunnel only.">RPC servers</label><input id="rpc" placeholder="box2:50052,box3:50052"></div>
         <div><label>Main GPU (-1 = auto)</label><input id="main_gpu" value="-1"></div>
       </div>
@@ -339,8 +341,8 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let models=[], sel=null, busy=false, ctrl=null, status_={}, pendingImgs=[];
 let chat={id:null,title:'New chat',messages:[]};
-const F=["ngl","ctx","batch","threads","experts","served_name","lora","extra","classifier","gpus","split_mode","tensor_split","main_gpu","rpc"];
-const TEXT_FIELDS=["served_name","lora","extra","classifier","gpus","split_mode","tensor_split","rpc"];
+const F=["ngl","ctx","batch","threads","experts","served_name","lora","extra","classifier","gpus","split_mode","tensor_split","main_gpu","rpc","loops","loop_kv"];
+const TEXT_FIELDS=["served_name","lora","extra","classifier","gpus","split_mode","tensor_split","rpc","loops","loop_kv"];
 // ---------- engine options (scripts/engine_options.py: one table for the form, the flags and the optimizer)
 let EO=null;
 async function loadEO(engine, values){
@@ -518,7 +520,7 @@ function renderModels(){
     return `<div class="m${sel&&sel.path===m.path?' sel':''}" data-i="${i}">
       <div class="mn">${esc(m.name)}${statBadge(m)}</div>
       <div class="mm">${m.quant?`<span class="tag">${esc(m.quant)}</span>`:''}${m.arch?`<span class="tag">${esc(m.arch)}</span>`:''}
-        ${m.n_experts?`<span class="tag">MoE ${m.n_experts}</span>`:''}${m.mmproj?'<span class="tag">vision</span>':''}
+        ${m.n_experts?`<span class="tag">MoE ${m.n_experts}</span>`:''}${m.looped?'<span class="tag" title="looped (latent-recurrent): set its loop count in the model settings">looped</span>':''}${m.mmproj?'<span class="tag">vision</span>':''}
         <span class="tag">${human(m.size)}</span>${fitBadge(f)}</div>
       <div class="mm ${cls}">${esc(f.note||'')}</div>${statLine(m)}</div>`;
   }).join('') : '<div class="note">No .gguf files found under the configured directories.</div>';
@@ -533,6 +535,8 @@ function pick(i){
   const s=sel.settings||{};
   F.forEach(k=>{ if($('#'+k)) $('#'+k).value = s[k] ?? ''; });
   $('#moebox').style.display = sel.n_experts?'block':'none';
+  document.querySelectorAll('.looped').forEach(e=>e.style.display=sel.looped?'':'none');
+  if(sel.looped) $('#loops').placeholder = sel.loops_default?`model default (${sel.loops_default})`:'model default';
   if(sel.n_experts) $('#moehint').textContent = `0 = model default (of ${sel.n_experts})`;
   $('#visionrow').style.display = sel.mmproj?'block':'none';
   $('#statsbox').innerHTML = statsTable(sel.stats); renderRadar(); quantBox();

@@ -117,6 +117,16 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 | [toyxyz](https://github.com/toyxyz)'s RGB mocap workflows | The idea of driving engines from video-derived pose data |
 | The [VMC protocol](https://protocol.vmc.info/) | `stream.py --vmc`: how engines and avatar tools receive the poses |
 
+## Looped models and NVIDIA's training stack
+
+| Work | Used for |
+|---|---|
+| NVIDIA, [Nemotron-Labs Dory 1.0 4B](https://huggingface.co/nvidia/NVIDIA-Nemotron-Labs-Dory1.0-4B-BF16) (OpenMDW-1.1), and its llama.cpp support (ggml-org/llama.cpp#30306, the fork its card pins) | Looped-model serving, `loop_sweep.py`, `loop_lens.py` ([DORY.md](DORY.md)) |
+| [NVIDIA-NeMo/Gym](https://github.com/NVIDIA-NeMo/Gym) (Apache-2.0) | The resources-server interface `integrations/nemo_gym/omnicortex_testqa` implements |
+| [NVIDIA-NeMo/RL](https://github.com/NVIDIA-NeMo/RL) (Apache-2.0) | GRPO training on that environment |
+| [NVIDIA/Megatron-LM](https://github.com/NVIDIA/Megatron-LM) | Background: how Dory was pre-trained |
+| [orailnoor/cross-platform-llm-client](https://github.com/orailnoor/cross-platform-llm-client) (MIT) | The starting point for the phone client plan ([MOBILE_CLIENTS.md](MOBILE_CLIENTS.md)) |
+
 ## Datasets and benchmarks
 
 | Work | Used for |

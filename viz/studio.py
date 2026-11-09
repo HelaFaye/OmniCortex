@@ -123,6 +123,12 @@ def _gguf_meta(path):
             out["n_experts"] = kv(f"{arch}.expert_count")
             out["n_experts_used"] = kv(f"{arch}.expert_used_count")
             out["context"] = kv(f"{arch}.context_length")
+            # looped (latent-recurrent) models such as NVIDIA's Dory: the recurrent block's repeat count and KV mode
+            loops = kv(f"{arch}.num_loops")
+            if loops is not None or arch == "dory":
+                out["looped"] = True
+                out["loops_default"] = loops
+                out["loop_kv_default"] = kv(f"{arch}.recurrent_kv_cache_mode")
         out["params"] = kv("general.parameter_count") or kv("general.size_label")
     except Exception as e:
         out["error"] = str(e)[:120]
@@ -495,6 +501,10 @@ DEFAULTS = {"ngl": 99, "ctx": 8192, "batch": 2048, "threads": 0,
             # (CUDA_VISIBLE_DEVICES), how llama-server splits it (layer | row |
             # none), the per-GPU proportions ("1,1,1,1") and the main GPU.
             "gpus": "", "split_mode": "", "tensor_split": "", "main_gpu": -1,
+            # Looped models (docs/DORY.md): how many times the recurrent block runs (1-4 for Dory; more loops,
+            # more computation per token) and whether each loop keeps its own KV cache (per_loop) or shares
+            # one (last_loop: the KV memory of a single loop). Empty: the model's own defaults.
+            "loops": "", "loop_kv": "",
             # Layer streaming (docs/INTEGRATED_OPTIONS.md): llama.cpp rpc-servers on other computers that hold
             # and run a share of the layers ("host:50052,host2:50052"); -ts then splits across them too.
             "rpc": ""}
@@ -822,6 +832,26 @@ def server_cmd(model, settings, port):
             if arch:
                 cmd += ["--override-kv",
                         f"{arch}.expert_used_count=int:{settings['experts']}"]
+        if model.get("looped") and model.get("arch"):
+            arch, kvs = model["arch"], []
+            if str(settings.get("loops") or "").strip():
+                n = int(settings["loops"])
+                if not 1 <= n <= 16:
+                    raise ValueError("loops: 1 to 16 (Dory: 1 to 4)")
+                kvs.append(f"{arch}.num_loops=int:{n}")
+            if settings.get("loop_kv"):
+                if settings["loop_kv"] not in ("per_loop", "last_loop"):
+                    raise ValueError("recurrent KV cache: per_loop or last_loop")
+                kvs.append(f"{arch}.recurrent_kv_cache_mode=str:{settings['loop_kv']}")
+            if kvs:
+                cmd += ["--override-kv", ",".join(kvs)]
+            extra = str(settings.get("extra") or "")
+            if arch == "dory":
+                # the model card's recipe: tool calls through the chat template, reasoning on
+                if "--jinja" not in extra:
+                    cmd.append("--jinja")
+                if "--reasoning" not in extra:
+                    cmd += ["--reasoning", "on"]
         if settings.get("split_mode"):
             if settings["split_mode"] not in ("layer", "row", "none", "tensor"):
                 raise ValueError("split mode must be layer, row, tensor or none")
