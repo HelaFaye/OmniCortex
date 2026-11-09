@@ -1,4 +1,4 @@
-"""Workspaces (scripts/ns_workspace.py) and tool approval rules
+"""Workspaces (scripts/oc_workspace.py) and tool approval rules
 (scripts/tool_rules.py)."""
 import json
 import sys
@@ -9,22 +9,22 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import ns_workspace as ws  # noqa: E402
+import oc_workspace as ws  # noqa: E402
 import tool_rules as tr  # noqa: E402
 
 
 @pytest.fixture()
 def cfg(tmp_path, monkeypatch):
     p = tmp_path / "config.json"
-    monkeypatch.setenv("NS_CONFIG", str(p))
-    monkeypatch.delenv("NS_WORKSPACE", raising=False)
+    monkeypatch.setenv("OC_CONFIG", str(p))
+    monkeypatch.delenv("OC_WORKSPACE", raising=False)
     return p
 
 
 def test_default_workspace_and_legacy_paths(cfg, tmp_path):
     a = ws.active()
     assert a["name"] == "default" and a["root"] == str(ROOT)
-    assert a["traces_dir"].endswith("/.neuronscope/traces")
+    assert a["traces_dir"].endswith("/.omnicortex/traces")
     # Paths the Setup page saved before workspaces existed still count.
     models = tmp_path / "m"
     models.mkdir()
@@ -46,8 +46,8 @@ def test_add_use_env_and_validation(cfg, tmp_path):
     a = ws.active()
     assert a["name"] == "ext" and a["server"] == str(srv) and a["review_dir"] == str(tmp_path / "state" / "review")
     env = ws.env_for(a)
-    assert env["NS_ROOT"] == str(root) and env["NS_LLAMA_SERVER"] == str(srv) and env["VK_DRIVER_FILES"]
-    assert "NS_CETT" not in env                         # not built: not exported
+    assert env["OC_ROOT"] == str(root) and env["OC_LLAMA_SERVER"] == str(srv) and env["VK_DRIVER_FILES"]
+    assert "OC_CETT" not in env                         # not built: not exported
     for bad in ({"root": str(tmp_path / "missing")}, {"env": {"PATH": "/x"}}, {"env": {"lower": "x"}},
                 {"server": str(models)}, {"nonsense": 1}, {"models_dirs": [str(tmp_path / "nope")]}):
         with pytest.raises(ValueError):
@@ -69,7 +69,7 @@ def test_cli_env(cfg, tmp_path, capsys):
     capsys.readouterr()
     assert ws.main(["env"]) == 0
     out = capsys.readouterr().out
-    assert f"export NS_ROOT={tmp_path / 'r'}" in out and "export HSA_OVERRIDE_GFX_VERSION=9.0.0" in out
+    assert f"export OC_ROOT={tmp_path / 'r'}" in out and "export HSA_OVERRIDE_GFX_VERSION=9.0.0" in out
     assert ws.main(["set", "w2", "env.PATH", "/x"]) == 2
 
 

@@ -29,9 +29,9 @@ def test_api_default_and_viewer_cookie(studio_srv):
     st, r = call(studio_srv, "/api/settings/theme", {"theme": "arcade"})
     assert st == 200 and studio.STATE["viz_theme"] == "arcade"
     h = studio.Handler.__new__(studio.Handler)
-    h.headers = {"Cookie": "ns_viz=ember"}
+    h.headers = {"Cookie": "oc_viz=ember"}
     assert h._viz_theme({"x": 1})["active"] == "#EF9F27"
-    h.headers = {"Cookie": "ns_viz=nonsense"}
+    h.headers = {"Cookie": "oc_viz=nonsense"}
     t = h._viz_theme({"x": 1})
     assert t["x"] == 1 and "jewel" in t["widgets"]          # the 3D theme carries the widget settings (WIDGETS.md)
     with urllib.request.urlopen(studio_srv + "/settings") as r:

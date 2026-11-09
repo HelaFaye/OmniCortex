@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-import ns_security as sec  # noqa: E402
-import ns_transfer as nt  # noqa: E402
+import oc_security as sec  # noqa: E402
+import oc_transfer as nt  # noqa: E402
 
 
 def test_generated_token_is_256_bits():
@@ -146,10 +146,10 @@ def test_tls_roundtrip(tmp_path):
 
 
 def test_mcp_never_puts_token_in_state_or_argv(tmp_path, monkeypatch):
-    monkeypatch.setenv("NS_CONFIG_DIR", str(tmp_path))
-    monkeypatch.setenv("NS_TRANSFER_MCP_STATE", str(tmp_path / "state.json"))
+    monkeypatch.setenv("OC_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("OC_TRANSFER_MCP_STATE", str(tmp_path / "state.json"))
     import importlib
-    import ns_transfer_mcp as m
+    import oc_transfer_mcp as m
     m = importlib.reload(m)
     monkeypatch.setattr(m, "_keyring", lambda: None)
     # Legacy state with an inline token is migrated out on load.

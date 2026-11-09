@@ -16,7 +16,7 @@ are not profiled. A model with an H-Neuron classifier gets its risk score from t
 
 | store | for |
 |---|---|
-| on this computer | the default: the review store (`~/.neuronscope/review`, or `--review-dir`) |
+| on this computer | the default: the review store (`~/.omnicortex/review`, or `--review-dir`) |
 | in another folder | a second disk, a network share, a mounted bucket: a host with little space of its own |
 | on another OmniCortex Studio | sent over HTTPS with that Studio's token (`POST /api/review/ingest`) to a server that keeps everyone's activations |
 | in memory only | a host with no persistent storage: kept until Studio restarts |

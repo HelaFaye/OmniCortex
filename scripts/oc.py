@@ -3,23 +3,23 @@
 OmniCortex from a terminal: everything Studio's web pages do, against a
 running Studio on this machine or another.
 
-Every command is one of the MCP tools (scripts/ns_mcp.py), so the terminal,
+Every command is one of the MCP tools (scripts/oc_mcp.py), so the terminal,
 agents and the web pages all go through the same Studio API, plus an
 interactive chat and job-log following:
 
-    python scripts/ns.py                                  # the commands
-    python scripts/ns.py studio-status
-    python scripts/ns.py list-models
-    python scripts/ns.py chat                             # interactive; /check, /right, /wrong, /model, /quit
-    python scripts/ns.py chat --model auto "Is 2**61-1 prime?"
-    python scripts/ns.py start-job --kind testqa --values '{"endpoint": ["m=http://127.0.0.1:7870/v1@MODEL"], "out": "runs/t.json"}'
-    python scripts/ns.py follow JOB_ID                    # a job's log as it runs
-    python scripts/ns.py get-project --id 20261012-5a19c04a
-    python scripts/ns.py review-summary --model acme/model-q4_k_m --subjects math --by month
-    python scripts/ns.py --studio https://gpu-box:7870 --token-file ~/.config/neuronscope/studio.token --cafile studio.pem list-models
+    python scripts/oc.py                                  # the commands
+    python scripts/oc.py studio-status
+    python scripts/oc.py list-models
+    python scripts/oc.py chat                             # interactive; /check, /right, /wrong, /model, /quit
+    python scripts/oc.py chat --model auto "Is 2**61-1 prime?"
+    python scripts/oc.py start-job --kind testqa --values '{"endpoint": ["m=http://127.0.0.1:7870/v1@MODEL"], "out": "runs/t.json"}'
+    python scripts/oc.py follow JOB_ID                    # a job's log as it runs
+    python scripts/oc.py get-project --id 20261012-5a19c04a
+    python scripts/oc.py review-summary --model acme/model-q4_k_m --subjects math --by month
+    python scripts/oc.py --studio https://gpu-box:7870 --token-file ~/.config/omnicortex/studio.token --cafile studio.pem list-models
 
 --json prints the raw answer. Settings, workspaces and tool rules are local
-files: scripts/ns_workspace.py and scripts/tool_rules.py.
+files: scripts/oc_workspace.py and scripts/tool_rules.py.
 """
 from __future__ import annotations
 
@@ -32,12 +32,12 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import ns_mcp  # noqa: E402
+import oc_mcp  # noqa: E402
 
 KIND = {"string": str, "integer": int, "number": float}
 
 
-class Client(ns_mcp.Studio):
+class Client(oc_mcp.Studio):
     def __init__(self, base, token=None, cafile=None):
         super().__init__(base, token)
         if cafile and base.startswith("https://"):
@@ -121,7 +121,7 @@ def chat(st: Client, model: str, first: str | None) -> int:
         msgs.append({"role": "user", "content": text})
         try:
             r = st.call("POST", "/v1/chat/completions", {"model": model, "messages": msgs, "stream": False})
-        except ns_mcp.ToolError as e:
+        except oc_mcp.ToolError as e:
             msgs.pop()
             print(f"! {e}")
             return
@@ -158,7 +158,7 @@ def chat(st: Client, model: str, first: str | None) -> int:
             try:
                 r = st.call("POST", "/api/trace", {"model": model if model not in ("", "auto") else None,
                                                    "messages": msgs[:-1], "text": msgs[-1]["content"]}, timeout=1800)
-            except ns_mcp.ToolError as e:
+            except oc_mcp.ToolError as e:
                 print(f"! {e}")
                 continue
             flagged = [r["pieces"][i] for i in r["flagged"]]
@@ -205,7 +205,7 @@ def settings(st: Client, a) -> int:
             r = w["resolved"]
             print(f"{'*' if w['active'] else ' '} {w['name']:<14} root {r['root']}  models {', '.join(r['models_dirs'][:2])}")
         if d.get("restart_needed"):
-            print("Studio switches after a restart: python scripts/ns.py restart")
+            print("Studio switches after a restart: python scripts/oc.py restart")
         return 0
     if a.cmd == "subject-defaults":
         d = st.call("GET", "/api/settings")
@@ -233,11 +233,16 @@ def settings(st: Client, a) -> int:
 
 
 def main(argv=None) -> int:
+    try:
+        import oc_migrate
+        oc_migrate.migrate()
+    except ImportError:
+        pass
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], epilog="commands: " + ", ".join(
-        ["chat", "follow"] + [_cmd(t[0]) for t in ns_mcp.TOOLS]))
-    p.add_argument("--studio", default=os.environ.get("NS_STUDIO_URL", "http://127.0.0.1:7870"),
-                   help="Studio's address (default $NS_STUDIO_URL or http://127.0.0.1:7870)")
-    p.add_argument("--token-file", help="Studio's token (or a paired device's); default $NS_STUDIO_TOKEN")
+        ["chat", "follow"] + [_cmd(t[0]) for t in oc_mcp.TOOLS]))
+    p.add_argument("--studio", default=os.environ.get("OC_STUDIO_URL", "http://127.0.0.1:7870"),
+                   help="Studio's address (default $OC_STUDIO_URL or http://127.0.0.1:7870)")
+    p.add_argument("--token-file", help="Studio's token (or a paired device's); default $OC_STUDIO_TOKEN")
     p.add_argument("--cafile", help="certificate to trust for a self-signed Studio")
     p.add_argument("--json", action="store_true", help="print raw JSON")
     sub = p.add_subparsers(dest="cmd")
@@ -257,7 +262,7 @@ def main(argv=None) -> int:
     tq.add_argument("--kind", action="append", default=[])
     sub.add_parser("restart", help="restart Studio")
     tools = {}
-    for name, desc, schema, _ann, fn in ns_mcp.TOOLS:
+    for name, desc, schema, _ann, fn in oc_mcp.TOOLS:
         if name == "chat":
             continue
         _add_tool(sub, name, desc, schema)
@@ -270,7 +275,7 @@ def main(argv=None) -> int:
     if not a.cmd:
         p.print_help()
         return 0
-    token = os.environ.get("NS_STUDIO_TOKEN") or None
+    token = os.environ.get("OC_STUDIO_TOKEN") or None
     if a.token_file:
         token = Path(os.path.expanduser(a.token_file)).read_text().strip()
     st = Client(a.studio, token, a.cafile)
@@ -285,7 +290,7 @@ def main(argv=None) -> int:
         args = {k: v for k, v in vars(a).items() if k not in ("studio", "token_file", "cafile", "json", "cmd")
                 and v not in (None, False)}
         out = fn(st, args)
-    except ns_mcp.ToolError as e:
+    except oc_mcp.ToolError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     if a.json:

@@ -12,7 +12,7 @@ from pathlib import Path
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument("--version", default="4.7.2-stable")
-p.add_argument("--folder", default="~/.neuronscope/godot")
+p.add_argument("--folder", default="~/.omnicortex/godot")
 a = p.parse_args()
 if not a.version.replace(".", "").replace("-", "").isalnum():
     raise SystemExit("version: a Godot release tag such as 4.7.2-stable")

@@ -1,6 +1,6 @@
 """Studio's /settings page: workspaces (where models, llama.cpp, pipeline data
 and Studio's state live), the model to use per subject, and tool approval
-rules for MCP tools in chat. Same as scripts/ns_workspace.py and
+rules for MCP tools in chat. Same as scripts/oc_workspace.py and
 scripts/tool_rules.py on the command line."""
 
 PAGE = r"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -68,7 +68,7 @@ dialog.dlg::backdrop{background:rgba(0,0,0,.5)}dialog.dlg form{padding:1rem 1.1r
 <div class="row" style="margin-top:.5rem"><button class="pri" id="wdSave">Save widgets</button><button id="wdReset">Back to the theme's</button><span id="wdMsg" class="note"></span></div></section>
 
 <section class="card" id="workspaces"><h2>Workspaces</h2>
-<div class="note">Where things are, by name: the models, the llama.cpp build, the folder that holds the pipeline's data (<code>data/</code>, <code>models/</code>, <code>runs/</code>…; jobs run there), Studio's own state, and environment for the GPU stack. Keep one per disk layout or machine, and switch instead of passing paths. Command line: <code>python scripts/ns_workspace.py</code>.</div>
+<div class="note">Where things are, by name: the models, the llama.cpp build, the folder that holds the pipeline's data (<code>data/</code>, <code>models/</code>, <code>runs/</code>…; jobs run there), Studio's own state, and environment for the GPU stack. Keep one per disk layout or machine, and switch instead of passing paths. Command line: <code>python scripts/oc_workspace.py</code>.</div>
 <div class="tabs" id="wstabs"></div>
 <div id="wsform"></div>
 <div class="row" style="margin-top:.7rem"><button class="pri" id="wssave">Save</button><button id="wsuse">Use this workspace</button>
@@ -178,7 +178,7 @@ dialog.dlg::backdrop{background:rgba(0,0,0,.5)}dialog.dlg form{padding:1rem 1.1r
 <li><b>A verification log, private</b>: per test item, its id, the verdict and the model's reply. The scoreboard uses it only to check the card by grading the replies again; it must not publish it.</li>
 <li><b>Never sent</b>: your chats, prompts you typed, file paths, user or computer names, tokens, other models.</li>
 <li><b>Public only for models anyone can find</b>: the file's SHA-256 matches a file in its Hugging Face repo, or you list an unlisted model below. Everything else is private, or not sent.</li>
-<li>Every submission is kept on this computer exactly as sent (<code>~/.neuronscope/submissions/</code>), and listed below.</li>
+<li>Every submission is kept on this computer exactly as sent (<code>~/.omnicortex/submissions/</code>), and listed below.</li>
 </ul></details>
 <label><input type="checkbox" id="shOn"> Share results</label>
 <label title="A scoreboard server's address, or github:owner/repo for a scoreboard kept in a GitHub repository">Scoreboard<input id="shEp" placeholder="https://scores.example.org or github:owner/repo"></label>
@@ -273,7 +273,7 @@ function wsForm(){
       (big?`<textarea data-f="${k}" hidden>${esc(val||'')}</textarea><div data-wl="${k}" data-dflt="${esc(dflt)}"></div>`:`<input data-f="${k}" value="${esc(val||'')}" placeholder="${esc(dflt?'default: '+dflt:'')}"${pick?` data-pick="${pick}"`:''}${k==='gguf'?' data-ext="gguf"':''}>`)+
       `${missing?`<div class="miss">${esc(missing)}${k==='server'||k==='cett'?' · <a href="/setup#build">build llama.cpp</a>':''}</div>`:''}<div data-err="${k}" class="err"></div>`; };
   $('#wsform').innerHTML=`<div class="grid"><div>${['root','models_dirs','download_dir','gguf','note'].map(field).join('')}</div><div>${['llama_dir','server','cett','state_dir','env'].map(field).join('')}</div></div>`+
-    `<div class="note" style="margin-top:.5rem">Saved in <code>${esc(WS.config)}</code>. ${WS.env_override?`Studio was started with workspace ${esc(WS.env_override)} (--workspace or NS_WORKSPACE); “active” applies when it starts without one.`:''} Empty fields use the default shown in grey.</div>`;
+    `<div class="note" style="margin-top:.5rem">Saved in <code>${esc(WS.config)}</code>. ${WS.env_override?`Studio was started with workspace ${esc(WS.env_override)} (--workspace or OC_WORKSPACE); “active” applies when it starts without one.`:''} Empty fields use the default shown in grey.</div>`;
   // Per-entry lists, synced into the hidden fields wsValues reads.
   document.querySelectorAll('[data-wl]').forEach(d=>{ const k=d.dataset.wl, ta=document.querySelector(`#wsform textarea[data-f=${k}]`), dirs=k==='models_dirs';
     nsListEditor(d,{values:ta.value.split('\n').map(x=>x.trim()).filter(Boolean),want:'dir',browse:dirs,addLabel:dirs?'+ Add folder':'+ Add variable',

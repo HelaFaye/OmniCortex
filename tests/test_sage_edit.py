@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 torch = pytest.importorskip("torch")
 import sage_edit as sg  # noqa: E402
 
-LLAMA = Path(os.environ.get("NS_LLAMA") or "~/llama.cpp").expanduser()
+LLAMA = Path(os.environ.get("OC_LLAMA") or "~/llama.cpp").expanduser()
 
 
 def test_edit_never_moves_the_protected_component():

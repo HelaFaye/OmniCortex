@@ -15,7 +15,7 @@ model, an edited GGUF or a graph is sent there (Connect → a host → Compare e
 
     python scripts/dep_snapshot.py snapshot --out here.json
     python scripts/dep_snapshot.py diff here.json there.json
-    python scripts/dep_snapshot.py sandbox --source here.json --dir ~/.neuronscope/sandboxes/job1
+    python scripts/dep_snapshot.py sandbox --source here.json --dir ~/.omnicortex/sandboxes/job1
 """
 from __future__ import annotations
 

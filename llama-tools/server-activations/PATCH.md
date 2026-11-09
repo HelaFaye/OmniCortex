@@ -19,19 +19,19 @@ left alone.
 
 ## What it changes
 
-**Files added to `tools/server/`:** `ns_activations.h` (callback, reduction,
+**Files added to `tools/server/`:** `oc_activations.h` (callback, reduction,
 classifier, per-subscriber queues; no llama.cpp internals) and
-`ns_server_glue.h` (the two globals and the SSE handler).
+`oc_server_glue.h` (the two globals and the SSE handler).
 
 **1. `server-context.cpp`, before `common_init_from_params`:** with
-`NS_ACTIVATIONS=sparse|binned|raw` set, put `ns::eval_callback` into
+`OC_ACTIVATIONS=sparse|binned|raw` set, put `ns::eval_callback` into
 `params_base.cb_eval`. Refused with a warning when `--parallel > 1`: a batch
 then interleaves several sequences and graph nodes carry no sequence id, so
-frames would mix conversations. `NS_TOPK` and `NS_BINS` tune the reductions.
+frames would mix conversations. `OC_TOPK` and `OC_BINS` tune the reductions.
 
 **2. `server-context.cpp`, after the model loads:** read the layer count, and
-load `NS_CLASSIFIER` if set. The expected size is layers × `feed_forward_length`
-from the GGUF metadata (`NS_NFF` overrides it); a classifier for another model
+load `OC_CLASSIFIER` if set. The expected size is layers × `feed_forward_length`
+from the GGUF metadata (`OC_NFF` overrides it); a classifier for another model
 is refused.
 
 **3. `src/llama-context.cpp`, before the graph-reuse check in
@@ -44,7 +44,7 @@ evaluates one sequence per process.
 **4. `server.cpp`:** register `GET /activations` beside `/metrics`. Each client
 gets a bounded queue that drops frames rather than block the inference thread;
 the subscription ends when the connection closes. A keepalive comment goes out
-every ~10 s of silence. Without `NS_ACTIVATIONS` the route answers 503.
+every ~10 s of silence. Without `OC_ACTIVATIONS` the route answers 503.
 It is not a public endpoint, so llama-server's `--api-key` applies to it as to
 `/completion`; frames reveal what is being generated, so expose it no more
 widely than the completion API.
@@ -92,8 +92,8 @@ unsubscribed callback costs nothing.
 ## Running it
 
 ```bash
-NS_ACTIVATIONS=sparse NS_TOPK=48 \
-NS_CLASSIFIER=models/classifier.bin \
+OC_ACTIVATIONS=sparse OC_TOPK=48 \
+OC_CLASSIFIER=models/classifier.bin \
   ./build/bin/llama-server -m model.gguf --parallel 1 --port 8080
 
 python viz/stream.py --source http://127.0.0.1:8080 --token-file viewer.token --host 0.0.0.0 --allow-plaintext
@@ -107,7 +107,7 @@ subscribed, before any device copy. Leaving the flag on is free.
 **Cost when watching** is one `ggml_backend_tensor_get` per layer per token
 plus a pass over `n_layers * n_ff` floats. On a 36x14336 model that is ~2 MB of
 device-to-host copy per token. At 4 tok/s it is not the bottleneck; at 60 tok/s
-on a fast card it might be, in which case use `NS_ACTIVATIONS=sparse` and
+on a fast card it might be, in which case use `OC_ACTIVATIONS=sparse` and
 accept the top-k selection cost instead.
 
 **Prefill is skipped.** Frames are only emitted when the batch is a single

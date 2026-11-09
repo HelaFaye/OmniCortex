@@ -7,7 +7,7 @@ import sys
 import comfy as C
 
 p = argparse.ArgumentParser(description=__doc__)
-p.add_argument("--folder", default="~/.neuronscope/comfyui")
+p.add_argument("--folder", default="~/.omnicortex/comfyui")
 p.add_argument("--port", type=int, default=8188)
 p.add_argument("--listen", default="127.0.0.1")
 p.add_argument("--vram", default="normal", choices=["normal", "low", "high", "cpu"])

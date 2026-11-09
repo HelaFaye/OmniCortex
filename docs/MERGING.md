@@ -62,7 +62,7 @@ fine-tunes of one base.
 
 **Special cases:** `passthrough` is not a merge -- it stacks layer ranges and
 changes the parameter count, so nothing else in this toolkit applies to the
-result. `neuronscope_select` is ours and needs a trained classifier first.
+result. `omnicortex_select` is ours and needs a trained classifier first.
 
 The generator enforces each method's arity and base requirement, so
 `slerp` with three models or `ties` without a base fails immediately rather
@@ -84,18 +84,18 @@ reference to what the parameters do. OmniCortex selects by a classifier trained 
 measured behaviour. Semantic selection instead of magnitude selection, and to
 my knowledge nobody has tried it as a merge criterion.
 
-`scripts/mergekit_neuronscope.py` registers `neuronscope_select` via mergekit's
+`scripts/mergekit_omnicortex.py` registers `omnicortex_select` via mergekit's
 `@merge_method` decorator:
 
 ```bash
 pip install -e /path/to/mergekit
-export NEURONSCOPE_NEURONS=models/h_neurons.json
-python scripts/mergekit_neuronscope.py            # prints a config to start from
+export OMNICORTEX_NEURONS=models/h_neurons.json
+python scripts/mergekit_omnicortex.py            # prints a config to start from
 mergekit-yaml merge.yaml ./out
 ```
 
 ```yaml
-merge_method: neuronscope_select
+merge_method: omnicortex_select
 base_model: org/base-model
 models:
   - model: org/finetuned-model

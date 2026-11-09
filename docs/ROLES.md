@@ -27,14 +27,14 @@ work in another.
 
 | connection | controller | does the work | protocol | where you set it up |
 |---|---|---|---|---|
-| an agent app uses OmniCortex's tools | the agent app | Studio's computer | MCP at Studio's `/mcp` (or `scripts/ns_mcp.py`, stdio) | Connect page |
+| an agent app uses OmniCortex's tools | the agent app | Studio's computer | MCP at Studio's `/mcp` (or `scripts/oc_mcp.py`, stdio) | Connect page |
 | an app chats with your models | the app | Studio's computer (or wherever Studio routes it) | OpenAI API at Studio's `/v1` | Connect page |
 | Studio uses another computer's LLMs | Studio | the host | MCP to OmniCortex Remote on the host | Remote page |
-| an agent app uses another computer's LLMs | the agent app | the host | MCP: `neuronscope_remote bridge <host>` on the app's computer | CONNECT.md, *MCP, step by step* B |
+| an agent app uses another computer's LLMs | the agent app | the host | MCP: `omnicortex_remote bridge <host>` on the app's computer | CONNECT.md, *MCP, step by step* B |
 | Studio sends project tasks to an endpoint | Studio | the endpoint's computer | OpenAI API at the endpoint's `/v1` | Workers page |
 | Studio's chat calls tools | Studio | wherever each tool server runs | MCP, from `mcp.json` and plugins | Settings, Plugins |
 | two Studios share models | the Studio that links | the linked Studio | Studio's API, with a device token | Connect → Devices |
-| an MCP client drives file transfers on another computer | Studio, or any MCP client | the computer running `ns_transfer_mcp.py --http` | MCP at its `/mcp`, bearer token | TRANSFER.md, *Over the network* |
+| an MCP client drives file transfers on another computer | Studio, or any MCP client | the computer running `oc_transfer_mcp.py --http` | MCP at its `/mcp`, bearer token | TRANSFER.md, *Over the network* |
 
 ## Ports
 
@@ -46,8 +46,8 @@ work in another.
 | 47870 (UDP) | OmniCortex Remote's beacon while pairing is open | UDP | no |
 | 8080 | llama-server (Studio's chat model) | OpenAI API | no |
 | 8090 | decode_lab (optional) | OpenAI API | no |
-| 8765 | `ns_transfer_mcp.py --http` (optional) | HTTP(S), bearer token | yes, at `/mcp` |
-| 8810 | `ns_transfer.py serve`, a file receiver | HTTP(S), bearer token | no |
+| 8765 | `oc_transfer_mcp.py --http` (optional) | HTTP(S), bearer token | yes, at `/mcp` |
+| 8810 | `oc_transfer.py serve`, a file receiver | HTTP(S), bearer token | no |
 | 1234 / 11434 / 8000 | LM Studio / Ollama / vLLM | OpenAI API | no |
 
 An LLM server's port is a chat API. Pointing an MCP client at it does

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 Start OmniCortex Studio and open it in the browser: the one thing to run
-after install (the app-menu entry, `./neuronscope` and OmniCortex.bat all
+after install (the app-menu entry, `./omnicortex` and OmniCortex.bat all
 call this).
 
 If Studio is already running it just opens it. Otherwise it starts Studio in
-the background with the settings from ~/.neuronscope/config.json (edited on
+the background with the settings from ~/.omnicortex/config.json (edited on
 the Setup page), waits until it answers, and opens Setup if anything is
 missing, Studio otherwise. Studio keeps running after the browser closes;
 stop it from the terminal it printed, or with --stop.
@@ -28,7 +28,7 @@ import webbrowser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-STATE_DIR = Path.home() / ".neuronscope"
+STATE_DIR = Path.home() / ".omnicortex"
 PIDFILE = STATE_DIR / "studio.pid"
 LOG = STATE_DIR / "studio.log"
 
@@ -64,6 +64,11 @@ def start(port: int, workspace: str | None = None) -> subprocess.Popen:
 
 
 def main(argv=None) -> int:
+    try:
+        import oc_migrate
+        oc_migrate.migrate()
+    except ImportError:
+        pass
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--port", type=int, default=7870)
     p.add_argument("--no-browser", action="store_true")

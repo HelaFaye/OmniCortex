@@ -80,7 +80,7 @@ Start from the question you have, not the tool:
 The usual path is the first three in order: **check** a reply in Studio, look
 at the shaded text for the flagged span, **open the 3D view** on it to see
 which layers lit up, and go to **timeline** only if you need to measure. Every
-check is saved as a trace session under `~/.neuronscope/traces/<id>`, which
+check is saved as a trace session under `~/.omnicortex/traces/<id>`, which
 the hub's Replay picker, `bloom.py` and `timeline.py` all open.
 
 The 3D views read the same way everywhere:
@@ -180,7 +180,7 @@ positions once and streams only intensities.
 
 ```bash
 python viz/bloom.py runs/trace-abc --host 0.0.0.0   # backend + web
-NS_API=http://127.0.0.1:7880 godot --path plugins/godot-client/client                # desktop
+OC_API=http://127.0.0.1:7880 godot --path plugins/godot-client/client                # desktop
 python viz/timeline.py runs/trace-abc                # analysis
 ```
 
@@ -194,13 +194,13 @@ A real trace comes from `scripts/trace_sample.py`.
 
 ```bash
 python viz/bloom.py --demo                                  # terminal 1
-NS_API=http://127.0.0.1:7880 godot --path plugins/godot-client/client         # terminal 2
-NS_FRAME=67 NS_PAUSED=1 NS_API=... godot --path plugins/godot-client/client   # open on one token, paused
+OC_API=http://127.0.0.1:7880 godot --path plugins/godot-client/client         # terminal 2
+OC_FRAME=67 OC_PAUSED=1 OC_API=... godot --path plugins/godot-client/client   # open on one token, paused
 ```
 
 Space pauses, Left/Right step a token, N jumps to the next flagged token,
-clicking the risk strip seeks, Esc quits. `NS_API` may include a path (Studio
-serves each checked reply at `.../viz/<id>/`) and `NS_TOKEN` sends a bearer
+clicking the risk strip seeks, Esc quits. `OC_API` may include a path (Studio
+serves each checked reply at `.../viz/<id>/`) and `OC_TOKEN` sends a bearer
 token for a Studio that needs one. It runs the project
 directly, no editor needed; opening `plugins/godot-client/client/project.godot` in the editor
 works too. Forward+ needs Vulkan; on a GPU or driver without it, add
@@ -314,7 +314,7 @@ Each frame carries:
 `--record` saves each reply as a trace session. The 3D replay, the timeline
 and the Godot client open it like any other, and also show the emotion lanes
 and the features at the current token. A request can skip watching with
-`"neuronscope": {"watch": false}` or skip recording with `{"record": false}`.
+`"omnicortex": {"watch": false}` or skip recording with `{"record": false}`.
 It cannot choose the folder.
 
 Cost on a CPU: 40 tokens of a 0.5B model with all three watched took 6 to 10
@@ -336,12 +336,12 @@ untouched.
 scripts/build_llama_tools.sh --server-activations     # or: apply_patch.py ~/llama.cpp, then rebuild
 python llama-tools/server-activations/export_classifier_bin.py \
     models/classifier.npz models/classifier.bin --gguf model.gguf
-NS_ACTIVATIONS=sparse NS_CLASSIFIER=models/classifier.bin \
+OC_ACTIVATIONS=sparse OC_CLASSIFIER=models/classifier.bin \
   ~/llama.cpp/build/bin/llama-server -m model.gguf --parallel 1 --port 8080
 python viz/stream.py --source http://127.0.0.1:8080 --token-file viewer.token
 ```
 
-A test (`tests/test_llamacpp_integration.py`, needs `NS_LLAMA` pointing at a
+A test (`tests/test_llamacpp_integration.py`, needs `OC_LLAMA` pointing at a
 patched build) checks every frame against PyTorch CETT on all layers, and the
 streamed score against the classifier applied in PyTorch.
 

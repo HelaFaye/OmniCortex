@@ -50,7 +50,7 @@ import torch
 from safetensors.torch import save_file
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import TEXT_LAYER_RE, load_model, text_config  # noqa: E402
+from oc_common import TEXT_LAYER_RE, load_model, text_config  # noqa: E402
 from profiles import Profile  # noqa: E402
 
 

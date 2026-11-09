@@ -10,7 +10,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "viz"))
 sys.path.insert(0, str(ROOT / "scripts"))
-import plugins as ns_plugins  # noqa: E402
+import plugins as oc_plugins  # noqa: E402
 from test_studio import call, studio_srv  # noqa: E402,F401
 
 EXAMPLE = ROOT / "plugins" / "claim-spotter"
@@ -30,21 +30,21 @@ def test_manifests_are_checked(tmp_path):
     make(tmp_path, {"name": "Bad Name"})
     make(tmp_path, {"name": "escape", "checks": [{"name": "c", "script": "../../evil.py"}]})
     make(tmp_path, {"name": "badfield", "jobs": [{"kind": "j", "script": "j.py", "fields": [{"name": "x", "kind": "list"}]}]})
-    pm = ns_plugins.Plugins([tmp_path / "plugins"], tmp_path / "state.json")
+    pm = oc_plugins.Plugins([tmp_path / "plugins"], tmp_path / "state.json")
     rows = {r["folder"].rsplit("/", 1)[-1]: r for r in pm.scan()}
     assert all(r["status"] == "broken" for r in rows.values())
     assert "outside" in rows["escape"]["error"] and "kind" in rows["badfield"]["error"]
-    with pytest.raises(ns_plugins.PluginError):
+    with pytest.raises(oc_plugins.PluginError):
         pm.set_enabled("escape", True)
 
 
 def test_opt_in_hash_jobs_and_checks(tmp_path):
     d = tmp_path / "plugins" / "claim-spotter"
     shutil.copytree(EXAMPLE, d)
-    pm = ns_plugins.Plugins([tmp_path / "plugins"], tmp_path / "state.json")
+    pm = oc_plugins.Plugins([tmp_path / "plugins"], tmp_path / "state.json")
     assert pm.get("claim-spotter", need_on=False)["status"] == "off"
     assert pm.job_specs() == {} and pm.checks() == []
-    with pytest.raises(ns_plugins.PluginError, match="off"):
+    with pytest.raises(oc_plugins.PluginError, match="off"):
         pm.run_check("claim-spotter", "claims", {"text": "x"})
     pm.set_enabled("claim-spotter", True)
     r = pm.run_check("claim-spotter", "claims", {"text": "It opened in 1889 and is 330 m tall."})
@@ -64,11 +64,11 @@ def test_opt_in_hash_jobs_and_checks(tmp_path):
 def test_bad_check_output_is_reported(tmp_path):
     make(tmp_path, {"name": "noisy", "checks": [{"name": "c", "script": "c.py"}, {"name": "boom", "script": "b.py"}]},
          {"c.py": "print('hello')", "b.py": "raise SystemExit('broken here')"})
-    pm = ns_plugins.Plugins([tmp_path / "plugins"], tmp_path / "state.json")
+    pm = oc_plugins.Plugins([tmp_path / "plugins"], tmp_path / "state.json")
     pm.set_enabled("noisy", True)
-    with pytest.raises(ns_plugins.PluginError, match="no JSON"):
+    with pytest.raises(oc_plugins.PluginError, match="no JSON"):
         pm.run_check("noisy", "c", {})
-    with pytest.raises(ns_plugins.PluginError, match="broken here"):
+    with pytest.raises(oc_plugins.PluginError, match="broken here"):
         pm.run_check("noisy", "boom", {})
 
 
@@ -119,7 +119,7 @@ def test_studio_plugins(studio_srv, tmp_path):
 
 def test_plugin_mcp_servers_join_the_hub(tmp_path):
     make(tmp_path, {"name": "tools", "mcp": {"command": "python", "args": ["server.py"]}}, {"server.py": ""})
-    pm = ns_plugins.Plugins([tmp_path / "plugins"], tmp_path / "state.json")
+    pm = oc_plugins.Plugins([tmp_path / "plugins"], tmp_path / "state.json")
     assert pm.mcp_servers() == {}
     pm.set_enabled("tools", True)
     srv = pm.mcp_servers()["plugin-tools"]

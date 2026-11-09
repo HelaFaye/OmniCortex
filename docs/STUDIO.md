@@ -57,7 +57,7 @@ How the pages get people there:
 | Per-model load settings (GPU layers, context, batch, threads, flash-attn, KV cache type) | yes | yes; persisted per file |
 | Several GPUs (split mode, tensor split, main GPU, which GPUs) | yes | yes; shown when NVIDIA GPUs are present, with a suggested split; fit estimate counts free VRAM on all of them ([HARDWARE.md](HARDWARE.md#nvidia--cuda)) |
 | Chat with streaming, reasoning shown separately | yes | yes |
-| Saved conversations, export | yes | yes; one JSON file per chat in `~/.neuronscope/chats`, Markdown export |
+| Saved conversations, export | yes | yes; one JSON file per chat in `~/.omnicortex/chats`, Markdown export |
 | Image input for vision models | yes | yes; an `mmproj-*.gguf` beside the model is loaded automatically |
 | Presets (system prompt, sampling) | yes | yes; includes JSON-schema and GBNF constrained output |
 | OpenAI-compatible local server | yes | yes, at `/v1` on the same port |
@@ -158,7 +158,7 @@ for three panes:
 
 ## Rolling stats
 
-Stats live in `~/.neuronscope/stats/<model id>.jsonl` (append-only) and are
+Stats live in `~/.omnicortex/stats/<model id>.jsonl` (append-only) and are
 tied to the model *file*: re-downloading or re-quantizing under the same name
 starts from zero. Summaries count only the last `--stats-window` (default
 500) observations of each kind, and nothing older than 180 days.
@@ -166,7 +166,7 @@ starts from zero. Summaries count only the last `--stats-window` (default
 | kind | source | used by auto? |
 |---|---|---|
 | graded: right / hallucinated / abstained, per subject | `testqa.py --publish-stats` or `--record-stats` | **yes** |
-| activation: H-Neuron classifier score per reply | Studio, for models with a classifier set in the load panel, when `--cett` (or `$NS_CETT`) is available | no, shown only |
+| activation: H-Neuron classifier score per reply | Studio, for models with a classifier set in the load panel, when `--cett` (or `$OC_CETT`) is available | no, shown only |
 | live: replies and how often the model declined | every chat and `/v1` reply | no, shown only |
 
 Activation scoring runs one extra prefill per reply in the background, after
@@ -182,7 +182,7 @@ CPU, scores every token, and shows the result under the reply: how many tokens
 crossed the classifier's 0.5 boundary, the peak and mean risk, and the reply
 text shaded by risk with the flagged tokens underlined. The check is saved
 with the chat and as a trace session in `--traces-dir`
-(`~/.neuronscope/traces/<id>`); *open 3D view* shows it at `/viz/<id>/` on
+(`~/.omnicortex/traces/<id>`); *open 3D view* shows it at `/viz/<id>/` on
 the same Studio, with the same login. `POST /api/trace` with `{model,
 messages, text}` does the same from a script; paired devices may call it.
 See VISUALIZATION.md, "Which view when", for what to do with a flagged span.
@@ -225,7 +225,7 @@ python viz/studio.py ... --rag-embed http://127.0.0.1:1234/v1@text-embedding-mod
 The embedding sidecar is a second llama-server (`--embedding`, port
 `--backend-port + 1`, CPU unless `--rag-embed-ngl`), so it never displaces the
 chat model. A collection remembers which embedding model built it and refuses
-to mix in vectors from another. Collections live in `~/.neuronscope/rag`
+to mix in vectors from another. Collections live in `~/.omnicortex/rag`
 (`--rag-dir`) and work from the command line too:
 
 ```bash
@@ -241,14 +241,14 @@ and either the server's URL, with an optional sign-in (a token file, an
 environment variable or headers), or the program to start with its
 arguments and environment. Saved secrets are never sent back to the page:
 they show as dots, and leaving them as dots keeps them. The page writes
-`~/.neuronscope/mcp.json` (`--mcp-config`), and the file can be edited by
+`~/.omnicortex/mcp.json` (`--mcp-config`), and the file can be edited by
 hand too. It uses the format LM Studio and Claude Desktop use:
 
 ```json
 {"mcpServers": {
   "files":  {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/me/notes"]},
   "search": {"url": "https://mcp.example.com/mcp", "headers": {"Authorization": "Bearer ..."}},
-  "box":    {"url": "https://box.example.ts.net/mcp", "token_file": "~/.config/neuronscope/secrets/box.token"},
+  "box":    {"url": "https://box.example.ts.net/mcp", "token_file": "~/.config/omnicortex/secrets/box.token"},
   "clock":  {"command": "python", "args": ["clock_server.py"], "autoApprove": ["now"]},
   "old":    {"command": "...", "disabled": true}
 }}
@@ -273,7 +273,7 @@ rounds per message. A declined call is reported to the model as declined.
 The **Tools** tab shows each server's status and tools, and reconnects after
 you edit the file. **Test** next to a server asks it for its tools again, and
 calls one tool it marks read-only and that needs no arguments (for the
-transfer server, `list_targets`). It shows the time taken and the answer. Stdio servers' logs go to `~/.neuronscope/mcp-logs/`.
+transfer server, `list_targets`). It shows the time taken and the answer. Stdio servers' logs go to `~/.omnicortex/mcp-logs/`.
 `python scripts/mcp_client.py tools` checks a config from the command line.
 
 MCP servers run with your permissions. Only configure servers you trust, and
@@ -288,7 +288,7 @@ links instead of sharing the master token.
 `https://studio.lan:7870/pair#c=K7QX-M2PA-9DTE&fp=…`, claimable for five
 minutes by default.
 Opened in a browser, it pairs that browser and logs it in; on the command line,
-`python scripts/ns_pairing.py claim '<link>' --out laptop.token` writes a token
+`python scripts/oc_pairing.py claim '<link>' --out laptop.token` writes a token
 file for API clients. Each device gets its own token, stored on the host only
 as a SHA-256 hash, listed with when it was last seen, and revocable at once.
 Paired devices can chat (with documents), use `/v1` and keep saved chats.
@@ -345,7 +345,7 @@ self-signed LAN certificate is pinned, not trusted blindly, and a machine in
 the middle can neither take the code nor read the traffic. Pairing requires
 the host to run with a token; without TLS the link has no fingerprint and
 should only be used inside a VPN. Tokens for linked hosts are kept in
-`~/.neuronscope/links.json` (0600); devices in `~/.neuronscope/devices.json`.
+`~/.omnicortex/links.json` (0600); devices in `~/.omnicortex/devices.json`.
 
 ## Jobs
 
@@ -355,7 +355,7 @@ data, fine-tuning, merge and GGUF conversion, SWE-bench predict / evaluate /
 import, LiveBench and CLIP_benchmark. Each job is a fixed script with a form of
 typed fields; there is no free-form command line, and no value may start with
 `-`, so a field cannot add flags. Output streams into the page and is kept in
-`~/.neuronscope/jobs/<id>/` (`--jobs-dir`); jobs keep running when the browser
+`~/.omnicortex/jobs/<id>/` (`--jobs-dir`); jobs keep running when the browser
 closes, and can be cancelled. `--max-jobs` (default 2) limits how many run at
 once.
 
@@ -373,9 +373,9 @@ Studio loads models, downloads files and runs inference, so binding beyond
 loopback is gated:
 
 ```bash
-python scripts/ns_security.py token --out ~/.config/neuronscope/studio.token
-python scripts/ns_security.py selfsigned --host studio.lan --host 192.0.2.10
-python viz/studio.py --host 0.0.0.0 --token-file ~/.config/neuronscope/studio.token \
+python scripts/oc_security.py token --out ~/.config/omnicortex/studio.token
+python scripts/oc_security.py selfsigned --host studio.lan --host 192.0.2.10
+python viz/studio.py --host 0.0.0.0 --token-file ~/.config/omnicortex/studio.token \
     --tls-cert ns-cert.pem --tls-key ns-key.pem
 ```
 

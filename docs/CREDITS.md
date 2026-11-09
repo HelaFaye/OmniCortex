@@ -83,7 +83,7 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 | Dettmers et al. (2023), *QLoRA: Efficient Finetuning of Quantized LLMs*, [arXiv:2305.14314](https://arxiv.org/abs/2305.14314) | `finetune.py --method qlora` |
 | Rafailov et al. (2023), *Direct Preference Optimization*, [arXiv:2305.18290](https://arxiv.org/abs/2305.18290) | `deficits.py` writes `dpo.jsonl`; `finetune.py --dpo` |
 | Gekhman et al. (2024), *Does Fine-Tuning LLMs on New Knowledge Encourage Hallucinations?*, EMNLP, [arXiv:2405.05904](https://arxiv.org/abs/2405.05904) | Why `deficits.py` teaches a decline, not an answer, for facts the model does not hold ([RETRAINING.md](RETRAINING.md)) |
-| Goddard et al. (2024), *Arcee's MergeKit*, [arXiv:2403.13257](https://arxiv.org/abs/2403.13257); [arcee-ai/mergekit](https://github.com/arcee-ai/mergekit) | `mergekit_neuronscope.py` registers a merge method in it |
+| Goddard et al. (2024), *Arcee's MergeKit*, [arXiv:2403.13257](https://arxiv.org/abs/2403.13257); [arcee-ai/mergekit](https://github.com/arcee-ai/mergekit) | `mergekit_omnicortex.py` registers a merge method in it |
 | Ilharco et al. (2023), *Editing Models with Task Arithmetic*, [arXiv:2212.04089](https://arxiv.org/abs/2212.04089); Yadav et al. (2023), *TIES-Merging*, [arXiv:2306.01708](https://arxiv.org/abs/2306.01708); Yu et al. (2024), *Language Models are Super Mario* (DARE), [arXiv:2311.03099](https://arxiv.org/abs/2311.03099) | The merge methods OmniCortex's neuron-selected merge is compared with ([MERGING.md](MERGING.md)); mergekit implements them |
 
 ## Retrieval, search and statistics
@@ -153,7 +153,7 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 | [Optuna](https://optuna.org) | Engine optimization |
 | [three.js](https://threejs.org) and [Godot Engine](https://godotengine.org) | The 3D views and the Godot client |
 | [LM Studio](https://lmstudio.ai), [Ollama](https://ollama.com), [vLLM](https://github.com/vllm-project/vllm) | Serving stacks OmniCortex connects to |
-| [Model Context Protocol](https://modelcontextprotocol.io) and [FastMCP](https://github.com/jlowin/fastmcp); [Cline](https://github.com/cline/cline) | `ns_mcp.py` and the MCP client; the Cline configuration |
+| [Model Context Protocol](https://modelcontextprotocol.io) and [FastMCP](https://github.com/jlowin/fastmcp); [Cline](https://github.com/cline/cline) | `oc_mcp.py` and the MCP client; the Cline configuration |
 | [Tailscale](https://tailscale.com), [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Reaching hosts and Studio from elsewhere ([REMOTE.md](REMOTE.md), [SECURITY.md](SECURITY.md)) |
 | WebRTC | Peer-to-peer model transfer ([TRANSFER.md](TRANSFER.md)) |
 | [Home Assistant](https://www.home-assistant.io) REST API | Power rules on the System page ([SYSTEM.md](SYSTEM.md)) |

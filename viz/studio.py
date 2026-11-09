@@ -29,7 +29,7 @@ it, `"model": "auto"` picks one from the subject classifier and each model's
 rolling performance stats (models without stats are never auto-picked), and --idle-ttl unloads after inactivity. Vision models are paired with
 their mmproj file automatically and accept image attachments in chat.
 
-Binding beyond loopback requires --token (or NS_STUDIO_TOKEN), and TLS unless
+Binding beyond loopback requires --token (or OC_STUDIO_TOKEN), and TLS unless
 --allow-plaintext is passed for a VPN / reverse-proxy deployment.
 """
 
@@ -61,15 +61,15 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "..", "scripts"))
 import gguf_utils
-import ns_security as sec
+import oc_security as sec
 import model_stats
-import jobs as ns_jobs
-import rag as ns_rag
-import mcp_client as ns_mcp
-import context_compress as ns_compress
-import quant_select as ns_qsel
-import ns_pairing
-import work_log as ns_work
+import jobs as oc_jobs
+import rag as oc_rag
+import mcp_client as oc_mcp
+import context_compress as oc_compress
+import quant_select as oc_qsel
+import oc_pairing
+import work_log as oc_work
 try:
     from hostcheck import Host, check as host_check
 except ImportError:
@@ -303,7 +303,7 @@ def fit_estimate(size_bytes):
 # ------------------------------------------------------------- hub search
 
 def _hf_get(url, timeout=25):
-    req = urllib.request.Request(url, headers={"User-Agent": "neuronscope"})
+    req = urllib.request.Request(url, headers={"User-Agent": "omnicortex"})
     tok = os.environ.get("HF_TOKEN")
     if tok:
         req.add_header("Authorization", f"Bearer {tok}")
@@ -374,7 +374,7 @@ def _download_one(repo, path, dest, job):
     # Resume: the Hub honours Range, and these files are large enough that
     # restarting from zero after a dropped connection is not acceptable.
     start = os.path.getsize(tmp) if os.path.exists(tmp) else 0
-    req = urllib.request.Request(url, headers={"User-Agent": "neuronscope"})
+    req = urllib.request.Request(url, headers={"User-Agent": "omnicortex"})
     if start:
         req.add_header("Range", f"bytes={start}-")
     tok = os.environ.get("HF_TOKEN")
@@ -924,7 +924,7 @@ def remote():
 
 # ---- system monitor, busy computers and automation rules (System page; scripts/automation.py)
 
-import automation as ns_auto  # noqa: E402
+import automation as oc_auto  # noqa: E402
 
 SYSMON = {"lock": threading.Lock(), "want": 0.0, "thread": None, "local": collections.deque(maxlen=1800),
           "hosts": {}, "presence": {}, "cpu_prev": None, "t_presence": 0.0, "t_hosts": 0.0}
@@ -992,7 +992,7 @@ def _sysmon_loop():
     """While the System page is open or automation rules are on: this computer every 2 s, its presence every
     5 s, every host every 10 s."""
     import remote_hosts  # noqa: F401  (puts the agent package on the path)
-    from neuronscope_remote import presence as ns_presence
+    from omnicortex_remote import presence as oc_presence
     while True:
         wanted = time.time() - SYSMON["want"] < 60 or any(r.get("enabled") for r in automation_config()["rules"])
         if not wanted:
@@ -1005,7 +1005,7 @@ def _sysmon_loop():
             now = time.time()
             if now - SYSMON["t_presence"] >= 5:
                 SYSMON["t_presence"] = now
-                SYSMON["presence"]["local"] = ns_presence.snapshot()
+                SYSMON["presence"]["local"] = oc_presence.snapshot()
             if now - SYSMON["t_hosts"] >= 10:
                 SYSMON["t_hosts"] = now
                 try:
@@ -1052,7 +1052,7 @@ def sysmon_view(points: int = 300) -> dict:
 
 
 def _auto_path() -> str:
-    return os.path.join(os.path.dirname(os.path.expanduser(STATE.get("settings_path") or "~/.neuronscope/studio.json")),
+    return os.path.join(os.path.dirname(os.path.expanduser(STATE.get("settings_path") or "~/.omnicortex/studio.json")),
                         "automation.json")
 
 
@@ -1083,7 +1083,7 @@ def _ha():
             tok = open(os.path.expanduser(ha["token_file"])).read().strip()
         except OSError:
             tok = ""
-    return ns_auto.HomeAssistant(ha["url"], tok) if ha.get("url") and tok else None
+    return oc_auto.HomeAssistant(ha["url"], tok) if ha.get("url") and tok else None
 
 
 def _power_inputs(rules: list, now: float) -> dict:
@@ -1098,7 +1098,7 @@ def _power_inputs(rules: list, now: float) -> dict:
         if w["kind"] != "power" or not r.get("enabled"):
             continue
         ent = w["entity"]
-        start, _ = ns_auto.period_bounds(w["period"], now, w.get("reset_day", 1), w.get("week_start", 0))
+        start, _ = oc_auto.period_bounds(w["period"], now, w.get("reset_day", 1), w.get("week_start", 0))
         buf = AUTO["samples"].setdefault(ent, [])
         try:
             if w["period"] not in ("second", "minute") and now - AUTO["history_at"].get(ent, 0) > 60:
@@ -1170,9 +1170,9 @@ def automation_tick(now: float | None = None) -> dict:
     inputs = {"presence": dict(SYSMON["presence"]), "power": _power_inputs(rules, now), "manual": cfg["manual"]}
     with AUTO["lock"]:
         prev = AUTO["results"]
-        res = {r["id"]: ns_auto.evaluate(r, inputs, now, prev.get(r["id"])) for r in rules}
+        res = {r["id"]: oc_auto.evaluate(r, inputs, now, prev.get(r["id"])) for r in rules}
         AUTO["results"] = res
-        combined = ns_auto.combine(rules, res)
+        combined = oc_auto.combine(rules, res)
         targets = set(combined) | {t for t, a in AUTO["applied"].items() if a.get("source", "rule") == "rule"}
         for t in targets:
             if (AUTO["applied"].get(t) or {}).get("source") == "api":
@@ -1221,7 +1221,7 @@ _PLOCK = threading.Lock()
 
 
 def _profiles_path() -> str:
-    return os.path.join(os.path.dirname(os.path.expanduser(STATE.get("settings_path") or "~/.neuronscope/studio.json")),
+    return os.path.join(os.path.dirname(os.path.expanduser(STATE.get("settings_path") or "~/.omnicortex/studio.json")),
                         "profiles.json")
 
 
@@ -1314,7 +1314,7 @@ def job_targets() -> list[dict]:
     for rec in hosts:
         name = rec["name"]
         info, err = _cached("jobs_info:" + name, 30, lambda: remote().call(name, "jobs_info", {}, timeout=8))
-        ok = bool(info and info.get("allowed") and info.get("neuronscope_dir"))
+        ok = bool(info and info.get("allowed") and info.get("omnicortex_dir"))
         why = err and ("unreachable: " + err) or (None if ok else "its owner has not allowed jobs (agent console → "
                                                   "What controllers may do)" if info and not info.get("allowed")
                                                   else "no OmniCortex folder on that host")
@@ -1356,7 +1356,7 @@ def link_models(refresh: bool = False) -> list[dict]:
                        "backend": m.get("backend")}
                       for m in remote().models(ln) if m.get("type") not in ("embeddings", "embedding")]
             else:
-                r = ns_pairing.request(ln["url"], "GET", "/v1/models", token=ln["token"],
+                r = oc_pairing.request(ln["url"], "GET", "/v1/models", token=ln["token"],
                                        fingerprint=ln.get("fingerprint", ""), timeout=5)
                 ms = [{"id": f"{ln['name']}{LINK_SEP}{m['id']}", "object": "model", "owned_by": f"link:{ln['name']}",
                        "remote_id": m["id"], "link": ln["name"], "vision": m.get("vision", False)}
@@ -1384,7 +1384,7 @@ def link_target(model_id: str | None):
 
 
 def _upstream_stream(upstream: dict, path: str, payload: dict):
-    r = ns_pairing.request(upstream["base"], "POST", path, payload, token=upstream["token"],
+    r = oc_pairing.request(upstream["base"], "POST", path, payload, token=upstream["token"],
                            fingerprint=upstream["fingerprint"], timeout=900, stream=True)
     if r.status >= 400:
         raise RuntimeError(f"linked host: HTTP {r.status}: {r.read()[:300].decode(errors='replace')}")
@@ -1422,7 +1422,7 @@ def fs_places():
                      ("LM Studio models (old)", os.path.join(home, ".cache", "lm-studio", "models")),
                      ("Hugging Face cache", os.path.join(home, ".cache", "huggingface", "hub")),
                      ("OmniCortex", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ("Studio's settings", os.path.dirname(
-                         os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json")))):
+                         os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json")))):
         if os.path.isdir(p):
             out.append({"label": label, "path": p})
     if platform.system() == "Windows":
@@ -1501,16 +1501,16 @@ def plugins():
     repository's plugins/ examples. None of them runs until the owner turns it on."""
     pm = STATE.get("plugins")
     if pm is None:
-        import plugins as ns_plugins
-        home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
+        import plugins as oc_plugins
+        home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json"))
         repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         dirs = STATE.get("plugin_dirs") or [os.path.join(home, "plugins"), os.path.join(repo, "plugins")]
-        pm = STATE["plugins"] = ns_plugins.Plugins(dirs, os.path.join(home, "plugins.json"),
+        pm = STATE["plugins"] = oc_plugins.Plugins(dirs, os.path.join(home, "plugins.json"),
                                                    bundled=[os.path.join(repo, "plugins")])
     return pm
 
 
-ns_jobs.EXTRA = lambda: plugins().job_specs()
+oc_jobs.EXTRA = lambda: plugins().job_specs()
 
 
 def addon_builtins():
@@ -1525,7 +1525,7 @@ def addon_builtins():
 
 def addon_packages():
     import addons
-    home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
+    home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json"))
     pm = plugins()
     install_dir = pm.dirs[0] if pm.dirs else os.path.join(home, "plugins")
 
@@ -1535,13 +1535,13 @@ def addon_packages():
     return addons.Packages(pm, install_dir, lambda: STATE.get("addon_repos") or [], save)
 
 
-ns_jobs.HIDDEN = lambda kind, spec: addon_builtins().job_hidden(kind, spec)
+oc_jobs.HIDDEN = lambda kind, spec: addon_builtins().job_hidden(kind, spec)
 
 
 def mcp_hub():
     hub = STATE.get("mcp")
     if hub is None and (STATE.get("mcp_config") or plugins().mcp_servers()):
-        hub = STATE["mcp"] = ns_mcp.MCPHub(STATE.get("mcp_config"))
+        hub = STATE["mcp"] = oc_mcp.MCPHub(STATE.get("mcp_config"))
         hub.extra = lambda: plugins().mcp_servers()
         hub.connect()
     return hub
@@ -1556,7 +1556,7 @@ def connectors_path() -> str:
 def connectors() -> dict:
     path = connectors_path()
     try:
-        cfg, err = ns_mcp.read_config(path), None
+        cfg, err = oc_mcp.read_config(path), None
     except (OSError, ValueError) as e:
         cfg, err = {"mcpServers": {}}, f"{path}: {e}"
     hub = STATE.get("mcp")
@@ -1565,14 +1565,14 @@ def connectors() -> dict:
     for name, spec in cfg.get("mcpServers", {}).items():
         if not isinstance(spec, dict):
             continue
-        st = live.get(ns_mcp._safe(name)) or {}
-        out.append({"name": name, "spec": ns_mcp.public_spec(spec), "transport": "http" if spec.get("url") else "stdio",
+        st = live.get(oc_mcp._safe(name)) or {}
+        out.append({"name": name, "spec": oc_mcp.public_spec(spec), "transport": "http" if spec.get("url") else "stdio",
                     "disabled": bool(spec.get("disabled")), "connected": bool(st.get("connected")),
                     "error": st.get("error"), "tools": [t["name"] for t in st.get("tools") or []]})
     plug = []
     try:
         for name, spec in (plugins().mcp_servers() or {}).items():
-            st = live.get(ns_mcp._safe(name)) or {}
+            st = live.get(oc_mcp._safe(name)) or {}
             plug.append({"name": name, "plugin": True, "transport": "http" if spec.get("url") else "stdio",
                          "connected": bool(st.get("connected")), "error": st.get("error"),
                          "tools": [t["name"] for t in st.get("tools") or []]})
@@ -1621,7 +1621,7 @@ def permissions_state() -> dict:
     pol = permissions()
     return {"policy": pol.load(), "path": str(pol.path), "presets": P.presets(), "actions": P.ACTIONS,
             "effects": list(P.EFFECTS), "matches": list(P.MATCHES), "job_presets": P.JOB_PRESETS,
-            "job_kinds": sorted(ns_jobs.all_specs()), "models": [m["id"] for m in scan_models()][:300]}
+            "job_kinds": sorted(oc_jobs.all_specs()), "models": [m["id"] for m in scan_models()][:300]}
 
 
 def with_permissions(decision: dict, model: str, info: dict, args: dict) -> dict:
@@ -1713,7 +1713,7 @@ def rag_embedder():
     """The embedder for dense retrieval: --rag-embed URL@model, or a llama-server
     --embedding sidecar for --rag-embed-gguf, started on first use."""
     if STATE.get("rag_embed"):
-        return ns_rag.Embedder(STATE["rag_embed"])
+        return oc_rag.Embedder(STATE["rag_embed"])
     gguf = STATE.get("rag_embed_gguf")
     if not gguf:
         return None
@@ -1734,13 +1734,13 @@ def rag_embedder():
                 proc.terminate()
                 raise RuntimeError(f"embedding server did not start: {why}")
             EMBED["proc"] = proc
-    return ns_rag.Embedder(f"http://127.0.0.1:{port}/v1@rag-embed")
+    return oc_rag.Embedder(f"http://127.0.0.1:{port}/v1@rag-embed")
 
 
 def rag_store():
     st = STATE.get("rag")
     if st is None:
-        st = STATE["rag"] = ns_rag.RagStore(STATE.get("rag_dir"))
+        st = STATE["rag"] = oc_rag.RagStore(STATE.get("rag_dir"))
     return st
 
 
@@ -1761,9 +1761,9 @@ def rag_context(req: dict, msgs: list) -> tuple[list, list]:
         return msgs, []
     if (req.get("compress") or {}).get("passages"):
         # Keep the sentences that bear on the question, within about a fifth of the context window.
-        hits, info = ns_compress.compress_passages(query, hits, budget=max(300, (_ctx_size() or 8192) // 5))
+        hits, info = oc_compress.compress_passages(query, hits, budget=max(300, (_ctx_size() or 8192) // 5))
         req["_compressed_passages"] = info
-    ctx = {"role": "system", "content": ns_rag.context_message(hits)}
+    ctx = {"role": "system", "content": oc_rag.context_message(hits)}
     i = 1 if msgs and msgs[0].get("role") == "system" else 0
     return msgs[:i] + [ctx] + msgs[i:], hits
 
@@ -1830,10 +1830,10 @@ def compress_history(msgs: list, req: dict, reserve: int, upstream=None) -> tupl
     sm = req.get("summary") or {}
     if mode == "summarize" and isinstance(sm, dict) and sm.get("text") and 0 < int(sm.get("upto") or 0) <= len(conv):
         upto, text = int(sm["upto"]), str(sm["text"])[:8000]
-    count = lambda t: int(ns_compress.est_tokens(t) * 1.15) + 1      # noqa: E731  # leave a margin: code tokenizes densely
+    count = lambda t: int(oc_compress.est_tokens(t) * 1.15) + 1      # noqa: E731  # leave a margin: code tokenizes densely
     budget = max(256, n_ctx - reserve - 64)
-    cur = fixed + ([ns_compress.summary_message(text, upto)] if text else []) + conv[upto:]
-    cut = ns_compress.fit_history(cur, budget, count)
+    cur = fixed + ([oc_compress.summary_message(text, upto)] if text else []) + conv[upto:]
+    cut = oc_compress.fit_history(cur, budget, count)
     if cut == 0:
         return cur, ({"history": "summary", "upto": upto} if text else None)
     lead = len(fixed) + (1 if text else 0)              # the summary counts as a leading system message
@@ -1844,7 +1844,7 @@ def compress_history(msgs: list, req: dict, reserve: int, upstream=None) -> tupl
         import semantic_compact
         prompt = semantic_compact.anchor_prompt(folded, text)
     else:
-        prompt = ns_compress.summary_prompt(folded, text)
+        prompt = oc_compress.summary_prompt(folded, text)
     r = proxy("/v1/chat/completions", {"messages": prompt, "max_tokens": 900 if anchor else 500, "temperature": 0.2,
                                        "stream": False}, upstream=upstream)
     new = ((r.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
@@ -1853,7 +1853,7 @@ def compress_history(msgs: list, req: dict, reserve: int, upstream=None) -> tupl
         return cur[:lead] + cur[lead + cut:], {"history": "cut", "dropped": upto + cut, "upto": upto + cut,
                                                "note": "the model gave no summary; the oldest turns were dropped"}
     upto += cut
-    return fixed + [ns_compress.summary_message(new, upto)] + conv[upto:], \
+    return fixed + [oc_compress.summary_message(new, upto)] + conv[upto:], \
         {"history": "summarized", "upto": upto, "summary": new, **({"anchored": True} if anchor else {})}
 
 
@@ -1879,7 +1879,7 @@ def context_usage(req: dict, role: str) -> dict:
     if ((req.get("compress") or {}).get("history") in ("summarize", "anchor") and isinstance(sm, dict) and sm.get("text")
             and 0 < int(sm.get("upto") or 0) <= len(msgs)):
         summarized = int(sm["upto"])
-        msgs = [ns_compress.summary_message(str(sm["text"]), summarized)] + msgs[summarized:]
+        msgs = [oc_compress.summary_message(str(sm["text"]), summarized)] + msgs[summarized:]
     docs = str(req.get("documents") or "")[:200_000]
     convo = "\n".join(f"{m.get('role')}: {_msg_text(m)}" for m in msgs)
     (n_sys, n_docs, n_tools, n_msgs), method = count_tokens([system, docs, tools, convo])
@@ -1920,7 +1920,7 @@ def harvest_add(req: dict) -> dict:
     msgs = req.get("messages") if isinstance(req.get("messages"), list) else []
     reply = str(req.get("reply") or "")
     item = harvest.add(model_id, msgs, reply, str(req.get("correction") or ""), str(req.get("note") or ""),
-                       home=os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json")))
+                       home=os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json")))
     m = find_model(model_id) if model_id else None
     if m is not None and STATE.get("cett") and activation_settings()["collect"]:
         clf = load_settings().get(_key(m["path"]), {}).get("classifier")
@@ -1930,13 +1930,13 @@ def harvest_add(req: dict) -> dict:
             pass
     if options()["decay"]["enabled"] and model_id:
         decay_log().trigger(model_id, "Fix This Mistake correction")
-    pend = len(harvest.unused(home=os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))))
+    pend = len(harvest.unused(home=os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json"))))
     return {"id": item["id"], "pending": pend, "auto_train": opt["auto_train"] and bool(opt["train_model"]),
             "min_pairs": opt["min_pairs"]}
 
 
 def _harvest_home():
-    return os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
+    return os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json"))
 
 
 def decay_log():
@@ -1971,7 +1971,7 @@ def decay_loop():
 
 def harvest_autotrain_loop():
     """Fix This Mistake's micro-tune: when enough new pairs wait and the computer has been idle long enough."""
-    from neuronscope_remote import presence as ns_presence
+    from omnicortex_remote import presence as oc_presence
     while True:
         time.sleep(300)
         try:
@@ -1981,7 +1981,7 @@ def harvest_autotrain_loop():
             import harvest
             if len(harvest.unused(home=_harvest_home())) < opt["min_pairs"]:
                 continue
-            idle = ns_presence.snapshot().get("idle_s")
+            idle = oc_presence.snapshot().get("idle_s")
             if idle is None or idle < opt["idle_minutes"] * 60 or ACTIVITY["active"] > 0:
                 continue
             if any(j.get("kind") == "harvest_train" and j.get("status") == "running" for j in STATE["jobs"].list()):
@@ -2013,7 +2013,7 @@ def proxy(path, payload, stream_to=None, hold_done=False, upstream=None, record=
     try:
         out = _proxy(path, payload, stream_to, hold_done, upstream, meas, guard=guard)
         if isinstance(out, dict) and ("usage" in out or "timings" in out):
-            meas.update(ns_work.llama_timings(out))
+            meas.update(oc_work.llama_timings(out))
         return out
     except Exception as e:
         err = f"{type(e).__name__}: {e}"
@@ -2081,7 +2081,7 @@ def _proxy_logged(path, payload, stream_to, hold_done, upstream, record, source,
     try:
         out = _proxy(path, payload, stream_to, hold_done, upstream, meas, guard=guard)
         if isinstance(out, dict) and ("usage" in out or "timings" in out):
-            meas.update(ns_work.llama_timings(out))
+            meas.update(oc_work.llama_timings(out))
         return out
     except Exception as e:
         err = f"{type(e).__name__}: {e}"
@@ -2104,7 +2104,7 @@ def _proxy(path, payload, stream_to=None, hold_done=False, upstream=None, meas=N
     if upstream is not None:
         # a linked host's model: same OpenAI API, its device token, its pinned certificate
         if stream_to is None:
-            return ns_pairing.request(upstream["base"], "POST", path, payload, token=upstream["token"],
+            return oc_pairing.request(upstream["base"], "POST", path, payload, token=upstream["token"],
                                       fingerprint=upstream["fingerprint"], timeout=900)
         opener = lambda: _upstream_stream(upstream, path, payload)  # noqa: E731
     else:
@@ -2156,7 +2156,7 @@ def _proxy(path, payload, stream_to=None, hold_done=False, upstream=None, meas=N
                     try:
                         d = json.loads(line[5:])
                         if meas is not None and ("usage" in d or "timings" in d):
-                            meas.update(ns_work.llama_timings(d))
+                            meas.update(oc_work.llama_timings(d))
                         ch = d["choices"][0]
                         delta = ch.get("delta") or {}
                         text.append(delta.get("content") or "")
@@ -2454,7 +2454,7 @@ def activation_sink():
     sink = STATE.get("act_sink")
     if sink is None:
         import activation_store
-        home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
+        home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json"))
         sink = STATE["act_sink"] = activation_store.Sink(activation_settings(), STATE.get("review_dir"), home)
         if sink.cfg["store"] in ("local",):
             sink._store = review_store()          # the same store the Review page reads
@@ -2854,17 +2854,17 @@ def workers_registry():
     reg = STATE.get("workers_reg")
     if reg is None:
         import worker_registry
-        home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
+        home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json"))
         reg = STATE["workers_reg"] = worker_registry.Registry(os.path.join(home, "workers.json"))
     return reg
 
 
 def work_log():
-    """The work log (scripts/work_log.py), beside Studio's config unless NS_WORK_LOG names a folder."""
+    """The work log (scripts/work_log.py), beside Studio's config unless OC_WORK_LOG names a folder."""
     wl = STATE.get("work_log")
     if wl is None:
-        home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
-        wl = STATE["work_log"] = ns_work.WorkLog(os.environ.get("NS_WORK_LOG") or os.path.join(home, "worklog"))
+        home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json"))
+        wl = STATE["work_log"] = oc_work.WorkLog(os.environ.get("OC_WORK_LOG") or os.path.join(home, "worklog"))
     return wl
 
 
@@ -3130,7 +3130,7 @@ SETUP_FIELDS = {
     "host": ("str", False, "Address Studio listens on: 127.0.0.1 is this computer only; 0.0.0.0 or a LAN/VPN address "
              "needs a token, and TLS or plaintext allowed", "Network and security"),
     "port": ("int", False, "Studio's port", "Network and security"),
-    "token_file": ("readfile", False, "File with Studio's access token (ns_security.py token makes one)",
+    "token_file": ("readfile", False, "File with Studio's access token (oc_security.py token makes one)",
                    "Network and security"),
     "tls_cert": ("readfile", False, "TLS certificate (PEM); with the key, Studio serves HTTPS", "Network and security"),
     "tls_key": ("readfile", False, "TLS private key (PEM)", "Network and security"),
@@ -3148,7 +3148,7 @@ ADVANCED_GROUPS = ("Network and security", "Pairing")
 
 def _ws_path():
     from pathlib import Path as _P
-    return _P(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
+    return _P(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json"))
 
 
 def subject_defaults():
@@ -3192,8 +3192,8 @@ def settings_state():
 
 
 def workspaces_state():
-    import ns_workspace
-    d = ns_workspace.describe(_ws_path(), STATE.get("workspace_forced"))
+    import oc_workspace
+    d = oc_workspace.describe(_ws_path(), STATE.get("workspace_forced"))
     d["running"] = STATE.get("workspace_name") or d["active"]
     return d
 
@@ -3335,7 +3335,7 @@ def unified_lookup(model: str) -> dict:
     SAELens's catalogue (cached a week) and this Studio's own observations."""
     import unified_review
     b = lookup_board()
-    cached = Path(os.environ.get("NS_HOME") or Path.home() / ".neuronscope") / "saelens" / "pretrained_saes.yaml"
+    cached = Path(os.environ.get("OC_HOME") or Path.home() / ".omnicortex") / "saelens" / "pretrained_saes.yaml"
     if not cached.exists() or time.time() - cached.stat().st_mtime > 7 * 86400:
         if not STATE.get("saelens_fetching"):      # never make a lookup wait for a download (or for PyTorch)
             STATE["saelens_fetching"] = True
@@ -3422,7 +3422,7 @@ def speed_predictions(since="30d") -> dict:
             return None
         return {"bytes": m.get("size"), "quant": (m.get("meta") or {}).get("quant") or score_quant(m["path"]),
                 "settings": settings.get(_key(m["path"]), {})}
-    local = pp.samples_from_worklog(work_log().read("work", ns_work.parse_since(since)), model_info, _device_info)
+    local = pp.samples_from_worklog(work_log().read("work", oc_work.parse_since(since)), model_info, _device_info)
     board = pp.samples_from_board(shared_board_rows())
     model = pp.fit(local + board)
     measured = {}
@@ -3459,7 +3459,7 @@ def measurement_weights() -> dict:
     ids = [m["id"] for m in scan_models()]
     table = mw.table_from_stats(STATE["stats"], ids, review=review_store()) if STATE.get("stats") else {}
     res = mw.fit(table)
-    home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"))
+    home = os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json"))
     hist = mw.remember(res, os.path.join(home, "measure-weights.json")) if table else []
     return {**res, "table": table, "history": hist[-30:]}
 
@@ -3480,7 +3480,7 @@ def studio_themes() -> dict:
 
 
 def load_studio_config(path=None):
-    p = os.path.expanduser(path or STATE.get("config_path") or "~/.neuronscope/config.json")
+    p = os.path.expanduser(path or STATE.get("config_path") or "~/.omnicortex/config.json")
     try:
         with open(p) as f:
             d = json.load(f)
@@ -3490,7 +3490,7 @@ def load_studio_config(path=None):
 
 
 def save_studio_config(values):
-    p = os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json")
+    p = os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json")
     try:
         with open(p) as f:
             d = json.load(f)
@@ -3536,15 +3536,15 @@ def clean_setup(values):
                 if v and kind == "url" and not re.match(r"https?://", v):
                     raise ValueError("must start with http:// or https://")
                 if v and k == "pair_default" and v != "persistent":
-                    ns_pairing.parse_duration(v)
+                    oc_pairing.parse_duration(v)
             elif kind == "duration":
                 v = str(v or "").strip() or None
                 if v:
-                    ns_pairing.parse_duration(v)
+                    oc_pairing.parse_duration(v)
             elif kind == "durations":
                 v = ",".join(x.strip() for x in str(v or "").split(",") if x.strip()) or None
                 for x in (v or "").split(",") if v else []:
-                    ns_pairing.parse_duration(x)
+                    oc_pairing.parse_duration(x)
             elif kind in ("int", "float") and v in (None, ""):
                 v = None
             elif kind == "int":
@@ -3639,7 +3639,7 @@ def setup_state():
     eff = setup_effective()
     # Binaries a llama.cpp build would have produced, to offer when nothing is set.
     found = {}
-    for root in [os.path.expanduser("~/llama.cpp"), os.environ.get("NS_LLAMA") or ""]:
+    for root in [os.path.expanduser("~/llama.cpp"), os.environ.get("OC_LLAMA") or ""]:
         for name, key in (("llama-server", "server"), ("llama-cett-dump", "cett")):
             pth = os.path.join(root, "build", "bin", name)
             if root and os.path.isfile(pth):
@@ -3647,7 +3647,7 @@ def setup_state():
     return {"fields": {k: {"kind": v[0], "live": v[1], "help": v[2], "group": v[3], "value": eff.get(k),
                            "advanced": v[3] in ADVANCED_GROUPS, "sensitive": SENSITIVE_FIELDS.get(k)}
                        for k, v in SETUP_FIELDS.items()},
-            "config_path": os.path.expanduser(STATE.get("config_path") or "~/.neuronscope/config.json"),
+            "config_path": os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json"),
             "found": found, "models": len(scan_models()),
             "ready": {"server": bool(STATE["server_bin"] and os.path.exists(STATE["server_bin"])),
                       "models": bool(scan_models()), "cett": bool(STATE["cett"])}}
@@ -3737,8 +3737,8 @@ def services() -> list[dict]:
         info, err = _cached("jobs_info:" + rec["name"], 30, lambda: remote().call(rec["name"], "jobs_info", {}, timeout=8))
         out.append({"id": "host:" + rec["name"], "name": f"Remote agent: {rec['name']}",
                     "state": "unreachable" if err else "connected", "warn": bool(err),
-                    "detail": err or ("runs jobs from " + info["neuronscope_dir"] if info and info.get("allowed")
-                                      and info.get("neuronscope_dir") else "jobs not allowed by its owner"),
+                    "detail": err or ("runs jobs from " + info["omnicortex_dir"] if info and info.get("allowed")
+                                      and info.get("omnicortex_dir") else "jobs not allowed by its owner"),
                     "actions": ["restart"]})
     runner = STATE.get("jobs")
     running = [j for j in runner.list(20) if j.get("status") == "running"] if runner else []
@@ -3806,7 +3806,7 @@ def run_doctor():
     env = dict(os.environ)
     if STATE.get("server_bin"):
         root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(STATE["server_bin"]))))
-        env.setdefault("NS_LLAMA", root)
+        env.setdefault("OC_LLAMA", root)
     try:
         r = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
                                                          "scripts", "doctor.py"), "--json"],
@@ -3872,10 +3872,10 @@ def screen_result(graph_name: str, t: dict, text: str, model: str | None) -> dic
     "feedback" fails it; a graph that stops to ask a person, or breaks, leaves it to the reviewer."""
     import graph_engine as G
     import graphs_api
-    import ns_mcp as studio_client
+    import oc_mcp as studio_client
     import permissions as P
     try:
-        store = graphs_api.Store(STATE.get("graphs_dir") or os.path.expanduser("~/.neuronscope/graphs"))
+        store = graphs_api.Store(STATE.get("graphs_dir") or os.path.expanduser("~/.omnicortex/graphs"))
         G.sync_plugins(plugins())
         G.HIDDEN = addon_builtins().node_hidden
         g = store.get(graph_name)
@@ -4102,7 +4102,7 @@ def openai_models():
                      "vision": bool(m.get("mmproj")), "arch": m.get("arch"),
                      "quant": m.get("quant"), "size": m["size"]})
     if any_eligible:
-        data.insert(0, {"id": "auto", "object": "model", "owned_by": "neuronscope",
+        data.insert(0, {"id": "auto", "object": "model", "owned_by": "omnicortex",
                         "description": "per prompt: subject classifier + rolling performance stats"})
     data += [{k: v for k, v in m.items() if k != "remote_id"} for m in link_models()]
     return {"object": "list", "data": data}
@@ -4171,8 +4171,8 @@ class Handler(BaseHTTPRequestHandler):
         if raw:
             try:
                 c = http.cookies.SimpleCookie(raw)
-                if "ns_token" in c:
-                    out.append(c["ns_token"].value)
+                if "oc_token" in c:
+                    out.append(c["oc_token"].value)
             except Exception:
                 pass
         return out
@@ -4194,7 +4194,7 @@ class Handler(BaseHTTPRequestHandler):
         return False
 
     def _plugins_get(self):
-        import plugins as ns_plugins
+        import plugins as oc_plugins
         pm = plugins()
         if self.path == "/api/plugins":
             return self._json(200, {"plugins": pm.summary(), "checks": pm.checks(),
@@ -4206,7 +4206,7 @@ class Handler(BaseHTTPRequestHandler):
         if d:
             try:
                 body = pm.download(m.group(1), d.group(1))
-            except ns_plugins.PluginError as e:
+            except oc_plugins.PluginError as e:
                 return self._json(404, {"error": str(e)})
             if body is None:
                 return self._json(404, {"error": "not found"})
@@ -4219,7 +4219,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             f = pm.page_file(m.group(1), urllib.parse.unquote(m.group(2)))
-        except ns_plugins.PluginError as e:
+        except oc_plugins.PluginError as e:
             return self._json(404, {"error": str(e)})
         if f is None:
             return self._json(404, {"error": "not found"})
@@ -4233,7 +4233,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _plugins_post(self):
-        import plugins as ns_plugins
+        import plugins as oc_plugins
         pm = plugins()
         req = self._read(MAX_BODY)
         try:
@@ -4250,7 +4250,7 @@ class Handler(BaseHTTPRequestHandler):
                 payload = {"model": req.get("model"), "messages": req.get("messages") or [],
                            "text": str(req.get("text") or "")}
                 return self._json(200, pm.run_check(str(req.get("plugin", "")), str(req.get("check", "")), payload))
-        except ns_plugins.PluginError as e:
+        except oc_plugins.PluginError as e:
             return self._json(400, {"error": str(e)})
         return self._json(404, {"error": "not found"})
 
@@ -4276,7 +4276,7 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(obj).encode()
         self.send_response(code)
         if self._route:
-            self.send_header("X-NeuronScope-Route", json.dumps(self._route)[:4000])
+            self.send_header("X-OmniCortex-Route", json.dumps(self._route)[:4000])
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -4293,7 +4293,7 @@ class Handler(BaseHTTPRequestHandler):
     def _send_headers_sse(self):
         self.send_response(200)
         if self._route:
-            self.send_header("X-NeuronScope-Route", json.dumps(self._route)[:4000])
+            self.send_header("X-OmniCortex-Route", json.dumps(self._route)[:4000])
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "close")
@@ -4367,7 +4367,7 @@ class Handler(BaseHTTPRequestHandler):
             # `a` only tells the claiming page what it will get; the host enforces it.
             frag = (f"c={code[:4]}-{code[4:8]}-{code[8:]}"
                     + (f"&fp={STATE['fingerprint']}" if STATE.get("fingerprint") else "")
-                    + f"&a={'p' if access is None else ns_pairing.fmt_duration(access)}")
+                    + f"&a={'p' if access is None else oc_pairing.fmt_duration(access)}")
             return self._json(200, {"code": code, "expires": exp, "link": f"{scheme}://{host}/pair#{frag}",
                                     "fingerprint": STATE.get("fingerprint"), "persistent": access is None,
                                     "access_seconds": access})
@@ -4384,7 +4384,7 @@ class Handler(BaseHTTPRequestHandler):
             name = re.sub(r"[^A-Za-z0-9_.-]", "-", str(req.get("name") or "remote"))[:32].strip("-") or "remote"
             links = [x for x in load_links() if x["name"] != name]
             try:
-                r = ns_pairing.claim(str(req.get("link", "")), str(req.get("device_name") or "studio"))
+                r = oc_pairing.claim(str(req.get("link", "")), str(req.get("device_name") or "studio"))
             except (ValueError, RuntimeError, OSError) as e:
                 return self._json(400, {"error": f"could not pair: {e}"})
             links.append({"name": name, "url": r["url"], "token": r["token"], "fingerprint": r["fingerprint"],
@@ -4411,10 +4411,10 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---------------------------------------------------------- MCP
     def _mcp_post(self):
-        """MCP over streamable HTTP: JSON-RPC in, JSON-RPC out (scripts/ns_mcp.py).
+        """MCP over streamable HTTP: JSON-RPC in, JSON-RPC out (scripts/oc_mcp.py).
         Every tool call goes back through this API with the caller's own token,
         so an agent can do exactly what the person or device it acts for can."""
-        import ns_mcp
+        import oc_mcp
         origin = self.headers.get("Origin")
         host = self.headers.get("Host", "")
         if origin and urllib.parse.urlparse(origin).netloc != host:
@@ -4424,7 +4424,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             payload = self._read(4 * 1024 * 1024)
         except ValueError as e:
-            body = json.dumps(ns_mcp._err(None, -32700, f"parse error: {e}")).encode()
+            body = json.dumps(oc_mcp._err(None, -32700, f"parse error: {e}")).encode()
             self.send_response(400)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
@@ -4432,8 +4432,8 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         token = (self._presented() or [None])[0] if STATE["token"] else None
-        studio = ns_mcp.Studio(self._self_url(), token, insecure_loopback=True)
-        resp = ns_mcp.handle_payload(payload, studio)
+        studio = oc_mcp.Studio(self._self_url(), token, insecure_loopback=True)
+        resp = oc_mcp.handle_payload(payload, studio)
         if resp is None:
             self.send_response(202)
             self.send_header("Content-Length", "0")
@@ -4641,7 +4641,7 @@ class Handler(BaseHTTPRequestHandler):
     def _jobs_get(self):
         runner = STATE.get("jobs")
         if self.path == "/api/jobs/specs":
-            return self._json(200, ns_jobs.public_specs())
+            return self._json(200, oc_jobs.public_specs())
         if self.path == "/api/jobs/defaults":
             # What the forms can fill in from the running workspace.
             ws = STATE.get("workspace") or {}
@@ -4661,9 +4661,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, job_targets())
         if self.path.startswith("/api/jobs/options"):
             kind = urllib.parse.parse_qs(self.path.split("?", 1)[-1]).get("kind", [""])[0]
-            if kind not in ns_jobs.all_specs():
+            if kind not in oc_jobs.all_specs():
                 return self._json(404, {"error": "no such job kind"})
-            return self._json(200, ns_jobs.script_options(kind))
+            return self._json(200, oc_jobs.script_options(kind))
         m = re.fullmatch(r"/api/jobs/host/([^/]+)/([0-9a-f]{12})/log", self.path)
         if m:
             try:
@@ -4801,7 +4801,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _graph_env(self, req):
         import graph_engine as G
-        import ns_mcp as studio_client
+        import oc_mcp as studio_client
         token = (self._presented() or [None])[0] if STATE["token"] else None
         st = studio_client.Studio(self._self_url(), token, insecure_loopback=True)
 
@@ -4829,7 +4829,7 @@ class Handler(BaseHTTPRequestHandler):
                 import work_page
                 return self._html(work_page.PAGE)
             if u.path == "/api/work":
-                return self._json(200, ns_work.breakdown(work_log(), q.get("since", "24h")))
+                return self._json(200, oc_work.breakdown(work_log(), q.get("since", "24h")))
             if u.path == "/api/work/predict":
                 return self._json(200, speed_predictions(q.get("since", "30d")))
             if u.path == "/api/work/measures":
@@ -4847,7 +4847,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _graph_store(self):
         import graphs_api
-        return graphs_api.Store(STATE.get("graphs_dir") or os.path.expanduser("~/.neuronscope/graphs"))
+        return graphs_api.Store(STATE.get("graphs_dir") or os.path.expanduser("~/.omnicortex/graphs"))
 
     def _graphs(self, req):
         import graph_engine as G
@@ -5000,11 +5000,11 @@ class Handler(BaseHTTPRequestHandler):
     # ------------------------------------------------ remote hosts (this Studio is the controller)
 
     def _viz_theme(self, default):
-        """The 3D views follow the viewer's own theme (cookie ns_viz, set by the theme picker)."""
+        """The 3D views follow the viewer's own theme (cookie oc_viz, set by the theme picker)."""
         import bloom
         try:
             c = http.cookies.SimpleCookie(self.headers.get("Cookie") or "")
-            name = c["ns_viz"].value if "ns_viz" in c else ""
+            name = c["oc_viz"].value if "oc_viz" in c else ""
         except Exception:
             name = ""
         import widgets
@@ -5114,7 +5114,7 @@ class Handler(BaseHTTPRequestHandler):
             body = remote_hosts.package_zip()
             self.send_response(200)
             self.send_header("Content-Type", "application/zip")
-            self.send_header("Content-Disposition", 'attachment; filename="neuronscope-remote.zip"')
+            self.send_header("Content-Disposition", 'attachment; filename="omnicortex-remote.zip"')
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -5195,7 +5195,7 @@ class Handler(BaseHTTPRequestHandler):
                             "Studio for the network (with a token and TLS, see Security), or put a tunnel in front "
                             "of it and give its address here.")
                 out["warning"] = warn
-                out["command"] = f"neuronscope-remote connect {out['invite']}"
+                out["command"] = f"omnicortex-remote connect {out['invite']}"
                 return self._json(200, out)
             if self.path == "/api/remote/call":
                 return self._json(200, r.call(str(req["host"]), str(req["tool"]), req.get("args") or {},
@@ -5377,7 +5377,7 @@ class Handler(BaseHTTPRequestHandler):
     def _settings(self):
         if not self._owner_only():
             return
-        import ns_workspace
+        import oc_workspace
         if self.command == "GET":
             if self.path == "/settings":
                 import settings_page
@@ -5410,12 +5410,12 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.path == "/api/workspaces/save":
                 name = str(req.get("name") or "")
-                ns_workspace.save(name, req.get("values") or {}, path=path, replace=bool(req.get("replace")))
+                oc_workspace.save(name, req.get("values") or {}, path=path, replace=bool(req.get("replace")))
                 out = workspaces_state()
                 out["restart_needed"] = name == STATE.get("workspace_name")
                 return self._json(200, out)
             if self.path == "/api/workspaces/use":
-                ns_workspace.use(str(req.get("name") or ""), path=path)
+                oc_workspace.use(str(req.get("name") or ""), path=path)
                 out = workspaces_state()
                 out["restart_needed"] = out["active"] != STATE.get("workspace_name")
                 return self._json(200, out)
@@ -5423,7 +5423,7 @@ class Handler(BaseHTTPRequestHandler):
                 name = str(req.get("name") or "")
                 if name == STATE.get("workspace_name"):
                     return self._json(409, {"error": "Studio is running in this workspace; switch first"})
-                ns_workspace.delete(name, path=path)
+                oc_workspace.delete(name, path=path)
                 return self._json(200, workspaces_state())
             if self.path.startswith("/api/settings/"):
                 return self._settings_post(req)
@@ -5581,12 +5581,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, d)
         return self._json(404, {"error": "not found"})
 
-    # ------------------------------------------------ requirements (scripts/ns_requirements.py)
+    # ------------------------------------------------ requirements (scripts/oc_requirements.py)
 
     def _requirements(self):
         if not self._owner_only():
             return
-        import ns_requirements as nrq
+        import oc_requirements as nrq
         post = self.command == "POST"
         req = self._read() if post else {}
         configured = _configured_bins()
@@ -5599,7 +5599,7 @@ class Handler(BaseHTTPRequestHandler):
                 body = nrq.freeze().encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/plain; charset=utf-8")
-                self.send_header("Content-Disposition", 'attachment; filename="neuronscope-env.txt"')
+                self.send_header("Content-Disposition", 'attachment; filename="omnicortex-env.txt"')
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -5801,9 +5801,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(body)
                 return
-            import ns_connect
+            import oc_connect
             base = self._self_url(public=True)
-            out = ns_connect.snippets(base, "token" if STATE["token"] else None)
+            out = oc_connect.snippets(base, "token" if STATE["token"] else None)
             out["token_required"] = bool(STATE["token"])
             out["models"] = ["auto"] + [m["id"] for m in scan_models()]
             return self._json(200, out)
@@ -5898,7 +5898,7 @@ class Handler(BaseHTTPRequestHandler):
             if self._role != "owner":
                 return self._json(403, {"error": "jobs need the owner"})
             if self.path == "/jobs":
-                body = ns_jobs.PAGE.encode()
+                body = oc_jobs.PAGE.encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
@@ -5942,9 +5942,9 @@ class Handler(BaseHTTPRequestHandler):
             # What quant_select.py measured for this model family on this hardware (Jobs -> Choose a quantization).
             fam = urllib.parse.unquote(m.group(1))
             if "hw" not in STATE:
-                STATE["hw"] = ns_qsel.hardware()
+                STATE["hw"] = oc_qsel.hardware()
             try:
-                allc = json.loads(Path(STATE.get("quant_choices") or ns_qsel.CHOICES).read_text())
+                allc = json.loads(Path(STATE.get("quant_choices") or oc_qsel.CHOICES).read_text())
             except (OSError, ValueError):
                 allc = {}
             here = (allc.get(fam) or {}).get(STATE["hw"]["id"])
@@ -5956,7 +5956,7 @@ class Handler(BaseHTTPRequestHandler):
                 m["settings"] = {**DEFAULTS, **st.get(_key(m["path"]), {})}
                 m["fit"] = fit_estimate(m["size"])
                 m["stats"] = model_summary(m, st)
-                m["family"], m["quant"] = ns_qsel.family(m["path"]), ns_qsel.quant_of(m["path"])
+                m["family"], m["quant"] = oc_qsel.family(m["path"]), oc_qsel.quant_of(m["path"])
             return self._json(200, ms)
         if self.path == "/api/stats":
             return self._json(200, {"min_graded": STATE["min_graded"], "min_subject": STATE["min_subject"],
@@ -6047,8 +6047,8 @@ class Handler(BaseHTTPRequestHandler):
                                            "has_token": bool(ha.get("token") or ha.get("token_file"))},
                                     "results": AUTO["results"], "applied": AUTO["applied"], "busy": BUSY,
                                     "log": list(AUTO["log"])[:60], "targets": ["local"] + ["host:" + h for h in hosts],
-                                    "computer": socket.gethostname(), "periods": ns_auto.PERIODS,
-                                    "actions": ns_auto.ACTIONS})
+                                    "computer": socket.gethostname(), "periods": oc_auto.PERIODS,
+                                    "actions": oc_auto.ACTIONS})
         if self.path.startswith("/api/profiles"):
             if not self._owner_only():
                 return
@@ -6087,7 +6087,7 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Set-Cookie",
-                                 f"ns_token={STATE['token']}; Path=/; "
+                                 f"oc_token={STATE['token']}; Path=/; "
                                  "HttpOnly; SameSite=Strict; Max-Age=604800"
                                  + ("; Secure" if STATE["tls"] else ""))
                 self.send_header("Content-Length", str(len(body)))
@@ -6116,7 +6116,7 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                 # The cookie lives as long as the access: a year for persistent pairing (the
                 # host can still revoke it), exactly the granted time for temporary access.
                 age = 31536000 if r["expires"] is None else max(1, int(r["expires"] - time.time()))
-                self.send_header("Set-Cookie", f"ns_token={r['token']}; Path=/; HttpOnly; SameSite=Strict; "
+                self.send_header("Set-Cookie", f"oc_token={r['token']}; Path=/; HttpOnly; SameSite=Strict; "
                                  f"Max-Age={age}" + ("; Secure" if STATE["tls"] else ""))
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -6181,7 +6181,7 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                 if ln is None:
                     return self._json(404, {"error": "no such linked Studio"})
                 try:
-                    there = ns_pairing.request(ln["url"], "GET", "/api/env/snapshot", None, token=ln["token"],
+                    there = oc_pairing.request(ln["url"], "GET", "/api/env/snapshot", None, token=ln["token"],
                                                fingerprint=ln.get("fingerprint", ""), timeout=30)
                 except Exception as e:
                     return self._json(502, {"error": f"{ln['name']}: {e}"})
@@ -6231,11 +6231,11 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                 try:
                     cfg = automation_config()
                     if self.path == "/api/automation/rules":
-                        cfg["rules"] = [ns_auto.clean_rule(r) for r in req.get("rules") or []]
+                        cfg["rules"] = [oc_auto.clean_rule(r) for r in req.get("rules") or []]
                         seen = set()
                         for r in cfg["rules"]:                  # every rule its own id, even if a client repeated one
                             if r["id"] in seen:
-                                r["id"] = ns_auto.clean_rule({**r, "id": None})["id"]
+                                r["id"] = oc_auto.clean_rule({**r, "id": None})["id"]
                             seen.add(r["id"])
                         automation_save(cfg)
                         sysmon_start()
@@ -6303,12 +6303,12 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                     clean, errs = clean_setup(req.get("values") or {})
                     if errs:
                         return self._json(400, {"error": "; ".join(f"{k}: {v}" for k, v in errs.items()), "fields": errs})
-                    import ns_workspace
+                    import oc_workspace
                     ws_keys = {"models_dir": "models_dirs", "server": "server", "cett": "cett",
                                "download_dir": "download_dir"}
                     to_ws = {ws_keys[k]: v for k, v in clean.items() if k in ws_keys}
                     if to_ws:
-                        ns_workspace.save(STATE.get("workspace_name") or ns_workspace.active_name(_ws_path()),
+                        oc_workspace.save(STATE.get("workspace_name") or oc_workspace.active_name(_ws_path()),
                                           to_ws, path=_ws_path(), check_exists=False)
                     rest = {k: v for k, v in clean.items() if k not in ws_keys}
                     if rest:
@@ -6454,11 +6454,11 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                 req, path = self._read(), connectors_path()
                 try:
                     if self.path.endswith("/save"):
-                        ns_mcp.save_server(path, req.get("name", ""), req.get("spec") or {}, req.get("old_name"))
+                        oc_mcp.save_server(path, req.get("name", ""), req.get("spec") or {}, req.get("old_name"))
                     elif self.path.endswith("/remove"):
-                        ns_mcp.remove_server(path, str(req.get("name", "")))
+                        oc_mcp.remove_server(path, str(req.get("name", "")))
                     else:
-                        ns_mcp.set_disabled(path, str(req.get("name", "")), bool(req.get("disabled")))
+                        oc_mcp.set_disabled(path, str(req.get("name", "")), bool(req.get("disabled")))
                 except (OSError, ValueError) as e:
                     return self._json(400, {"error": str(e)})
                 connectors_changed()
@@ -6681,9 +6681,9 @@ def build_parser():
     p = argparse.ArgumentParser(description="OmniCortex Studio: model manager, chat and OpenAI-compatible server")
     p.add_argument("--models-dir", action="append", default=[],
                    help="repeatable; searched recursively for .gguf")
-    p.add_argument("--server", help="path to llama-server (or $NS_LLAMA_SERVER)")
-    p.add_argument("--vllm", default=os.environ.get("NS_VLLM", "vllm"),
-                   help="the vLLM command, for models served with the vLLM engine (default $NS_VLLM or vllm)")
+    p.add_argument("--server", help="path to llama-server (or $OC_LLAMA_SERVER)")
+    p.add_argument("--vllm", default=os.environ.get("OC_VLLM", "vllm"),
+                   help="the vLLM command, for models served with the vLLM engine (default $OC_VLLM or vllm)")
     p.add_argument("--port", type=int, default=7870)
     p.add_argument("--host", default="127.0.0.1",
                    help="non-loopback binds require a token, and TLS unless --allow-plaintext")
@@ -6691,8 +6691,8 @@ def build_parser():
     p.add_argument("--download-dir",
                    help="where hub downloads land (default: first --models-dir)")
     p.add_argument("--settings",
-                   default=os.path.expanduser("~/.neuronscope/studio.json"))
-    p.add_argument("--chats-dir", default=os.path.expanduser("~/.neuronscope/chats"))
+                   default=os.path.expanduser("~/.omnicortex/studio.json"))
+    p.add_argument("--chats-dir", default=os.path.expanduser("~/.omnicortex/chats"))
     p.add_argument("--stats-dir", default=str(model_stats.DEFAULT_DIR),
                    help="rolling per-model stats (shared with testqa.py --record-stats)")
     p.add_argument("--stats-window", type=int, default=500, help="most recent observations per kind that count")
@@ -6700,36 +6700,36 @@ def build_parser():
                    help="graded results a model needs before model \"auto\" will consider it")
     p.add_argument("--hallucination-cost", type=float, default=1.0,
                    help="how much a wrong answer costs relative to a right one when auto ranks models")
-    p.add_argument("--cett", default=os.environ.get("NS_CETT"),
+    p.add_argument("--cett", default=os.environ.get("OC_CETT"),
                    help="llama-cett-dump binary; enables activation scoring for models with a classifier set")
     p.add_argument("--score-ngl", type=int, default=0,
                    help="GPU layers for activation scoring (0 keeps it off the GPU llama-server is using)")
     p.add_argument("--score-every", type=int, default=1, help="score one reply in N")
-    p.add_argument("--projects-dir", default=os.path.expanduser("~/.neuronscope/projects"),
+    p.add_argument("--projects-dir", default=os.path.expanduser("~/.omnicortex/projects"),
                    help="director projects: plans, results and history (/projects)")
     p.add_argument("--max-workers", type=int, default=2,
                    help="worker models the director may run at once, besides the chat model")
     p.add_argument("--worker-idle", type=int, default=300, help="stop a worker model after N idle seconds")
-    p.add_argument("--hardware", default=os.path.expanduser("~/.neuronscope/hardware.json"),
+    p.add_argument("--hardware", default=os.path.expanduser("~/.omnicortex/hardware.json"),
                    help="accelerators for worker models: llama-server per backend (rocm, vulkan, cuda, metal, "
                         "cpu), per-device settings, devices to skip (see scripts/accelerators.py)")
     p.add_argument("--no-work-log", action="store_true",
                    help="do not record who did what work and hardware samples (/work)")
-    p.add_argument("--graphs-dir", default=os.path.expanduser("~/.neuronscope/graphs"),
+    p.add_argument("--graphs-dir", default=os.path.expanduser("~/.omnicortex/graphs"),
                    help="node graphs and their runs (/graphs)")
-    p.add_argument("--traces-dir", default=os.path.expanduser("~/.neuronscope/traces"),
+    p.add_argument("--traces-dir", default=os.path.expanduser("~/.omnicortex/traces"),
                    help="where per-reply checks are saved (open them in the 3D view or timeline.py)")
-    p.add_argument("--review-dir", default=os.path.expanduser("~/.neuronscope/review"),
+    p.add_argument("--review-dir", default=os.path.expanduser("~/.omnicortex/review"),
                    help="neuron review store: every checked reply's activations, for the /review page")
     p.add_argument("--idle-ttl", type=int, default=0, help="unload the model after N idle seconds (0 = never)")
     p.add_argument("--no-jit", action="store_true", help="/v1 requests never load or swap models")
-    p.add_argument("--jobs-dir", default=os.path.expanduser("~/.neuronscope/jobs"),
+    p.add_argument("--jobs-dir", default=os.path.expanduser("~/.omnicortex/jobs"),
                    help="logs and state of evaluation/retraining jobs started from /jobs")
     p.add_argument("--max-jobs", type=int, default=2, help="jobs that may run at once")
     p.add_argument("--allow-remote-jobs", action="store_true",
                    help="allow /jobs on a non-loopback bind (jobs can train models and run model-written code)")
     p.add_argument("--no-jobs", action="store_true", help="disable /jobs entirely")
-    p.add_argument("--devices", default=os.path.expanduser("~/.neuronscope/devices.json"),
+    p.add_argument("--devices", default=os.path.expanduser("~/.omnicortex/devices.json"),
                    help="paired devices (token hashes only)")
     p.add_argument("--pair-code-ttl", default="5m",
                    help="how long a pairing link can be claimed (e.g. 90s, 5m, 1h; max 1d)")
@@ -6740,16 +6740,16 @@ def build_parser():
                    help="what a pairing grants unless chosen otherwise: persistent, or a duration like 8h")
     p.add_argument("--no-persistent-pairing", action="store_true",
                    help="only grant temporary access; every paired device expires")
-    p.add_argument("--links", default=os.path.expanduser("~/.neuronscope/links.json"),
+    p.add_argument("--links", default=os.path.expanduser("~/.omnicortex/links.json"),
                    help="linked hosts whose models this Studio serves (holds their device tokens; 0600)")
-    p.add_argument("--mcp-config", default=str(ns_mcp.DEFAULT_CONFIG),
+    p.add_argument("--mcp-config", default=str(oc_mcp.DEFAULT_CONFIG),
                    help="MCP servers for chat tools (mcpServers JSON, as in LM Studio / Claude Desktop)")
-    p.add_argument("--rag-dir", default=os.path.expanduser("~/.neuronscope/rag"), help="document collections")
+    p.add_argument("--rag-dir", default=os.path.expanduser("~/.omnicortex/rag"), help="document collections")
     p.add_argument("--rag-embed", help="URL[@model] of an OpenAI-compatible embeddings endpoint for dense retrieval")
     p.add_argument("--rag-embed-gguf", help="embedding GGUF; Studio runs it with llama-server --embedding on demand")
     p.add_argument("--rag-embed-ngl", type=int, default=0, help="GPU layers for the embedding model")
     sec.add_server_security_args(p)
-    p.add_argument("--config", default=os.environ.get("NS_CONFIG", "~/.neuronscope/config.json"),
+    p.add_argument("--config", default=os.environ.get("OC_CONFIG", "~/.omnicortex/config.json"),
                    help="settings file (\"studio\" section); the Setup page writes it, and flags override it")
     p.add_argument("--workspace", help="which workspace's folders to use (Settings -> Workspaces; "
                                        "default: the active one)")
@@ -6757,19 +6757,24 @@ def build_parser():
 
 
 def main(argv=None):
+    try:
+        import oc_migrate
+        oc_migrate.migrate()
+    except ImportError:
+        pass
     p = build_parser()
     pre, _ = p.parse_known_args(argv)
     STATE["config_path"] = pre.config
-    os.environ["NS_CONFIG"] = os.path.expanduser(pre.config)
-    import ns_workspace
+    os.environ["OC_CONFIG"] = os.path.expanduser(pre.config)
+    import oc_workspace
     # A workspace chosen for this run (flag or variable) wins over the file's choice.
-    STATE["workspace_forced"] = pre.workspace or os.environ.get("NS_WORKSPACE")
+    STATE["workspace_forced"] = pre.workspace or os.environ.get("OC_WORKSPACE")
     if pre.workspace:
-        if pre.workspace not in ns_workspace.names():
-            print(f"error: no workspace {pre.workspace!r}; have {', '.join(ns_workspace.names())}", file=sys.stderr)
+        if pre.workspace not in oc_workspace.names():
+            print(f"error: no workspace {pre.workspace!r}; have {', '.join(oc_workspace.names())}", file=sys.stderr)
             return 2
-        os.environ["NS_WORKSPACE"] = pre.workspace
-    ws = ns_workspace.active()
+        os.environ["OC_WORKSPACE"] = pre.workspace
+    ws = oc_workspace.active()
     # Where things are comes from the workspace; the "studio" section holds behaviour.
     # Precedence: flags, then the studio section, then the workspace.
     WS_FLAGS = {"models_dir", "server", "cett", "download_dir", "chats_dir", "traces_dir", "review_dir",
@@ -6796,13 +6801,13 @@ def main(argv=None):
         STATE["widgets"] = {}
     STATE["tool_rules_path"] = cfg.get("tool_rules") or None
     STATE["permissions_path"] = cfg.get("permissions") or None
-    os.environ.update(ns_workspace.env_for(ws))
+    os.environ.update(oc_workspace.env_for(ws))
 
     STATE["models_dirs"] = [os.path.expanduser(d) for d in a.models_dir] or ws["models_dirs"]
     a.server = a.server or (ws["server"] if os.path.isfile(ws["server"]) else None)
     a.cett = a.cett or (ws["cett"] if os.path.isfile(ws["cett"]) else None)
     a.download_dir = a.download_dir or ws["download_dir"]
-    STATE["server_bin"] = a.server or os.environ.get("NS_LLAMA_SERVER")
+    STATE["server_bin"] = a.server or os.environ.get("OC_LLAMA_SERVER")
     STATE["vllm_bin"] = a.vllm
     STATE["settings_path"] = os.path.expanduser(a.settings)
     STATE["chats_dir"] = os.path.expanduser(a.chats_dir)
@@ -6813,7 +6818,7 @@ def main(argv=None):
     import director
     DIRECTOR["store"] = director.ProjectStore(os.path.expanduser(a.projects_dir))
     STATE["graphs_dir"] = os.path.expanduser(a.graphs_dir)
-    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("NS_STUDIO_TOKEN", ""))
+    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("OC_STUDIO_TOKEN", ""))
     STATE["token"] = sec.resolve_token(a.token, a.token_file) or None
     STATE["download_dir"] = (os.path.expanduser(a.download_dir)
                              if a.download_dir else None)
@@ -6836,13 +6841,13 @@ def main(argv=None):
         return 2
 
     try:
-        policy = ns_pairing.PairingPolicy(a.pair_code_ttl, a.pair_durations.split(","), a.pair_max,
+        policy = oc_pairing.PairingPolicy(a.pair_code_ttl, a.pair_durations.split(","), a.pair_max,
                                           not a.no_persistent_pairing, a.pair_default)
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    STATE.update(devices=ns_pairing.DeviceRegistry(a.devices, policy), links_path=os.path.expanduser(a.links),
-                 fingerprint=ns_pairing.cert_fingerprint(a.tls_cert) if a.tls_cert and a.tls_key else None)
+    STATE.update(devices=oc_pairing.DeviceRegistry(a.devices, policy), links_path=os.path.expanduser(a.links),
+                 fingerprint=oc_pairing.cert_fingerprint(a.tls_cert) if a.tls_cert and a.tls_key else None)
     STATE.update(mcp_config=a.mcp_config if os.path.exists(os.path.expanduser(a.mcp_config)) else None, mcp=None,
                  mcp_config_path=os.path.expanduser(a.mcp_config))
     STATE.update(rag_dir=a.rag_dir, rag_embed=a.rag_embed, rag_embed_gguf=a.rag_embed_gguf,
@@ -6854,7 +6859,7 @@ def main(argv=None):
         STATE["jobs_off"] = ("jobs are off on a network bind: they can train models and run model-written code. "
                              "Restart Studio with --allow-remote-jobs to enable them.")
     else:
-        STATE["jobs"] = ns_jobs.JobRunner(a.jobs_dir, a.max_jobs, cwd=ws["root"])
+        STATE["jobs"] = oc_jobs.JobRunner(a.jobs_dir, a.max_jobs, cwd=ws["root"])
         STATE["jobs"].on_finish = job_finished
         apply_options()
         threading.Thread(target=harvest_autotrain_loop, daemon=True).start()
@@ -6879,7 +6884,7 @@ def main(argv=None):
         print(f"  {d}{'' if os.path.isdir(d) else '   (missing)'}")
     if not any(os.path.isdir(d) for d in STATE["models_dirs"]):
         print(f"  set your models folder: {scheme}://{a.host}:{a.port}/settings#workspaces, or\n"
-              f"  python scripts/ns_workspace.py set {ws['name']} models_dirs /path/to/models")
+              f"  python scripts/oc_workspace.py set {ws['name']} models_dirs /path/to/models")
     try:
         found = [m["id"] for m in scan_models()]
     except Exception:
@@ -6903,7 +6908,7 @@ def main(argv=None):
             srv.socket, server_side=True, do_handshake_on_connect=False)
     threading.Thread(target=idle_reaper, daemon=True).start()
     threading.Thread(target=score_worker, daemon=True).start()
-    STATE["work_log_off"] = a.no_work_log or os.environ.get("NS_WORK_LOG") == "off"
+    STATE["work_log_off"] = a.no_work_log or os.environ.get("OC_WORK_LOG") == "off"
     threading.Thread(target=_hw_sampler, daemon=True).start()
     recover_projects()
     threading.Thread(target=director_loop, daemon=True).start()

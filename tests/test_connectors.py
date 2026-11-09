@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "viz"))
 sys.path.insert(0, str(ROOT / "scripts"))
 import mcp_client  # noqa: E402
-import ns_connect  # noqa: E402
+import oc_connect  # noqa: E402
 from test_studio import call, studio_srv  # noqa: E402,F401
 
 FAKE = str(ROOT / "tests" / "fake_mcp_server.py")
@@ -66,9 +66,9 @@ def test_connectors_api(studio_srv, tmp_path):
 
 
 def test_claude_instructions():
-    s = ns_connect.snippets("http://127.0.0.1:7870", token="t")
-    assert s["claude_code"]["http"].startswith("claude mcp add --transport http --scope user neuronscope "
+    s = oc_connect.snippets("http://127.0.0.1:7870", token="t")
+    assert s["claude_code"]["http"].startswith("claude mcp add --transport http --scope user omnicortex "
                                                "http://127.0.0.1:7870/mcp")
     assert '--header "Authorization: Bearer <your Studio token>"' in s["claude_code"]["http"]
-    assert " -- " in s["claude_code"]["stdio"] and "ns_mcp.py" in s["claude_code"]["stdio"]
-    assert "--header" not in ns_connect.snippets("http://127.0.0.1:7870")["claude_code"]["http"]
+    assert " -- " in s["claude_code"]["stdio"] and "oc_mcp.py" in s["claude_code"]["stdio"]
+    assert "--header" not in oc_connect.snippets("http://127.0.0.1:7870")["claude_code"]["http"]

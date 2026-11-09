@@ -48,7 +48,7 @@ def test_tour_stops_point_at_real_elements(studio_srv):
     for path, sel, title in steps:
         code, page = call(studio_srv, path)
         assert code == 200, path
-        assert "NS_TOUR" in page and "nsHelpButton" in page, path          # the tour and ? button on every page
+        assert "OC_TOUR" in page and "nsHelpButton" in page, path          # the tour and ? button on every page
         for part in sel.split(","):
             ids = re.findall(r"#([\w-]+)", part)
             tab = re.findall(r"\[data-tab=(\w+)\]", part)

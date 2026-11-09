@@ -39,7 +39,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_constants import TEXT_LAYER_RE, normalise_piece  # noqa: E402
+from oc_constants import TEXT_LAYER_RE, normalise_piece  # noqa: E402
 
 LOCATIONS = ["input", "output", "answer_tokens", "all_except_answer_tokens"]
 
@@ -262,7 +262,7 @@ def saliency_one(model, hooks: SaliencyHooks, ids, target: tuple[int, int], meth
 def run_saliency(a) -> dict:
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    from ns_common import build_sequence, find_regions
+    from oc_common import build_sequence, find_regions
     dtype = {"float32": torch.float32, "float16": torch.float16, "bfloat16": torch.bfloat16}[a.dtype]
     device = a.device if a.device != "auto" else ("cuda" if torch.cuda.is_available() else "cpu")
     tok = AutoTokenizer.from_pretrained(a.model_path, trust_remote_code=not a.no_trust_remote_code)

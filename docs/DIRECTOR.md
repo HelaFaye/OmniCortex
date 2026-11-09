@@ -157,7 +157,7 @@ listing what; you can start anyway. Workers are told what the machine has
 and what it lacks, so their build steps and commands fit it.
 
 ```bash
-python scripts/ns_requirements.py project ~/src/game     # the same, for any checkout
+python scripts/oc_requirements.py project ~/src/game     # the same, for any checkout
 ```
 
 ## API
@@ -181,7 +181,7 @@ Owner only (a paired device gets 403), like Jobs.
 | `POST /api/projects/<id>/policy` | `{policy: {review, max_parallel, max_attempts, default_model, check, devices, device_settings}}` |
 | `GET /api/workers`, `POST /api/workers/stop` | running workers and detected devices |
 
-Plans live in `--projects-dir` (default `~/.neuronscope/projects/<id>/plan.json`).
+Plans live in `--projects-dir` (default `~/.omnicortex/projects/<id>/plan.json`).
 
 ## Verification graphs
 

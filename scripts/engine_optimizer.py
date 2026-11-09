@@ -12,7 +12,7 @@ one-option-at-a-time refinement around the best trial.
 
     python scripts/engine_optimizer.py --model models/m-Q4_K_M.gguf --trials 30 --out runs/opt-m
     python scripts/engine_optimizer.py --model ... --objective request --prompt-tokens 2000 --gen-tokens 200
-    python scripts/engine_optimizer.py --model ... --apply ~/.neuronscope/studio.json    # Studio uses the winner
+    python scripts/engine_optimizer.py --model ... --apply ~/.omnicortex/studio.json    # Studio uses the winner
 
 Objectives:
   gen       generation tokens per second (the default; what chat feels like)
@@ -371,8 +371,8 @@ def apply(settings_path: str, model: str, best: dict) -> None:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--model", required=True, help="the GGUF to tune for")
-    p.add_argument("--server", default=os.environ.get("NS_LLAMA_SERVER")
-                   or str(Path(os.environ.get("NS_LLAMA", "~/llama.cpp")).expanduser() / "build" / "bin" / "llama-server"))
+    p.add_argument("--server", default=os.environ.get("OC_LLAMA_SERVER")
+                   or str(Path(os.environ.get("OC_LLAMA", "~/llama.cpp")).expanduser() / "build" / "bin" / "llama-server"))
     p.add_argument("--out", required=True, help="folder for trials.jsonl, best.json, report.txt")
     p.add_argument("--trials", type=int, default=24, help="new measurements to make (cached ones are free)")
     p.add_argument("--objective", choices=["gen", "prompt", "request"], default="gen")

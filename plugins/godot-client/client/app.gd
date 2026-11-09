@@ -7,9 +7,9 @@ extends Control
 ## same HTTP API as Studio's web pages, so the two cannot drift.
 ##
 ##   godot --path plugins/godot-client/client                                   # pick or add a Studio under Connect
-##   NS_STUDIO=https://gpu-box:7870 NS_TOKEN=… godot --path plugins/godot-client/client
-##   NS_TAB=Review godot --path plugins/godot-client/client                       # open on a tab (or a page inside a group)
-##   NS_SHOTS=/tmp/shots NS_STUDIO=… godot --path plugins/godot-client/client     # screenshot every tab, then quit
+##   OC_STUDIO=https://gpu-box:7870 OC_TOKEN=… godot --path plugins/godot-client/client
+##   OC_TAB=Review godot --path plugins/godot-client/client                       # open on a tab (or a page inside a group)
+##   OC_SHOTS=/tmp/shots OC_STUDIO=… godot --path plugins/godot-client/client     # screenshot every tab, then quit
 ##
 ## Beyond the web pages: the 3D view is native (orbit, layer filter, F12
 ## screenshots, review periods as frames), several Studios are remembered, and
@@ -345,10 +345,10 @@ func _use_saved(s: Dictionary) -> void:
 
 
 func _auto_connect() -> void:
-	var env_url := OS.get_environment("NS_STUDIO")
+	var env_url := OS.get_environment("OC_STUDIO")
 	if env_url != "":
 		ui.url.text = env_url
-		ui.token.text = OS.get_environment("NS_TOKEN")
+		ui.token.text = OS.get_environment("OC_TOKEN")
 		_do_connect()
 		return
 	for s in studio.saved():
@@ -364,10 +364,10 @@ func _do_connect() -> void:
 			studio.save_connection(ui.cname.text if ui.cname.text != "" else "studio", studio.base, studio.token, studio.cert_path)
 			_list_saved()
 			ui.connmsg.text = "[color=#%s]connected[/color] as %s" % [GOOD.to_html(false), studio.role]
-			var start := OS.get_environment("NS_TAB")
+			var start := OS.get_environment("OC_TAB")
 			_go(start if start != "" else "Chat")
-			if OS.get_environment("NS_SHOTS") != "":
-				_capture_all(OS.get_environment("NS_SHOTS"))
+			if OS.get_environment("OC_SHOTS") != "":
+				_capture_all(OS.get_environment("OC_SHOTS"))
 		else:
 			ui.connmsg.text = _err(studio.last_error))
 
@@ -1213,11 +1213,11 @@ func _load_lab() -> void:
 				_btn("Stop", func(): studio.post_json("/api/lab/stop", {"name": name}, func(_c, _d): _load_lab()))])))
 
 
-## Screenshot every tab (docs and checks): NS_SHOTS=<dir>. NS_SHOT_3D=<url>
+## Screenshot every tab (docs and checks): OC_SHOTS=<dir>. OC_SHOT_3D=<url>
 ## opens that trace or review view in the 3D tab first.
 func _capture_all(dir: String) -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
-	var v3d := OS.get_environment("NS_SHOT_3D")
+	var v3d := OS.get_environment("OC_SHOT_3D")
 	var all: Array = []
 	for i in tabs.get_tab_count():
 		var top := tabs.get_tab_title(i)
@@ -1235,10 +1235,10 @@ func _capture_all(dir: String) -> void:
 		_go(t)
 		if t == "3D" and v3d != "":
 			viz.open(v3d, studio.token)
-			var w := OS.get_environment("NS_SHOT_WAIT")
+			var w := OS.get_environment("OC_SHOT_WAIT")
 			await get_tree().create_timer(float(w) if w.is_valid_float() else 6.0).timeout
-		elif t == "Chat" and OS.get_environment("NS_SHOT_CHAT") != "":
-			ui.chatin.text = OS.get_environment("NS_SHOT_CHAT")
+		elif t == "Chat" and OS.get_environment("OC_SHOT_CHAT") != "":
+			ui.chatin.text = OS.get_environment("OC_SHOT_CHAT")
 			_send()
 			await get_tree().create_timer(6.0).timeout
 		else:

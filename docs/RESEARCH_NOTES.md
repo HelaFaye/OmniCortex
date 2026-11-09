@@ -54,7 +54,7 @@ real failure mode is one of those, the neurons you find may not transfer.
 
 Written against the papers and the upstream source, but **not executed against
 real weights** — treat the first run of each stage as a debugging session. The
-likeliest thing to need adjusting is `TEXT_LAYER_RE` in `ns_common.py` if your
+likeliest thing to need adjusting is `TEXT_LAYER_RE` in `oc_common.py` if your
 model's remote code names its modules unconventionally. `preflight.py` will
 show you the names.
 

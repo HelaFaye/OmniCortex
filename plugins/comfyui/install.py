@@ -6,10 +6,10 @@ import venv
 import comfy as C
 
 p = argparse.ArgumentParser(description=__doc__)
-p.add_argument("--folder", default="~/.neuronscope/comfyui")
+p.add_argument("--folder", default="~/.omnicortex/comfyui")
 p.add_argument("--torch", default="auto", choices=["auto", "cuda", "rocm", "xpu", "cpu", "mps", "directml"])
 p.add_argument("--manager", action="store_true")
-p.add_argument("--neuronscope-nodes", action="store_true")
+p.add_argument("--omnicortex-nodes", action="store_true")
 p.add_argument("--llm-nodes", nargs="*", default=[], choices=sorted(C.LLM_PACKS))
 a = p.parse_args()
 C.need_git()
@@ -30,7 +30,7 @@ for k in a.llm_nodes:
     url, name = C.LLM_PACKS[k]
     C.clone_or_pull(url, root / "custom_nodes" / name)
     C.requirements(root, root / "custom_nodes" / name)
-if a.neuronscope_nodes:
-    C.neuronscope_nodes(root)
+if a.omnicortex_nodes:
+    C.omnicortex_nodes(root)
 C.save_state(folder=str(root), torch=kind)
 C.say("done. Start it with the job 'ComfyUI: run', then open the ComfyUI tab.")

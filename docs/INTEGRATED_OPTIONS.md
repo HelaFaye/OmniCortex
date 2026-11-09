@@ -39,7 +39,7 @@ OmniCortex keeps:
 When the model has an activation method (`llama-cett-dump`), the reply's activation profile also goes into
 the neuron review with verdict *wrong*. Neurons that fire on confident mistakes are then counted there.
 
-The pairs collect in `~/.neuronscope/harvest/`.
+The pairs collect in `~/.omnicortex/harvest/`.
 
 The **Fix This Mistake: micro-tune** job (`harvest.py train`) runs a short SFT + DPO pass (`finetune.py`) on
 the pairs no earlier run used. Turn on **auto train** to run it by itself when two things hold:
@@ -292,7 +292,7 @@ one. The score, 0 to 1, comes from:
 - a long conversation;
 - images.
 
-Each part is reported in the request's route (`X-NeuronScope-Route`, the reply's route note).
+Each part is reported in the request's route (`X-OmniCortex-Route`, the reply's route note).
 
 **Not done:** skipping layers inside one model. llama.cpp runs every layer it loads, and early exit only works
 for models trained for it, so two real models are used instead. Keep the small one where it does not evict the

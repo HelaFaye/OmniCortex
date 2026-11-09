@@ -40,7 +40,7 @@ and installed elsewhere.
 
 | package | what it is |
 |---|---|
-| `godot-client` | The Godot client: a sidebar tab, a job that downloads Godot 4 and checks it against the release's SHA-512 list, a job that opens the client here, and the client as a `.zip` for another computer (`/plugins/godot-client/download/neuronscope-godot.zip`). `./neuronscope godot` uses it. |
+| `godot-client` | The Godot client: a sidebar tab, a job that downloads Godot 4 and checks it against the release's SHA-512 list, a job that opens the client here, and the client as a `.zip` for another computer (`/plugins/godot-client/download/omnicortex-godot.zip`). `./omnicortex godot` uses it. |
 | `jewel-styles` | The icosphere and tesseract jewel styles, for the browser views (`styles.js`) and the Godot client (`styles.gd`, compiled by the client when it connects). Without it the jewel has the reactor core and off. |
 | `theme-pack` | The Arcade, Ember, Forest and Solar themes and the Ember, Cool, Arcade, Forest and Solar 3D palettes. The core keeps Midnight, Daylight, Contrast and Clinical. |
 | `graph-screens` | Graph nodes: a code security screen (shell injection, eval, disabled certificate checks, hard-coded secrets, destructive commands) and a prompt-injection screen for text a model is about to read. |
@@ -85,7 +85,7 @@ page also gets a sidebar tab (under *Add-ons*) while it is on.
 
 `plugins/comfyui` comes with OmniCortex. Turn it on, and a **ComfyUI** tab shows ComfyUI inside Studio. Its jobs (Jobs → Plugins: comfyui):
 
-- **install** clones [ComfyUI](https://github.com/comfy-org/ComfyUI) into its own folder (default `~/.neuronscope/comfyui`) and gives it its own Python environment (`.venv`). It installs the PyTorch build for this machine: CUDA, ROCm, XPU, Apple (MPS), DirectML or CPU, picked from the GPUs found. Optionally it also adds:
+- **install** clones [ComfyUI](https://github.com/comfy-org/ComfyUI) into its own folder (default `~/.omnicortex/comfyui`) and gives it its own Python environment (`.venv`). It installs the PyTorch build for this machine: CUDA, ROCm, XPU, Apple (MPS), DirectML or CPU, picked from the GPUs found. Optionally it also adds:
   - [ComfyUI-Manager](https://github.com/Comfy-Org/ComfyUI-Manager);
   - the LLM node packs [comfyui_LLM_party](https://github.com/heshengtao/comfyui_LLM_party), [ComfyUI-LLMs-Toolkit](https://github.com/ComfyUI-Kelin/ComfyUI-LLMs-Toolkit) and [ComfyUI-LLMs](https://github.com/leoleelxh/ComfyUI-LLMs);
   - OmniCortex's own nodes (below).
@@ -101,7 +101,7 @@ page also gets a sidebar tab (under *Add-ons*) while it is on.
 - **hallucination check** gives each token's risk from the model's neurons, the flagged text, and a link to the 3D view.
 - **run a graph** runs a Studio graph ([GRAPHS.md](GRAPHS.md)), such as `template:screen-and-verify`, and returns its output.
 
-They reach Studio at `http://127.0.0.1:7870`, set per node, using `NS_STUDIO_TOKEN` or `~/.neuronscope/studio.token` if Studio has a token. ComfyUI is GPL-3.0 and is downloaded from its own repository; none of it is shipped here.
+They reach Studio at `http://127.0.0.1:7870`, set per node, using `OC_STUDIO_TOKEN` or `~/.omnicortex/studio.token` if Studio has a token. ComfyUI is GPL-3.0 and is downloaded from its own repository; none of it is shipped here.
 
 ## Language packs
 

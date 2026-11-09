@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "tests"))
 import testqa as tq  # noqa: E402
 
-LLAMA = Path(os.environ.get("NS_LLAMA") or "~/llama.cpp").expanduser()
+LLAMA = Path(os.environ.get("OC_LLAMA") or "~/llama.cpp").expanduser()
 
 
 class Teacher(BaseHTTPRequestHandler):
@@ -40,7 +40,7 @@ def test_cycle_end_to_end(tmp_path):
     for m in ("peft", "trl", "sentencepiece"):
         pytest.importorskip(m)
     if not (LLAMA / "convert_hf_to_gguf.py").exists() or not (LLAMA / "build" / "bin" / "llama-server").exists():
-        pytest.skip("needs a llama.cpp checkout with llama-server (NS_LLAMA)")
+        pytest.skip("needs a llama.cpp checkout with llama-server (OC_LLAMA)")
     import tiny_models
     hf = tiny_models.make_tiny_llama(tmp_path / "tiny", layers=4)
     base_gguf = tmp_path / "base.gguf"
@@ -72,7 +72,7 @@ def test_cycle_end_to_end(tmp_path):
         for name in ("all", "1-2"):
             assert arms[name]["verdict"] in ("keep", "reject", "inconclusive")
             assert Path(arms[name]["gguf"]).exists() and arms[name]["holdout"]["n"] > 0
-        lay = json.loads((out / "arms" / "1-2" / "adapter" / "neuronscope-finetune.json").read_text())["layers"]
+        lay = json.loads((out / "arms" / "1-2" / "adapter" / "omnicortex-finetune.json").read_text())["layers"]
         assert lay == [1, 2]
         # every arm was asked exactly the baseline's holdout items
         ids = set(json.loads((out / "data" / "eval_ids.json").read_text())["ids"])

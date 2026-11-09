@@ -2,7 +2,7 @@
 
 OmniCortex touches many layers: Python packages, llama.cpp builds for
 different GPU backends, kernel drivers and device permissions, and the
-machine's memory. `scripts/ns_requirements.py` keeps track of all of it per
+machine's memory. `scripts/oc_requirements.py` keeps track of all of it per
 feature, and **Setup → Requirements** in Studio shows the same.
 
 ## What each feature needs
@@ -43,7 +43,7 @@ instead of running it.
 
 **Take a snapshot** records every installed Python package, the programs
 above with their versions, the llama.cpp builds (time and backends), the
-devices and the OmniCortex commit, to `~/.neuronscope/env/<time>.json`.
+devices and the OmniCortex commit, to `~/.omnicortex/env/<time>.json`.
 **Compare** two snapshots after an update, a driver change or a rebuild:
 "it was faster last week" usually turns out to be a llama.cpp rebuilt
 without its GPU backend, or a package that moved a major version.
@@ -60,14 +60,14 @@ the same way; Start waits until required items are present. See
 
 ## Command line
 
-    python scripts/ns_requirements.py                       # every feature
-    python scripts/ns_requirements.py check --feature amd_vulkan -v
-    python scripts/ns_requirements.py check --json
-    python scripts/ns_requirements.py install peft
-    python scripts/ns_requirements.py snapshot
-    python scripts/ns_requirements.py diff                  # the last two
-    python scripts/ns_requirements.py freeze > env.txt
-    python scripts/ns_requirements.py project ~/src/game    # a project's own needs
+    python scripts/oc_requirements.py                       # every feature
+    python scripts/oc_requirements.py check --feature amd_vulkan -v
+    python scripts/oc_requirements.py check --json
+    python scripts/oc_requirements.py install peft
+    python scripts/oc_requirements.py snapshot
+    python scripts/oc_requirements.py diff                  # the last two
+    python scripts/oc_requirements.py freeze > env.txt
+    python scripts/oc_requirements.py project ~/src/game    # a project's own needs
 
 MCP: the `requirements` tool (optionally one `feature`), and `start_job`
 with `install_package` or `env_snapshot`. `doctor.py` remains the "can I run

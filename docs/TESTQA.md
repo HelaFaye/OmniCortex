@@ -182,7 +182,7 @@ paired comparison, or a bigger bank, before acting on the difference.
 ```bash
 python scripts/testqa.py --endpoint m=http://127.0.0.1:7870/v1@<id> --allow-exec \
     --publish-stats http://127.0.0.1:7870            # Studio ties results to the exact model file
-python scripts/testqa.py --endpoint m=... --record-stats   # or write ~/.neuronscope/stats directly
+python scripts/testqa.py --endpoint m=... --record-stats   # or write ~/.omnicortex/stats directly
 ```
 
 Every graded item becomes a rolling observation for that model (see

@@ -245,7 +245,7 @@ projector to `mmproj-model-f16.gguf`. llama.cpp converts projectors for the VLM
 families it serves (Gemma 3, Qwen-VL, SmolVLM, Pixtral and others) but not
 every Hugging Face layout, HF-format LLaVA included. When it cannot, the
 command exits with status 2, records `mmproj_error` in
-`neuronscope-export.json`, and points you at `--freeze-projector`.
+`omnicortex-export.json`, and points you at `--freeze-projector`.
 
 ## 5. Measure again, honestly, and decide
 

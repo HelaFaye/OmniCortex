@@ -25,7 +25,7 @@ Measurements come from Studio's work log (this computer and its hosts) and from 
 board.json (cards carry the speeds their runs measured), so the weights improve as results arrive from
 more and more different hardware.
 
-    python scripts/perf_predict.py --board board.json --worklog ~/.neuronscope/worklog --show
+    python scripts/perf_predict.py --board board.json --worklog ~/.omnicortex/worklog --show
 """
 from __future__ import annotations
 

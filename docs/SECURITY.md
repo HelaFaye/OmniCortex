@@ -2,7 +2,7 @@
 
 OmniCortex runs several network services: the Studio UI and API, the WebRTC
 signaling server, the resumable transfer receiver, and the tuning worker.
-They share one policy, implemented once in `scripts/ns_security.py` and
+They share one policy, implemented once in `scripts/oc_security.py` and
 covered by `tests/test_security.py`.
 
 ## Bind policy (all services)
@@ -24,12 +24,12 @@ Tailscale or a TLS-terminating reverse proxy". The service still prints a
 warning.
 
 ```bash
-python scripts/ns_security.py token --out ~/.config/neuronscope/transfer.token   # 256-bit, written 0600
-python scripts/ns_security.py selfsigned --host myhost.lan --host 192.0.2.10    # P-256 cert for LAN use
+python scripts/oc_security.py token --out ~/.config/omnicortex/transfer.token   # 256-bit, written 0600
+python scripts/oc_security.py selfsigned --host myhost.lan --host 192.0.2.10    # P-256 cert for LAN use
 ```
 
-Pass secrets with `--token-file` or `$NS_TRANSFER_TOKEN` (Studio also reads
-`$NS_STUDIO_TOKEN`). `--token` still works but warns, because argv is visible
+Pass secrets with `--token-file` or `$OC_TRANSFER_TOKEN` (Studio also reads
+`$OC_STUDIO_TOKEN`). `--token` still works but warns, because argv is visible
 to every local user. Clients trust a self-signed cert with `--cafile`.
 
 ### IPv6 transfer receiver
@@ -51,12 +51,12 @@ IPv6 address or DNS name clients use, and clients should pass it with
 Example (IPv6-only, TLS):
 
 ```bash
-python scripts/ns_security.py token --out ~/.config/neuronscope/transfer.token
-python scripts/ns_security.py selfsigned --host 2001:db8::10 \
+python scripts/oc_security.py token --out ~/.config/omnicortex/transfer.token
+python scripts/oc_security.py selfsigned --host 2001:db8::10 \
   --cert transfer-cert.pem --key transfer-key.pem
-python scripts/ns_transfer.py serve --host :: --family ipv6 --port 8810 \
-  --root /srv/neuronscope-incoming \
-  --token-file ~/.config/neuronscope/transfer.token \
+python scripts/oc_transfer.py serve --host :: --family ipv6 --port 8810 \
+  --root /srv/omnicortex-incoming \
+  --token-file ~/.config/omnicortex/transfer.token \
   --tls-cert transfer-cert.pem --tls-key transfer-key.pem
 ```
 

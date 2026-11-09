@@ -33,7 +33,7 @@ import torch
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import THINK_CLOSE, load_model  # noqa: E402
+from oc_common import THINK_CLOSE, load_model  # noqa: E402
 from profiles import Profile, SuppressionHandle, fingerprint  # noqa: E402
 
 # Deliberately generic. Anything matching counts as a decline, not a wrong

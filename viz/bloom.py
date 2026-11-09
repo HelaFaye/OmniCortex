@@ -52,7 +52,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 from records import Session  # noqa: E402
 from timeline import THEMES, add_flag_args, classify_frames, load_trace, resolve_mask  # noqa
 import widgets  # noqa: E402
@@ -269,7 +269,7 @@ button:hover{background:#16161e}
 <div id="panel"><div id="row"><button id="play">Pause</button><canvas id="spark"></canvas><canvas id="jewel" hidden></canvas><div id="tok"></div></div>
 <div id="ef" style="margin-top:4px;font-size:12.5px;color:#8a8a92;min-height:1em"></div>
 <div id="text"></div></div>
-<script>/*NS_WIDGETS*/</script>
+<script>/*OC_WIDGETS*/</script>
 <script type="importmap">
 {"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js",
 "three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
@@ -526,7 +526,7 @@ addEventListener('resize', ()=>{
   renderer.setSize(innerWidth,innerHeight); composer.setSize(innerWidth,innerHeight); drawSpark();
 });
 </script>"""
-PAGE = PAGE.replace("/*NS_WIDGETS*/", widgets.WIDGETS_JS)
+PAGE = PAGE.replace("/*OC_WIDGETS*/", widgets.WIDGETS_JS)
 
 
 def main():
@@ -574,7 +574,7 @@ def main():
         return
 
     print(f"\nopen http://{a.host}:{a.port}  (three.js client)")
-    print(f"Godot client: set NS_API=http://{a.host}:{a.port} and run "
+    print(f"Godot client: set OC_API=http://{a.host}:{a.port} and run "
           "plugins/godot-client/client/")
     print("This is the presentation view. Bloom blurs neighbours together, so "
           "use\nviz/timeline.py to decide anything.")

@@ -165,7 +165,7 @@ def choose_scratch(policy: str, model_size: int, candidates: int, requested: str
     if policy == "disk":
         root = Path(os.path.expanduser(requested or tempfile.gettempdir()))
         root.mkdir(parents=True, exist_ok=True)
-        return Path(tempfile.mkdtemp(prefix="neuronscope-scale-", dir=root))
+        return Path(tempfile.mkdtemp(prefix="omnicortex-scale-", dir=root))
     # auto/ram need capacity for the current batch, not the entire sweep.
     if policy == "ram":
         roots = [Path("/dev/shm")] if Path("/dev/shm").is_dir() else []
@@ -177,12 +177,12 @@ def choose_scratch(policy: str, model_size: int, candidates: int, requested: str
         try:
             root.mkdir(parents=True, exist_ok=True)
             if shutil.disk_usage(root).free >= need:
-                return Path(tempfile.mkdtemp(prefix="neuronscope-scale-", dir=root))
+                return Path(tempfile.mkdtemp(prefix="omnicortex-scale-", dir=root))
         except OSError:
             continue
     if policy == "ram":
         raise SweepError(f"insufficient RAM/tmpfs scratch for {candidates} model(s); need about {need/2**30:.2f} GiB")
-    return Path(tempfile.mkdtemp(prefix="neuronscope-scale-", dir=Path(tempfile.gettempdir())))
+    return Path(tempfile.mkdtemp(prefix="omnicortex-scale-", dir=Path(tempfile.gettempdir())))
 
 
 def _run_suppressor(
@@ -347,7 +347,7 @@ class SweepEngine:
                         result = {**asdict(c), "status": "built", "sha256": sha256_file(dest), "size_bytes": dest.stat().st_size}
                         if evaluator_cmd:
                             env = os.environ.copy()
-                            env.update({"NS_MODEL": str(dest), "NS_SCALE": str(c.scale), "NS_BASELINE": str(baseline_score if baseline_score is not None else ""), "NS_PROFILE": profile})
+                            env.update({"OC_MODEL": str(dest), "OC_SCALE": str(c.scale), "OC_BASELINE": str(baseline_score if baseline_score is not None else ""), "OC_PROFILE": profile})
                             cmd = evaluator_cmd.format(model=str(dest), scale=str(c.scale), baseline=str(baseline_score if baseline_score is not None else ""), profile=profile)
                             ep = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout, env=env)
                             if ep.returncode != 0:

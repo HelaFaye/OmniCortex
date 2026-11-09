@@ -1,4 +1,4 @@
-// ns_activations.h -- stream per-token activations out of llama-server.
+// oc_activations.h -- stream per-token activations out of llama-server.
 //
 // Self-contained on purpose. The server sources are large and change often, so
 // a patch against their internals would rot within weeks. Everything here
@@ -33,7 +33,7 @@
 //
 // LIMITATION: single slot. With --parallel > 1 a batch interleaves tokens from
 // several sequences, and the node carries no sequence id we can recover here.
-// ns_activations refuses to enable itself when n_parallel > 1 rather than
+// oc_activations refuses to enable itself when n_parallel > 1 rather than
 // emitting frames that silently mix two conversations.
 
 #pragma once

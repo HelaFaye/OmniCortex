@@ -14,8 +14,8 @@ at runtime.
     python scripts/merge_export.py --base org/base-model --adapter runs/adapter \\
         --out runs/adapter-gguf --lora-gguf
 
-Uses llama.cpp's own converters from $NS_LLAMA (scripts/build_llama_tools.sh)
-and its llama-quantize. Writes a neuronscope-export.json next to the result.
+Uses llama.cpp's own converters from $OC_LLAMA (scripts/build_llama_tools.sh)
+and its llama-quantize. Writes a omnicortex-export.json next to the result.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from pathlib import Path
 
 
 def llama_dir(arg: str | None) -> Path:
-    d = Path(arg or os.environ.get("NS_LLAMA", "~/llama.cpp")).expanduser()
+    d = Path(arg or os.environ.get("OC_LLAMA", "~/llama.cpp")).expanduser()
     if not (d / "convert_hf_to_gguf.py").exists():
         raise SystemExit(f"no llama.cpp checkout at {d}; run scripts/build_llama_tools.sh or pass --llama")
     return d
@@ -68,7 +68,7 @@ def main(argv=None) -> int:
     p.add_argument("--base", required=True, help="HF id or path of the base model the adapter was trained on")
     p.add_argument("--adapter", required=True)
     p.add_argument("--out", required=True)
-    p.add_argument("--llama", help="llama.cpp checkout (default $NS_LLAMA)")
+    p.add_argument("--llama", help="llama.cpp checkout (default $OC_LLAMA)")
     p.add_argument("--dtype", default="float16", choices=["float16", "bfloat16", "float32"])
     p.add_argument("--gguf", nargs="?", const="F16", metavar="QUANT",
                    help="also convert to GGUF; optional quant type such as Q4_K_M or Q8_0 (default F16)")
@@ -117,7 +117,7 @@ def main(argv=None) -> int:
                     # llama.cpp converts projectors for the VLM families it serves (Gemma 3,
                     # Qwen-VL, SmolVLM, Pixtral, ...), not every HF layout.
                     meta["mmproj_error"] = (r.stderr or r.stdout).strip().splitlines()[-1][:500]
-    (out / "neuronscope-export.json").write_text(json.dumps(meta, indent=2))
+    (out / "omnicortex-export.json").write_text(json.dumps(meta, indent=2))
     print(json.dumps(meta, indent=2))
     if "mmproj_error" in meta:
         print("\nThe language model converted, but llama.cpp could not convert this projector:\n  "

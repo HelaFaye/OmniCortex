@@ -18,7 +18,7 @@
       "fields": [
         {
           "name": "folder",
-          "default": "~/.neuronscope/comfyui",
+          "default": "~/.omnicortex/comfyui",
           "help": "where ComfyUI goes"
         },
         {
@@ -42,7 +42,7 @@
           "help": "add ComfyUI-Manager (install custom nodes from ComfyUI)"
         },
         {
-          "name": "neuronscope_nodes",
+          "name": "omnicortex_nodes",
           "kind": "bool",
           "default": true,
           "help": "add OmniCortex's nodes: chat through Studio, hallucination check, run a graph"
@@ -67,7 +67,7 @@
       "fields": [
         {
           "name": "folder",
-          "default": "~/.neuronscope/comfyui"
+          "default": "~/.omnicortex/comfyui"
         },
         {
           "name": "port",
@@ -104,7 +104,7 @@
       "fields": [
         {
           "name": "folder",
-          "default": "~/.neuronscope/comfyui"
+          "default": "~/.omnicortex/comfyui"
         }
       ]
     },
@@ -116,7 +116,7 @@
       "fields": [
         {
           "name": "folder",
-          "default": "~/.neuronscope/comfyui"
+          "default": "~/.omnicortex/comfyui"
         },
         {
           "name": "repo",

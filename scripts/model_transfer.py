@@ -36,7 +36,7 @@ from urllib.parse import urlparse
 from aiohttp import web
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 CODE_LEN = 10               # ~49.5 bits: a rendezvous label, not the secret
@@ -287,7 +287,7 @@ async def security_headers(request: web.Request, handler):
 
 
 async def health(_: web.Request) -> web.Response:
-    return web.json_response({"ok": True, "service": "neuronscope-model-transfer", "p2p": True})
+    return web.json_response({"ok": True, "service": "omnicortex-model-transfer", "p2p": True})
 
 
 async def ice_config(request: web.Request) -> web.Response:
@@ -475,7 +475,7 @@ def main(argv=None) -> int:
     if not sec.is_loopback(args.host) and not tls and not args.allow_plaintext:
         print("error: refusing plain HTTP on a non-loopback address. Browsers only expose the APIs this "
               "page needs (crypto.subtle, showDirectoryPicker) in a secure context, and room keys would "
-              "cross the network in clear. Pass --tls-cert/--tls-key (ns_security.py selfsigned makes a "
+              "cross the network in clear. Pass --tls-cert/--tls-key (oc_security.py selfsigned makes a "
               "LAN cert) or --allow-plaintext behind a TLS reverse proxy.", file=sys.stderr)
         return 2
     if args.ice_mode == "relay" and not args.turn_url:

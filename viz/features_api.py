@@ -76,7 +76,7 @@ def list_all(ws_root: str, extra: list[str] | None = None) -> dict:
                 m = _json(d / "meta.json")
             except (ValueError, OSError):
                 continue
-            if m.get("format") == "neuronscope-acts/1":
+            if m.get("format") == "omnicortex-acts/1":
                 out["acts"].append({"path": str(d), "name": d.name, "model": m.get("model"), "points": m.get("points"),
                                     "tokens": m.get("tokens"), "created": m.get("created")})
         for d in _walk(base, "emotions.json"):

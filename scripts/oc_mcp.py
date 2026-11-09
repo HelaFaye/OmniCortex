@@ -10,13 +10,13 @@ paired-device limits, jobs only from typed forms. Two ways to connect:
   * streamable HTTP, served by Studio itself at  http://127.0.0.1:7870/mcp
     (nothing to install; send Studio's token as a Bearer header if it has one);
   * stdio, for clients that start a process:
-        python scripts/ns_mcp.py --studio http://127.0.0.1:7870 [--token-file F]
+        python scripts/oc_mcp.py --studio http://127.0.0.1:7870 [--token-file F]
 
 No MCP library is needed: the protocol (JSON-RPC 2.0: initialize, tools/list,
 tools/call, ping) is implemented here, and tests check it against the
 official `mcp` client.
 
-    python scripts/ns_mcp.py --list        # the tools, and what each does
+    python scripts/oc_mcp.py --list        # the tools, and what each does
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-SERVER_NAME = "neuronscope"
+SERVER_NAME = "omnicortex"
 SERVER_VERSION = "1.0"
 PROTOCOLS = ("2025-06-18", "2025-03-26", "2024-11-05")
 INSTRUCTIONS = (
@@ -451,10 +451,15 @@ def serve_stdio(studio: Studio) -> None:
 
 
 def main(argv=None) -> int:
+    try:
+        import oc_migrate
+        oc_migrate.migrate()
+    except ImportError:
+        pass
     p = argparse.ArgumentParser(description="OmniCortex MCP server (stdio). An MCP client starts this; "
                                             "run alone it waits for requests on stdin.")
-    p.add_argument("--studio", default=os.environ.get("NS_STUDIO_URL", "http://127.0.0.1:7870"),
-                   help="Studio URL (default $NS_STUDIO_URL or http://127.0.0.1:7870)")
+    p.add_argument("--studio", default=os.environ.get("OC_STUDIO_URL", "http://127.0.0.1:7870"),
+                   help="Studio URL (default $OC_STUDIO_URL or http://127.0.0.1:7870)")
     p.add_argument("--token-file", help="file holding Studio's token (or a paired device's)")
     p.add_argument("--list", action="store_true", help="print the tools and exit")
     a = p.parse_args(argv)
@@ -464,7 +469,7 @@ def main(argv=None) -> int:
                                                            else "starts work / stops work")
             print(f"{n:<16} [{kind}] {d}")
         return 0
-    token = os.environ.get("NS_STUDIO_TOKEN") or None
+    token = os.environ.get("OC_STUDIO_TOKEN") or None
     if a.token_file:
         token = open(os.path.expanduser(a.token_file)).read().strip()
     serve_stdio(Studio(a.studio, token))

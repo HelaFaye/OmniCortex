@@ -35,7 +35,7 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import TEXT_LAYER_RE, load_model  # noqa: E402
+from oc_common import TEXT_LAYER_RE, load_model  # noqa: E402
 from profiles import validate_selection  # noqa: E402
 
 

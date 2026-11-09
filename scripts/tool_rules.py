@@ -47,7 +47,7 @@ import time
 import uuid
 from pathlib import Path
 
-DEFAULT_PATH = Path.home() / ".neuronscope" / "tool-rules.json"
+DEFAULT_PATH = Path.home() / ".omnicortex" / "tool-rules.json"
 ACTIONS = ("allow", "ask", "deny")
 CAT_ACTIONS = ("default",) + ACTIONS          # "default": this kind follows the overall default
 KINDS = ("read_only", "write", "destructive", "open_world", "unknown")
@@ -171,7 +171,7 @@ def validate_rule(r: dict) -> dict:
 
 class Rules:
     def __init__(self, path: str | Path | None = None):
-        self.path = Path(path or os.environ.get("NS_TOOL_RULES") or DEFAULT_PATH).expanduser()
+        self.path = Path(path or os.environ.get("OC_TOOL_RULES") or DEFAULT_PATH).expanduser()
 
     def load(self) -> dict:
         try:
@@ -290,7 +290,7 @@ def rule_from_call(kind: str, server: str, tool: str, args: dict) -> dict:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("--file", help=f"rules file (default {DEFAULT_PATH}, or $NS_TOOL_RULES)")
+    p.add_argument("--file", help=f"rules file (default {DEFAULT_PATH}, or $OC_TOOL_RULES)")
     sub = p.add_subparsers(dest="cmd")
     sub.add_parser("list")
     a_ = sub.add_parser("add", help="add a rule at the top (it wins over later ones)")

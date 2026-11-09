@@ -26,7 +26,7 @@ are listed; the Vulkan twin of a GPU that a native backend reaches is disabled
 by default, so one GPU is not booked twice. Turn either on or off in the
 hardware config:
 
-    ~/.neuronscope/hardware.json
+    ~/.omnicortex/hardware.json
     {"servers": {"rocm": "~/llama.cpp/build-rocm/bin/llama-server",
                  "vulkan": "~/llama.cpp/build-vulkan/bin/llama-server"},
      "devices": {"rocm:0": {"enabled": true, "reserve_gib": 2,
@@ -78,7 +78,7 @@ from pathlib import Path
 
 GIB = 1024 ** 3
 BACKENDS = ("cuda", "rocm", "vulkan", "metal", "cpu")
-DEFAULT_CONFIG = Path.home() / ".neuronscope" / "hardware.json"
+DEFAULT_CONFIG = Path.home() / ".omnicortex" / "hardware.json"
 VENDORS = {"0x10de": "nvidia", "0x1002": "amd", "0x8086": "intel", "0x106b": "apple", "0x13b5": "arm",
            "0x5143": "qualcomm"}
 # Environment a device entry may set for its llama-server. Nothing else passes.

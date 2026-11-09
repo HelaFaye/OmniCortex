@@ -13,7 +13,7 @@ the wrong place. See PATCH.md for what each change does and why.
 
 Then run:
 
-    NS_ACTIVATIONS=sparse NS_CLASSIFIER=models/classifier.bin \\
+    OC_ACTIVATIONS=sparse OC_CLASSIFIER=models/classifier.bin \\
         llama-server -m model.gguf --parallel 1
     curl -N http://127.0.0.1:8080/activations     # one SSE frame per generated token
 """
@@ -29,7 +29,7 @@ MARK = "ns-activations"
 GLUE = r'''#pragma once
 // ns-activations: globals and the /activations route, shared by
 // server-context.cpp (callback setup) and server.cpp (route).
-#include "ns_activations.h"
+#include "oc_activations.h"
 #include "server-http.h"
 
 #include <chrono>
@@ -40,11 +40,11 @@ GLUE = r'''#pragma once
 inline ns::streamer g_ns_stream;
 inline ns::ctx      g_ns_ctx;
 
-inline server_http_res_ptr ns_activations_handler(const server_http_req & req) {
+inline server_http_res_ptr oc_activations_handler(const server_http_req & req) {
     auto res = std::make_unique<server_http_res>();
     if (!g_ns_stream.cfg.enabled) {
         res->status = 503;
-        res->data = "{\"error\":\"start llama-server with NS_ACTIVATIONS=sparse|binned|raw and --parallel 1\"}";
+        res->data = "{\"error\":\"start llama-server with OC_ACTIVATIONS=sparse|binned|raw and --parallel 1\"}";
         return res;
     }
     res->content_type = "text/event-stream";
@@ -79,18 +79,18 @@ inline server_http_res_ptr ns_activations_handler(const server_http_req & req) {
 '''
 
 CONFIG_BLOCK = r'''        // --- ns-activations: register the eval callback before the context exists
-        if (const char * ns_mode = getenv("NS_ACTIVATIONS")) {
+        if (const char * oc_mode = getenv("OC_ACTIVATIONS")) {
             if (params_base.n_parallel > 1) {
                 // Several slots interleave sequences in one batch, and graph nodes
                 // carry no sequence id, so frames would mix conversations.
-                SRV_WRN("%s", "NS_ACTIVATIONS ignored: needs --parallel 1\n");
+                SRV_WRN("%s", "OC_ACTIVATIONS ignored: needs --parallel 1\n");
             } else {
                 g_ns_stream.cfg.enabled = true;
                 g_ns_stream.cfg.reduction =
-                    strcmp(ns_mode, "binned") == 0 ? ns::tier::binned :
-                    strcmp(ns_mode, "raw")    == 0 ? ns::tier::raw    : ns::tier::sparse;
-                if (const char * v = getenv("NS_TOPK")) g_ns_stream.cfg.top_k = atoi(v);
-                if (const char * v = getenv("NS_BINS")) g_ns_stream.cfg.bins  = atoi(v);
+                    strcmp(oc_mode, "binned") == 0 ? ns::tier::binned :
+                    strcmp(oc_mode, "raw")    == 0 ? ns::tier::raw    : ns::tier::sparse;
+                if (const char * v = getenv("OC_TOPK")) g_ns_stream.cfg.top_k = atoi(v);
+                if (const char * v = getenv("OC_BINS")) g_ns_stream.cfg.bins  = atoi(v);
                 g_ns_ctx.str = &g_ns_stream;
                 params_base.cb_eval           = ns::eval_callback;
                 params_base.cb_eval_user_data = &g_ns_ctx;
@@ -102,9 +102,9 @@ SETUP_BLOCK = r'''
         // --- ns-activations: layer count and optional classifier, now the model is known
         if (g_ns_stream.cfg.enabled) {
             g_ns_ctx.n_layers = llama_model_n_layer(model_tgt);
-            if (const char * p = getenv("NS_CLASSIFIER")) {
+            if (const char * p = getenv("OC_CLASSIFIER")) {
                 int n_ff = 0;
-                if (const char * v = getenv("NS_NFF")) {
+                if (const char * v = getenv("OC_NFF")) {
                     n_ff = atoi(v);
                 } else {
                     char arch[128] = {0}, val[64] = {0};
@@ -157,18 +157,18 @@ def main(argv=None) -> int:
     server = root / "tools" / "server"
     if not (server / "server-context.cpp").exists():
         raise SystemExit(f"{server}/server-context.cpp not found: older llama.cpp layout; apply PATCH.md by hand")
-    shutil.copy(HERE / "ns_activations.h", server / "ns_activations.h")
-    (server / "ns_server_glue.h").write_text(GLUE)
-    print(f"wrote {server / 'ns_activations.h'} and ns_server_glue.h")
+    shutil.copy(HERE / "oc_activations.h", server / "oc_activations.h")
+    (server / "oc_server_glue.h").write_text(GLUE)
+    print(f"wrote {server / 'oc_activations.h'} and oc_server_glue.h")
 
     patch_file(server / "server-context.cpp", [
-        ('#include "server-context.h"\n', '#include "ns_server_glue.h" // ns-activations\n', "after"),
+        ('#include "server-context.h"\n', '#include "oc_server_glue.h" // ns-activations\n', "after"),
         ("        llama_init = common_init_from_params(params_base);\n", CONFIG_BLOCK, "before"),
         ("        vocab = llama_model_get_vocab(model_tgt);\n", SETUP_BLOCK, "after"),
     ])
     patch_file(server / "server.cpp", [
-        ('#include "server-http.h"\n', '#include "ns_server_glue.h" // ns-activations\n', "after"),
-        ('    ctx_http.get ("/metrics",', '    ctx_http.get ("/activations",              ex_wrapper(ns_activations_handler)); // ns-activations\n', "before"),
+        ('#include "server-http.h"\n', '#include "oc_server_glue.h" // ns-activations\n', "after"),
+        ('    ctx_http.get ("/metrics",', '    ctx_http.get ("/activations",              ex_wrapper(oc_activations_handler)); // ns-activations\n', "before"),
     ])
     patch_file(root / "src" / "llama-context.cpp", [
         ("    if (!graph_reuse_disable && gf_res_prev_active == res && res->can_reuse(gparams)) {\n", REUSE_FIX, "before"),

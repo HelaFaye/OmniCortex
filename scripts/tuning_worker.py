@@ -5,7 +5,7 @@ Keeps source GGUFs and generated candidates on the remote machine. The API is
 metadata-only and enforces atomic output, checksums, bounded concurrency,
 filesystem capacity, cancellation, and persistent job state.
 
-Same security rules as ns_transfer.py: a non-loopback bind needs a token, and
+Same security rules as oc_transfer.py: a non-loopback bind needs a token, and
 TLS unless --allow-plaintext (VPN / reverse proxy) is given.
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 
 JOB_ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
@@ -142,7 +142,7 @@ class Store:
         # The evaluator command comes from the operator's own command line, never
         # from the API; the model path is passed via env as well as {model}.
         env = os.environ.copy()
-        env.update({"NS_MODEL": str(out), "NS_SCALE": str(scale), "NS_PROFILE": str(self.profile)})
+        env.update({"OC_MODEL": str(out), "OC_SCALE": str(scale), "OC_PROFILE": str(self.profile)})
         cmd = self.evaluator.format(model=str(out), scale=scale, profile=str(self.profile))
         ep = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout, env=env)
         if ep.returncode != 0:
@@ -203,7 +203,7 @@ def app(store: Store, token: str):
             if not self.auth():
                 return
             if self.path == "/health":
-                self.sendj({"ok": True, "service": "neuronscope-tuning-worker",
+                self.sendj({"ok": True, "service": "omnicortex-tuning-worker",
                             "source": store.source.name, "profile": store.profile.name})
                 return
             if self.path.startswith("/api/jobs/"):

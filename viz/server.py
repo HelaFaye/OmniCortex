@@ -28,7 +28,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 import re
 import urllib.error
 import urllib.request

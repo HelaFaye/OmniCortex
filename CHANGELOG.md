@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed (the rest of the name)
+
+- Everything that still said NeuronScope now says OmniCortex: the launcher (`./omnicortex`), the data folders (`~/.omnicortex`, `~/.config/omnicortex`, moved on first start), environment variables (`OC_*`, `OCR_*`), the MCP server name, the route header, ComfyUI node ids, the remote agent and its package, cookies, and the `ns_*` modules (now `oc_*`, the CLI `scripts/oc.py`). No old names are kept as aliases; README.md lists what an existing install needs to change.
+
 ### Added (pose add-on)
 
 - `plugins/pose`: video (MediaPipe) or OpenPose to tracked 3D poses; a kinematic sieve (hyperextension, inversion, velocity, bone length, floor clip, foot slip) that stages corrected and rejected pairs; a review page with skeleton overlays; a DPO refinement orchestrator; VMC and JSON-over-UDP streaming; Godot and Blender clients (stress shaders, x-ray pass, vertex-colour baking to FBX). See docs/POSE.md.

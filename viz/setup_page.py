@@ -1,5 +1,5 @@
 """Studio's /setup page: everything that used to need a terminal after install.
-Paths and behaviour (saved to ~/.neuronscope/config.json), building llama.cpp,
+Paths and behaviour (saved to ~/.omnicortex/config.json), building llama.cpp,
 hardware (hardware.json), and the doctor's checks."""
 
 PAGE = r"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -81,7 +81,7 @@ a.btn{display:inline-block;padding:.3rem .7rem;border:1px solid var(--line);bord
 <button id="doctor" style="margin-top:.5rem">Run checks</button><div id="checks"></div></section>
 
 <section class="card" id="requirements"><h2>Requirements</h2>
-<div class="note">What each feature needs (Python packages, programs, llama.cpp builds, drivers, device access, memory) and what this machine has. Python packages install from here into Studio’s Python, at the versions <code>requirements*.txt</code> ask for; system packages show the command for your OS. Same as <code>python scripts/ns_requirements.py</code>.</div>
+<div class="note">What each feature needs (Python packages, programs, llama.cpp builds, drivers, device access, memory) and what this machine has. Python packages install from here into Studio’s Python, at the versions <code>requirements*.txt</code> ask for; system packages show the command for your OS. Same as <code>python scripts/oc_requirements.py</code>.</div>
 <div class="row" style="margin-top:.5rem"><button id="reqcheck">Check requirements</button><span class="note" id="reqsys"></span></div>
 <div id="reqs"></div>
 <h2 style="margin-top:1.2rem" id="snapshots">Environment snapshots</h2>
@@ -202,7 +202,7 @@ $('#doctor').onclick=async()=>{ $('#doctor').disabled=true; $('#checks').innerHT
 load().catch(e=>$('#status').innerHTML=`<span class="err">${esc(e.message)}</span>`);
 api('api/hardware').then(renderHW).catch(e=>$('#devs').innerHTML=`<tr><td class="err">${esc(e.message)}</td></tr>`);
 
-// ---------- requirements (scripts/ns_requirements.py)
+// ---------- requirements (scripts/oc_requirements.py)
 function reqItem(i){
   const opt=i.optional?' <span class="note">(optional)</span>':'';
   const need=i.need&&!['installed','built','any'].includes(i.need)?` <span class="note">needs ${esc(i.need)}</span>`:'';

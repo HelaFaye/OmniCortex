@@ -121,7 +121,7 @@ def fits(man: dict, n_layers: int, d_model: int, hf_repo: str | None = None) -> 
 
 
 def home() -> Path:
-    return Path(os.environ.get("NS_HOME") or Path.home() / ".neuronscope") / "features" / "packs"
+    return Path(os.environ.get("OC_HOME") or Path.home() / ".omnicortex") / "features" / "packs"
 
 
 def install(data: bytes, n_layers: int, d_model: int, hf_repo: str | None = None, root: Path | None = None) -> dict:

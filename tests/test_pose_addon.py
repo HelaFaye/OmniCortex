@@ -144,7 +144,7 @@ def test_orchestrator_pieces(tmp_path):
     assert O.pick(res)["lr"] == 5e-6                                             # a tie goes to the lower rate
     run = tmp_path / "run"
     run.mkdir()
-    (run / "neuronscope-finetune.json").write_text(json.dumps({"log": {"dpo": [{"step": 1, "loss": 0.6, "rewards/margins": 0.2}]}}))
+    (run / "omnicortex-finetune.json").write_text(json.dumps({"log": {"dpo": [{"step": 1, "loss": 0.6, "rewards/margins": 0.2}]}}))
     assert O.dpo_curve(run) == [{"step": 1, "loss": 0.6, "margin": 0.2}]
     cfgp = tmp_path / "stage2.yaml"
     cfgp.write_text("other: 1\n")

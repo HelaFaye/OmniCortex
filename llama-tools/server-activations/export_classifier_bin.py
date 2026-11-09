@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export a trained classifier for NS_CLASSIFIER.
+"""Export a trained classifier for OC_CLASSIFIER.
 
 Flat little-endian float32: [n_layers * n_ff] coefficients, then one intercept.
 Deliberately dumb -- the server should not need numpy or a parser to read it.
@@ -8,7 +8,7 @@ Deliberately dumb -- the server should not need numpy or a parser to read it.
         models/classifier.npz models/classifier.bin --gguf model.gguf
 
 The server streams |a| / ||layer output||, i.e. CETT without the down_proj
-column norm (see ns_activations.h). The classifier was trained on full CETT,
+column norm (see oc_activations.h). The classifier was trained on full CETT,
 so --gguf folds each column norm into its coefficient:
 
     coef_j * CETT_j  ==  (coef_j * ||W[:, j]||) * |a_j| / ||out||
@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("src", help="classifier.npz from scripts/classifier.py")
-    p.add_argument("dst", help="output .bin for NS_CLASSIFIER")
+    p.add_argument("dst", help="output .bin for OC_CLASSIFIER")
     p.add_argument("--gguf", help="model GGUF: fold its down_proj column norms into the weights (recommended)")
     a = p.parse_args(argv)
     blob = np.load(a.src)

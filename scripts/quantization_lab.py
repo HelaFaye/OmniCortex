@@ -600,9 +600,9 @@ def build_model(
     scratch_root, scratch_info = choose_scratch(scratch, required)
     owned_tmp = None
     if scratch_root:
-        owned_tmp = tempfile.mkdtemp(prefix="neuronscope-quant-", dir=scratch_root)
+        owned_tmp = tempfile.mkdtemp(prefix="omnicortex-quant-", dir=scratch_root)
     else:
-        owned_tmp = tempfile.mkdtemp(prefix="neuronscope-quant-")
+        owned_tmp = tempfile.mkdtemp(prefix="omnicortex-quant-")
 
     try:
         calib_path = os.path.join(owned_tmp, "calibration.txt")
@@ -647,7 +647,7 @@ def build_model(
             "scratch": scratch_info,
             "allow_requantize_source": allow_requantize_source,
         }
-        manifest_path = output + ".neuronscope.json"
+        manifest_path = output + ".omnicortex.json"
         tmp_manifest = manifest_path + f".partial.{os.getpid()}"
         with open(tmp_manifest, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)

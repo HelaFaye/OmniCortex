@@ -2,12 +2,12 @@
 """OmniCortex reliable transfer: resumable, checksummed HTTP(S) file transfer.
 
     # receiver (e.g. the LM Studio host)
-    python scripts/ns_security.py token --out ~/.config/neuronscope/transfer.token
-    python scripts/ns_transfer.py serve --host 0.0.0.0 --root ~/.lmstudio/models/neuronscope \\
-        --token-file ~/.config/neuronscope/transfer.token --tls-cert cert.pem --tls-key key.pem
+    python scripts/oc_security.py token --out ~/.config/omnicortex/transfer.token
+    python scripts/oc_transfer.py serve --host 0.0.0.0 --root ~/.lmstudio/models/omnicortex \\
+        --token-file ~/.config/omnicortex/transfer.token --tls-cert cert.pem --tls-key key.pem
 
     # sender
-    NS_TRANSFER_TOKEN=... python scripts/ns_transfer.py send --url https://host:8810 \\
+    OC_TRANSFER_TOKEN=... python scripts/oc_transfer.py send --url https://host:8810 \\
         --cafile cert.pem --file model.gguf
 
 Security model (see docs/SECURITY.md): the bearer token authenticates, TLS (or
@@ -35,7 +35,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 
 VERSION = "1.1"
 CHUNK = 4 * 1024 * 1024
@@ -119,7 +119,7 @@ class Receiver:
     def __init__(self, root: Path, max_active: int = 8):
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
-        self.meta_dir = self.root / ".neuronscope-transfers"
+        self.meta_dir = self.root / ".omnicortex-transfers"
         self.meta_dir.mkdir(exist_ok=True)
         self.max_active = max_active
         self.lock = threading.RLock()
@@ -249,7 +249,7 @@ class Handler(BaseHTTPRequestHandler):
     token = ""
     throttle = sec.FailureThrottle()
     timeout = 120  # per-socket idle timeout; stops slow clients pinning threads
-    server_version = "NeuronScopeTransfer/" + VERSION
+    server_version = "OmniCortexTransfer/" + VERSION
     sys_version = ""
 
     def _json(self, code: int, obj) -> None:
@@ -535,7 +535,7 @@ def main(argv=None) -> int:
     c = client("watch", "send new/changed files as they appear")
     c.add_argument("--dir", required=True)
     c.add_argument("--glob", default="*.gguf")
-    c.add_argument("--state", default=".neuronscope-transfer-watch.json")
+    c.add_argument("--state", default=".omnicortex-transfer-watch.json")
     c.add_argument("--interval", type=float, default=5)
     c.add_argument("--workers", type=int, default=1)
     c.add_argument("--subdir", default="")

@@ -7,7 +7,7 @@ Each job kind is a fixed script plus a schema of typed fields. The argv is
 built from the schema only: unknown fields are ignored, booleans become bare
 flags, numbers must parse, and no value may start with "-" (so a value can
 never smuggle in an extra flag). Jobs run as subprocesses with their output in
-a log file under ~/.neuronscope/jobs/<id>/, survive the browser closing, and
+a log file under ~/.omnicortex/jobs/<id>/, survive the browser closing, and
 can be cancelled.
 
 Studio serves the page at /jobs and the API at /api/jobs. Because a job can run
@@ -33,10 +33,10 @@ S = ROOT / "scripts"
 
 
 def _installable() -> list[str]:
-    """Packages the install_package job may install: scripts/ns_requirements.py's catalog."""
+    """Packages the install_package job may install: scripts/oc_requirements.py's catalog."""
     sys.path.insert(0, str(S))
-    import ns_requirements
-    return [p for p in ns_requirements.PACKAGES if p not in ns_requirements.NOT_PIP]
+    import oc_requirements
+    return [p for p in oc_requirements.PACKAGES if p not in oc_requirements.NOT_PIP]
 
 
 def F(name, flag=None, kind="str", req=False, default=None, help="", choices=None, multi=False, repeat=False):
@@ -109,7 +109,7 @@ SPECS: dict[str, dict] = {
             F("spec", kind="bool", help="also try draft-free speculative decoding"),
             F("placement", kind="bool", help="also try strict CPU placement"),
             F("ngl", kind="int", default=99), F("server", help="llama-server (default from the workspace)"),
-            F("apply", help="Studio's settings file, to use the winner (e.g. ~/.neuronscope/studio.json)")]},
+            F("apply", help="Studio's settings file, to use the winner (e.g. ~/.omnicortex/studio.json)")]},
     "retrain_cycle": {
         "title": "Retraining cycle", "group": "Retrain", "argv": [S / "retrain_cycle.py"],
         "help": "Measure, curate, train each arm, convert, measure on the holdout, keep or reject. Resumes.",
@@ -125,7 +125,7 @@ SPECS: dict[str, dict] = {
             F("expand", kind="int", default=0), F("per_subject", kind="int", help="TestQA items per subject"),
             F("subject", multi=True), F("allow_exec", kind="bool"),
             F("sandbox", choices=["none", "docker", "podman"], default="docker"),
-            F("quant", default="Q4_K_M"), F("llama", help="llama.cpp checkout (default $NS_LLAMA)")]},
+            F("quant", default="Q4_K_M"), F("llama", help="llama.cpp checkout (default $OC_LLAMA)")]},
     "decode_lab": {
         "title": "Decoding lab (SLED, steering, features, emotions)", "group": "Evaluate", "argv": [S / "decode_lab.py"],
         "help": "Serve one Hugging Face model as several decoding variants on an OpenAI-compatible port, for TestQA "
@@ -219,7 +219,7 @@ SPECS: dict[str, dict] = {
         "fields": [
             F("base", req=True), F("adapter", req=True), F("out", req=True),
             F("gguf", help="quant type, e.g. Q4_K_M (empty: no GGUF)"), F("lora_gguf", kind="bool"),
-            F("vision", kind="bool"), F("llama", help="llama.cpp checkout (default $NS_LLAMA)")]},
+            F("vision", kind="bool"), F("llama", help="llama.cpp checkout (default $OC_LLAMA)")]},
     "swe_predict": {
         "title": "SWE-bench predict", "group": "Benchmarks", "argv": [S / "benchmarks.py", "swebench", "predict"],
         "help": "Single-shot retrieval patches; score with the Docker harness.",
@@ -466,12 +466,12 @@ SPECS.update({
                    F("portable", kind="bool", help="no -march=native: the binaries run on other CPUs"),
                    F("server_activations", kind="bool", help="also patch llama-server to stream /activations")]},
     "install_package": {
-        "title": "Install a Python package", "group": "Setup", "argv": [S / "ns_requirements.py", "install"],
+        "title": "Install a Python package", "group": "Setup", "argv": [S / "oc_requirements.py", "install"],
         "help": "pip install one package OmniCortex uses, at the version requirements*.txt asks for, into Studio's "
-                "Python. Only packages from the catalog (scripts/ns_requirements.py); torch comes from install.sh.",
+                "Python. Only packages from the catalog (scripts/oc_requirements.py); torch comes from install.sh.",
         "fields": [F("package", flag="", req=True, choices=_installable())]},
     "env_snapshot": {
-        "title": "Snapshot the environment", "group": "Setup", "argv": [S / "ns_requirements.py", "snapshot"],
+        "title": "Snapshot the environment", "group": "Setup", "argv": [S / "oc_requirements.py", "snapshot"],
         "help": "Record installed packages, programs, llama.cpp builds and devices, to compare after an update "
                 "(Setup → Requirements → compare).", "fields": []},
     # ---- the text H-Neuron pipeline (docs/PIPELINE.md)
@@ -506,7 +506,7 @@ SPECS.update({
     "extract_gguf": {
         "title": "4 · Extract CETT (llama.cpp)", "group": "H-Neurons", "argv": [S / "extract_activations_gguf.py"],
         "help": "Activations from a GGUF with cett-dump: no PyTorch, any GPU llama.cpp supports. Use a Q8_0/F16 file.",
-        "fields": [U("gguf", help="model file (default $NS_GGUF)"), U("binary", help="llama-cett-dump (default $NS_CETT)"),
+        "fields": [U("gguf", help="model file (default $OC_GGUF)"), U("binary", help="llama-cett-dump (default $OC_CETT)"),
                    U("input_path", default="data/answer_tokens.jsonl"), U("ids_path", default="data/train_qids.json"),
                    U("output_root", default="data/activations"),
                    U("locations", multi=True, choices=LOCS, default=["answer_tokens", "all_except_answer_tokens"]),
@@ -828,7 +828,7 @@ SPECS.update({
     "view_timeline": {
         "title": "Timeline (window)", "group": "Views", "argv": [ROOT / "viz" / "timeline.py"],
         "help": "Exact, unbloomed per-token view of a trace, in a desktop window (pygfx).",
-        "fields": [F("session", flag="", req=True, help="trace folder, e.g. runs/trace-1 or ~/.neuronscope/traces/<id>"),
+        "fields": [F("session", flag="", req=True, help="trace folder, e.g. runs/trace-1 or ~/.omnicortex/traces/<id>"),
                    F("h_neurons"), F("play", kind="bool")]},
     "view_explore": {
         "title": "Explorer (window)", "group": "Views", "argv": [ROOT / "viz" / "explore.py"],
@@ -1004,7 +1004,7 @@ TQDM = re.compile(r"(?:(?P<label>[^\r\n|]*?):\s*)?(?P<pct>\d{1,3})%\|[^|]*\|\s*(
                   r"\s*\[(?P<el>[^<\]]*)<(?P<eta>[^,\]]*)(?:,\s*(?P<rate>[^\]]*))?\]")
 BRACKET = re.compile(r"\[(\d+)\s*/\s*(\d+)\]")
 PLAIN = re.compile(r"^\s*(\d+)\s*/\s*(\d+)\b")
-# module name -> catalog package (scripts/ns_requirements.py), for an Install button
+# module name -> catalog package (scripts/oc_requirements.py), for an Install button
 MODULE_PACKAGE = {"datasets": "datasets", "sklearn": "scikit-learn", "PIL": "pillow", "pandas": "pandas",
                   "pyarrow": "pyarrow", "openai": "openai", "gguf": "gguf", "transformers": "transformers",
                   "safetensors": "safetensors", "accelerate": "accelerate", "peft": "peft", "mcp": "mcp",

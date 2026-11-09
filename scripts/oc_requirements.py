@@ -5,14 +5,14 @@ builds, drivers, device access and hardware), what this machine has, and the
 command that fixes each gap on this OS. Also snapshots of the environment, so
 "it worked last week" can be answered with a diff.
 
-    python scripts/ns_requirements.py                    # every feature, short
-    python scripts/ns_requirements.py check --feature studio --feature amd_rocm
-    python scripts/ns_requirements.py check --json
-    python scripts/ns_requirements.py install scikit-learn   # catalog packages only
-    python scripts/ns_requirements.py snapshot               # -> ~/.neuronscope/env/<time>.json
-    python scripts/ns_requirements.py diff                   # the last two snapshots
-    python scripts/ns_requirements.py freeze > my-env.txt    # exact versions of the catalog's packages
-    python scripts/ns_requirements.py project ~/src/game      # a project's own toolchain, libraries, packages
+    python scripts/oc_requirements.py                    # every feature, short
+    python scripts/oc_requirements.py check --feature studio --feature amd_rocm
+    python scripts/oc_requirements.py check --json
+    python scripts/oc_requirements.py install scikit-learn   # catalog packages only
+    python scripts/oc_requirements.py snapshot               # -> ~/.omnicortex/env/<time>.json
+    python scripts/oc_requirements.py diff                   # the last two snapshots
+    python scripts/oc_requirements.py freeze > my-env.txt    # exact versions of the catalog's packages
+    python scripts/oc_requirements.py project ~/src/game      # a project's own toolchain, libraries, packages
 
 The package version floors come from requirements*.txt, so the files stay the
 one place a version is decided. doctor.py answers "can I run the pipeline
@@ -34,7 +34,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
-SNAP_DIR = Path.home() / ".neuronscope" / "env"
+SNAP_DIR = Path.home() / ".omnicortex" / "env"
 OK, WARN, MISSING = "ok", "warn", "missing"
 
 # ---------------------------------------------------------------- catalog
@@ -237,7 +237,7 @@ def tool_version(binaries, vcmd) -> tuple[str | None, str | None]:
 
 def llama_dirs() -> list[Path]:
     dirs = []
-    for d in [os.environ.get("NS_LLAMA"), "~/llama.cpp"]:
+    for d in [os.environ.get("OC_LLAMA"), "~/llama.cpp"]:
         if d:
             p = Path(os.path.expanduser(d))
             dirs += [p / "build" / "bin", p]
@@ -344,7 +344,7 @@ def hardware() -> dict:
     except Exception as e:
         out["devices_error"] = str(e)
     try:
-        home = Path.home() / ".neuronscope"
+        home = Path.home() / ".omnicortex"
         out["disk_free_gib"] = round(shutil.disk_usage(home if home.exists() else Path.home()).free / 2**30, 1)
     except OSError:
         pass
@@ -472,7 +472,7 @@ def snapshot(configured: dict | None = None) -> dict:
         git = None
     return {"time": time.time(), "when": time.strftime("%Y-%m-%d %H:%M:%S"), "host": platform.node(),
             "os": f"{platform.system()} {platform.release()}", "python": platform.python_version(),
-            "executable": sys.executable, "neuronscope": git, "packages": pk, "tools": tools, "llama": llama,
+            "executable": sys.executable, "omnicortex": git, "packages": pk, "tools": tools, "llama": llama,
             "hardware": hardware()}
 
 
@@ -491,7 +491,7 @@ def list_snapshots(d: Path | None = None) -> list[dict]:
         try:
             s = json.loads(p.read_text())
             out.append({"id": p.stem, "when": s.get("when"), "host": s.get("host"), "packages": len(s.get("packages", {})),
-                        "neuronscope": s.get("neuronscope")})
+                        "omnicortex": s.get("omnicortex")})
         except (OSError, ValueError):
             continue
     return out
@@ -520,7 +520,7 @@ def diff(a: dict, b: dict) -> dict:
            "packages": _dict_diff(a.get("packages", {}), b.get("packages", {})),
            "tools": _dict_diff(a.get("tools", {}), b.get("tools", {})),
            "llama": _dict_diff(lla(a), lla(b)), "devices": _dict_diff(dev(a), dev(b)),
-           "system": {k: [a.get(k), b.get(k)] for k in ("os", "python", "neuronscope", "host") if a.get(k) != b.get(k)}}
+           "system": {k: [a.get(k), b.get(k)] for k in ("os", "python", "omnicortex", "host") if a.get(k) != b.get(k)}}
     out["unchanged"] = not any(v for sec in ("packages", "tools", "llama", "devices") for v in out[sec].values()) \
         and not out["system"]
     return out
@@ -1032,7 +1032,7 @@ def main(argv=None) -> int:
         return 0
     if a.cmd == "snapshots":
         for s in list_snapshots():
-            print(f"{s['id']}  {s['host']}  {s['packages']} packages  neuronscope {s['neuronscope']}")
+            print(f"{s['id']}  {s['host']}  {s['packages']} packages  omnicortex {s['omnicortex']}")
         return 0
     if a.cmd == "diff":
         snaps = [x["id"] for x in list_snapshots()]

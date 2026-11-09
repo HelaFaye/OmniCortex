@@ -27,7 +27,7 @@ import threading
 import time
 from pathlib import Path
 
-DEFAULT_ROOT = Path(os.environ.get("NS_WORK_LOG") or Path.home() / ".neuronscope" / "worklog")
+DEFAULT_ROOT = Path(os.environ.get("OC_WORK_LOG") or Path.home() / ".omnicortex" / "worklog")
 KINDS = ("chat", "task", "job")
 _LOCK = threading.Lock()
 

@@ -24,7 +24,7 @@ import torch
 from transformers import AutoConfig
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import load_model
+from oc_common import load_model
 from profiles import Profile, SuppressionHandle, fingerprint
 
 

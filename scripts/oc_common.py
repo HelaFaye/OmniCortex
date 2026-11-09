@@ -15,7 +15,7 @@ the upstream repo does not:
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from ns_constants import TEXT_LAYER_RE, THINK_CLOSE, normalise_piece
+from oc_constants import TEXT_LAYER_RE, THINK_CLOSE, normalise_piece
 
 
 def text_config(cfg):

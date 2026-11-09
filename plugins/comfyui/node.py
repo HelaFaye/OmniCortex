@@ -5,7 +5,7 @@ import re
 import comfy as C
 
 p = argparse.ArgumentParser(description=__doc__)
-p.add_argument("--folder", default="~/.neuronscope/comfyui")
+p.add_argument("--folder", default="~/.omnicortex/comfyui")
 p.add_argument("--repo", required=True)
 a = p.parse_args()
 m = re.fullmatch(r"https://(github\.com|gitlab\.com|codeberg\.org)/[\w.-]+/([\w.-]+?)(\.git)?/?", a.repo.strip())

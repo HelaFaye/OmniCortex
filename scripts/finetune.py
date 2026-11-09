@@ -353,7 +353,7 @@ def train(a) -> int:
             "precision": prec, "hardware": rep,
             # the training curves, so sweeps can compare runs without TensorBoard
             "log": {"sft": trainer.state.log_history, "dpo": dtrainer.state.log_history if a.dpo else None}}
-    (out / "neuronscope-finetune.json").write_text(json.dumps(meta, indent=2))
+    (out / "omnicortex-finetune.json").write_text(json.dumps(meta, indent=2))
     print(f"wrote {out}")
     return 0
 

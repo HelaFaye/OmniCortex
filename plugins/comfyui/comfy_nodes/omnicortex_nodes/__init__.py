@@ -1,8 +1,8 @@
 """OmniCortex nodes for ComfyUI: chat through Studio (with its model routing), check a reply for
 hallucination from the model's own neurons, and run a OmniCortex graph. Standard library only.
 
-Studio's address comes from each node (default http://127.0.0.1:7870); its token from NS_STUDIO_TOKEN,
-or ~/.neuronscope/studio.token if that exists. Installed by OmniCortex's ComfyUI add-on."""
+Studio's address comes from each node (default http://127.0.0.1:7870); its token from OC_STUDIO_TOKEN,
+or ~/.omnicortex/studio.token if that exists. Installed by OmniCortex's ComfyUI add-on."""
 import json
 import os
 import time
@@ -11,10 +11,10 @@ from pathlib import Path
 
 
 def _token():
-    t = os.environ.get("NS_STUDIO_TOKEN")
+    t = os.environ.get("OC_STUDIO_TOKEN")
     if t:
         return t
-    p = Path.home() / ".neuronscope" / "studio.token"
+    p = Path.home() / ".omnicortex" / "studio.token"
     return p.read_text().strip() if p.exists() else None
 
 
@@ -37,7 +37,7 @@ def _call(base, method, path, body=None, timeout=900):
 STUDIO = ("STRING", {"default": "http://127.0.0.1:7870"})
 
 
-class NeuronScopeChat:
+class OmniCortexChat:
     """Ask one of your models through Studio. model 'auto' lets Studio pick by the prompt's subject."""
     CATEGORY = "OmniCortex"
     RETURN_TYPES = ("STRING", "STRING", "STRING")
@@ -59,7 +59,7 @@ class NeuronScopeChat:
         return (m.get("content") or "", m.get("reasoning_content") or "", r.get("model") or model)
 
 
-class NeuronScopeCheck:
+class OmniCortexCheck:
     """Each token's hallucination risk from the model's neurons (needs its H-Neuron classifier)."""
     CATEGORY = "OmniCortex"
     RETURN_TYPES = ("FLOAT", "STRING", "BOOLEAN", "STRING")
@@ -78,7 +78,7 @@ class NeuronScopeCheck:
         return (float(r.get("max") or 0.0), "".join(flagged), bool(flagged), studio.rstrip("/") + "/" + r.get("url", ""))
 
 
-class NeuronScopeGraph:
+class OmniCortexGraph:
     """Run a OmniCortex graph (Studio -> Graphs) and return one of its outputs."""
     CATEGORY = "OmniCortex"
     RETURN_TYPES = ("STRING", "STRING")
@@ -108,7 +108,7 @@ class NeuronScopeGraph:
         return (v if isinstance(v, str) else json.dumps(v), json.dumps(out))
 
 
-NODE_CLASS_MAPPINGS = {"NeuronScopeChat": NeuronScopeChat, "NeuronScopeCheck": NeuronScopeCheck,
-                       "NeuronScopeGraph": NeuronScopeGraph}
-NODE_DISPLAY_NAME_MAPPINGS = {"NeuronScopeChat": "OmniCortex: chat", "NeuronScopeCheck": "OmniCortex: hallucination check",
-                              "NeuronScopeGraph": "OmniCortex: run a graph"}
+NODE_CLASS_MAPPINGS = {"OmniCortexChat": OmniCortexChat, "OmniCortexCheck": OmniCortexCheck,
+                       "OmniCortexGraph": OmniCortexGraph}
+NODE_DISPLAY_NAME_MAPPINGS = {"OmniCortexChat": "OmniCortex: chat", "OmniCortexCheck": "OmniCortex: hallucination check",
+                              "OmniCortexGraph": "OmniCortex: run a graph"}

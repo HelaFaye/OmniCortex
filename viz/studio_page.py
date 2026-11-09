@@ -472,7 +472,7 @@ $('#api').onclick=async()=>{try{await navigator.clipboard.writeText(location.ori
 // tabs
 function showTab(name){ $$('.tabs button').forEach(x=>x.classList.toggle('pri',x.dataset.tab===name));
   // The sidebar shows which tab is open.
-  window.NS_TAB=name; document.dispatchEvent(new CustomEvent('ns-tab',{detail:name}));
+  window.OC_TAB=name; document.dispatchEvent(new CustomEvent('ns-tab',{detail:name}));
   ['chats','local','hub','docs','tools'].forEach(t=>$('#tab-'+t).style.display=t===name?'block':'none'); }
 $$('.tabs button').forEach(b=>b.onclick=()=>{ showTab(b.dataset.tab); history.replaceState(null,'','#'+(b.dataset.tab==='local'?'models':b.dataset.tab)); });
 // Links from other pages: /#tools, /#models, /#hub, /#docs, /#chats, or
@@ -804,10 +804,10 @@ async function checkReply(d){
   showRisk(el,c);
   if(!c.error){ m.check={id:c.id,pieces:c.pieces,prob:c.prob,flagged:c.flagged,threshold:c.threshold,max:c.max,mean:c.mean,url:c.url,review:c.review,traced_on:c.traced_on}; await persist(); }
 }
-try{ $('#autoCheck').checked=localStorage.getItem('ns_autocheck')==='1'; }catch{}
-$('#autoCheck').onchange=()=>{ try{ localStorage.setItem('ns_autocheck',$('#autoCheck').checked?'1':'0'); }catch{} };
-try{ $('#confOn').checked=localStorage.getItem('ns_conf')!=='0'; }catch{ $('#confOn').checked=true; }
-$('#confOn').onchange=()=>{ try{ localStorage.setItem('ns_conf',$('#confOn').checked?'1':'0'); }catch{} };
+try{ $('#autoCheck').checked=localStorage.getItem('oc_autocheck')==='1'; }catch{}
+$('#autoCheck').onchange=()=>{ try{ localStorage.setItem('oc_autocheck',$('#autoCheck').checked?'1':'0'); }catch{} };
+try{ $('#confOn').checked=localStorage.getItem('oc_conf')!=='0'; }catch{ $('#confOn').checked=true; }
+$('#confOn').onchange=()=>{ try{ localStorage.setItem('oc_conf',$('#confOn').checked?'1':'0'); }catch{} };
 
 // ---------- images
 $('#attach').onclick=()=>$('#file').click();
@@ -838,7 +838,7 @@ async function stream(){
         rag:$('#ragPick').value?{collection:$('#ragPick').value,k:4}:undefined, tools:$('#toolsOn').checked||undefined,
         confidence:$('#confOn').checked||undefined, ...cmpReq()})});
     if(!r.ok){ let e=await r.text(); try{e=JSON.parse(e).error||e}catch{} e=typeof e==='string'?e:(e.message||JSON.stringify(e)); out.body.innerHTML='error: '+linkify(esc(e)); throw 0; }
-    try{ const rt=JSON.parse(r.headers.get('X-NeuronScope-Route')||'null');
+    try{ const rt=JSON.parse(r.headers.get('X-OmniCortex-Route')||'null');
       if(rt) servedBy=rt.model;
       if(rt){ routeNote = rt.mode==='auto' ? `auto → ${rt.model}: ${rt.reason}` : `model: ${rt.model}${rt.mode==='manual'?' (chosen manually)':''}`;
         const m=models.find(x=>x.id===rt.model); if(m&&m.stats&&!m.stats.eligible) routeNote+=' ⚠ no performance stats'; } }catch{}

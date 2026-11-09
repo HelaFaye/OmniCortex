@@ -5,7 +5,7 @@ Rows of a Hugging Face dataset split, with or without the `datasets` package.
 
 With `datasets` installed it is used as usual. Without it, the Hub's own
 parquet export of the split (/api/datasets/<repo>/parquet) is downloaded
-once into ~/.cache/neuronscope/datasets and read with pandas, so a job does
+once into ~/.cache/omnicortex/datasets and read with pandas, so a job does
 not fail just because one large package is missing. HF_TOKEN is sent for
 gated datasets.
 """
@@ -19,12 +19,12 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-CACHE = Path(os.environ.get("NS_DATASET_CACHE") or Path.home() / ".cache" / "neuronscope" / "datasets")
+CACHE = Path(os.environ.get("OC_DATASET_CACHE") or Path.home() / ".cache" / "omnicortex" / "datasets")
 HUB = "https://huggingface.co"
 
 
 def _get(url: str, timeout: float = 60):
-    req = urllib.request.Request(url, headers={"User-Agent": "neuronscope"})
+    req = urllib.request.Request(url, headers={"User-Agent": "omnicortex"})
     tok = os.environ.get("HF_TOKEN")
     if tok:
         req.add_header("Authorization", f"Bearer {tok}")

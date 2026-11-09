@@ -11,7 +11,7 @@ panel (**Engine**):
 Hugging Face folders under your models folders (a `config.json` with
 `*.safetensors` next to it) show up in the model list and default to vLLM.
 Install vLLM separately (`pip install vllm`, or AMD's ROCm build) and tell
-Studio its command with `--vllm` or `$NS_VLLM` if it is not on the PATH.
+Studio its command with `--vllm` or `$OC_VLLM` if it is not on the PATH.
 
 ## The options
 
@@ -159,7 +159,7 @@ root (`sysctl -w kernel.numa_balancing=0`), so Studio does not change it.
 
 ```bash
 python scripts/engine_optimizer.py --model models/m-Q4_K_M.gguf --trials 30 --out runs/opt-m --kv --spec \
-    --apply ~/.neuronscope/studio.json
+    --apply ~/.omnicortex/studio.json
 ```
 
 It is also in Studio: Jobs → Setup → *Find the fastest engine settings*.
@@ -209,7 +209,7 @@ It keeps the fastest file that fits and clears the fidelity bar (`--max-kld
 0.1`, `--min-same-top 85`, or `--min-agreement 0.6`). If none clears it,
 it keeps the most faithful file that fits and says so. The choice is stored per hardware
 (CPU, accelerators and their memory, never the computer's name) in
-`~/.neuronscope/quant_choices.json`, and My Models marks it with ★. A
+`~/.omnicortex/quant_choices.json`, and My Models marks it with ★. A
 laptop and a GPU desktop can then each run the file that suits them.
 
 One real run (Qwen2.5-0.5B-Instruct, 4 CPU cores, no GPU, default bars;

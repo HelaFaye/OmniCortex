@@ -158,14 +158,14 @@ METHODS = [
               "this toolkit assumes a changed parameter count -- your existing "
               "profiles will not apply to the result."),
 
-    dict(name="neuronscope_select", tier=4, models=(1, None), base="required",
+    dict(name="omnicortex_select", tier=4, models=(1, None), base="required",
          summary="Merge only at classifier-identified H-Neurons.",
-         why="Ours, from scripts/mergekit_neuronscope.py. Every method above "
+         why="Ours, from scripts/mergekit_omnicortex.py. Every method above "
              "selects by magnitude or variance; this selects by measured "
              "behaviour. Requires a trained classifier, so it is last by "
              "prerequisite, not by merit.",
          params={"weight": 1.0},
-         note="Needs NEURONSCOPE_NEURONS set and the plugin imported."),
+         note="Needs OMNICORTEX_NEURONS set and the plugin imported."),
 ]
 
 TIER_LABEL = {
@@ -267,7 +267,7 @@ def verify():
         except Exception as e:
             raise SystemExit(f"could not inspect mergekit: {e}\n"
                              "  pip install -e /path/to/mergekit")
-    ours = {m["name"] for m in METHODS} - {"neuronscope_select"}
+    ours = {m["name"] for m in METHODS} - {"omnicortex_select"}
     missing = sorted(ours - have)
     extra = sorted(have - ours)
     print(f"{len(have)} methods registered in the installed mergekit")

@@ -40,7 +40,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-import plugins as ns_plugins
+import plugins as oc_plugins
 
 MAX_PACKAGE = 200 * 1024 * 1024
 MAX_FILES = 5000
@@ -242,7 +242,7 @@ def unpack(data: bytes, dest_root: Path) -> tuple[str, Path]:
             out.parent.mkdir(parents=True, exist_ok=True)
             with z.open(i) as src, open(out, "wb") as dst:
                 shutil.copyfileobj(src, dst)
-        m = ns_plugins.read_manifest(tmp)
+        m = oc_plugins.read_manifest(tmp)
         name = m["name"]
         dest = dest_root / name
         old = dest.with_name(f".{name}.old")
@@ -260,7 +260,7 @@ def unpack(data: bytes, dest_root: Path) -> tuple[str, Path]:
 class Packages:
     """Installing, updating and removing packaged add-ons in the user's plugins folder."""
 
-    def __init__(self, pm: ns_plugins.Plugins, install_dir: str | Path, repos_load, repos_save):
+    def __init__(self, pm: oc_plugins.Plugins, install_dir: str | Path, repos_load, repos_save):
         self.pm, self.dir = pm, Path(install_dir).expanduser()
         self._repos_load, self._repos_save = repos_load, repos_save
 
@@ -290,7 +290,7 @@ class Packages:
                 out.append({"repo": repo, "error": f"{type(e).__name__}: {e}"[:300]})
                 continue
             for a in idx.get("addons") or []:
-                if not ns_plugins.NAME.match(str(a.get("name", ""))):
+                if not oc_plugins.NAME.match(str(a.get("name", ""))):
                     continue
                 have = installed.get(a["name"])
                 ver = ((have or {}).get("manifest") or {}).get("version")
@@ -335,7 +335,7 @@ class Packages:
 
 def pack(folder: str | Path, out_dir: str | Path) -> Path:
     folder = Path(folder)
-    m = ns_plugins.read_manifest(folder)
+    m = oc_plugins.read_manifest(folder)
     out = Path(out_dir) / f"{m['name']}-{m.get('version', '0')}.zip"
     out.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:

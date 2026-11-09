@@ -319,7 +319,7 @@ Where steering can run:
 - the **Steer** tab, which combines features and emotions, compares with the plain reply, and saves setting profiles;
 - each feature card, and each emotion's detail;
 - the **decoding lab**, as variants (`--variant 'calm={"emotion": {"file": "runs/emotions/m", "mix": {"calm": 0.05}}}'`), so TestQA and the retrain gate can measure a steered model against plain. The Steer tab writes this line for you;
-- per request, under `"neuronscope": {...}` in a chat completion to the lab;
+- per request, under `"omnicortex": {...}` in a chat completion to the lab;
 - **llama.cpp**: `emotions.py cvec` writes an emotion mix as a control vector for `llama-server --control-vector`. It is fixed, scaled by the layer's typical norm, since llama.cpp cannot scale by each token.
 
 ## Files

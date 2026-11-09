@@ -99,7 +99,7 @@ def find(models: list[Path], kinds=KINDS, llama_dirs=None, home=None) -> list[di
         except (OSError, subprocess.SubprocessError):
             pass
     if "addon-cache" in kinds:
-        h = Path(home or os.environ.get("NS_HOME") or Path.home() / ".neuronscope")
+        h = Path(home or os.environ.get("OC_HOME") or Path.home() / ".omnicortex")
         cache, inst = h / "addons" / "cache", h / "plugins"
         installed = {p.name for p in inst.iterdir()} if inst.is_dir() else set()
         for z in cache.glob("*.zip") if cache.is_dir() else []:

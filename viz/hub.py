@@ -38,7 +38,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 try:
     import shell            # the mode registry
 except ImportError:
@@ -124,7 +124,7 @@ def declare(root, py):
     }
 
 
-TRACE_DIRS = ["~/.neuronscope/traces", "runs", "runs/traces"]     # runs/traces: the decoding lab's --record
+TRACE_DIRS = ["~/.omnicortex/traces", "runs", "runs/traces"]     # runs/traces: the decoding lab's --record
 
 
 def find_traces(limit=200, extra=()):
@@ -319,7 +319,7 @@ class Handler(BaseHTTPRequestHandler):
         if raw:
             try:
                 c = http.cookies.SimpleCookie(raw)
-                if "ns" in c and hmac.compare_digest(c["ns"].value, tok):
+                if "oc" in c and hmac.compare_digest(c["oc"].value, tok):
                     return True
             except Exception:
                 pass
@@ -367,7 +367,7 @@ class Handler(BaseHTTPRequestHandler):
                 body = b'{"ok":true}'
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Set-Cookie", f"ns={STATE['token']}; Path=/; "
+                self.send_header("Set-Cookie", f"oc={STATE['token']}; Path=/; "
                                                "HttpOnly; SameSite=Strict")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -429,7 +429,7 @@ def ui_theme():
     try:
         with open(os.path.join(HERE, "themes.json")) as f:
             t = json.load(f).get("_ui", {})
-        return t.get("neuronscope-dark", {})
+        return t.get("omnicortex-dark", {})
     except Exception:
         return {}
 
@@ -643,7 +643,7 @@ def main():
     sec.add_server_security_args(p)
     a = p.parse_args()
 
-    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("NS_STUDIO_TOKEN", ""))
+    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("OC_STUDIO_TOKEN", ""))
     token = sec.resolve_token(a.token, a.token_file) or None
     tls = bool(a.tls_cert and a.tls_key)
     try:

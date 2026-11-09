@@ -3,7 +3,7 @@
 Where recorded activations go (docs/ACTIVATIONS.md). Every reply's activation profile (float16 [layers, bins])
 is collected by default and written through a Sink:
 
-    local    the review store on this computer (~/.neuronscope/review, or --review-dir)
+    local    the review store on this computer (~/.omnicortex/review, or --review-dir)
     folder   a review store somewhere else: another disk, a network share, a mounted bucket
     studio   another OmniCortex Studio, over HTTPS with its token (POST /api/review/ingest)
     memory   kept in memory only, for a host with little or no persistent storage; shown, exported or
@@ -48,7 +48,7 @@ class Sink:
         if self.cfg["store"] not in MODES:
             raise ValueError(f"store: one of {', '.join(MODES)}")
         self.local_root = local_root
-        self.home = Path(home or Path.home() / ".neuronscope").expanduser()
+        self.home = Path(home or Path.home() / ".omnicortex").expanduser()
         self.spool: collections.deque = collections.deque(maxlen=int(self.cfg["spool"]))
         self.memory: collections.deque = collections.deque(maxlen=int(self.cfg["spool"]))
         self.lock = threading.Lock()

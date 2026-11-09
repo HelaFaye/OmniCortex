@@ -35,8 +35,8 @@ def server(tmp_path):
     tok = tmp_path / "mcp.token"
     tok.write_text(TOKEN + "\n")
     port = _port()
-    env = {**os.environ, "NS_CONFIG_DIR": str(tmp_path / "cfg")}
-    p = subprocess.Popen([sys.executable, str(ROOT / "scripts" / "ns_transfer_mcp.py"), "--http", "--port", str(port),
+    env = {**os.environ, "OC_CONFIG_DIR": str(tmp_path / "cfg")}
+    p = subprocess.Popen([sys.executable, str(ROOT / "scripts" / "oc_transfer_mcp.py"), "--http", "--port", str(port),
                           "--token-file", str(tok)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     base = f"http://127.0.0.1:{port}"
     for _ in range(150):
@@ -114,18 +114,18 @@ def test_official_client_and_studios_hub(server, tmp_path):
 
 
 def test_token_references():
-    os.environ["NS_TEST_TOKEN"] = "abc"
-    assert mcp_client.expand("Bearer ${env:NS_TEST_TOKEN}") == "Bearer abc"
+    os.environ["OC_TEST_TOKEN"] = "abc"
+    assert mcp_client.expand("Bearer ${env:OC_TEST_TOKEN}") == "Bearer abc"
     with pytest.raises(ValueError):
-        mcp_client.expand("${env:NS_NO_SUCH_VAR_123}")
+        mcp_client.expand("${env:OC_NO_SUCH_VAR_123}")
     with pytest.raises(ValueError):
         mcp_client.expand("${file:/no/such/file}")
-    assert mcp_client.http_headers({"token_env": "NS_TEST_TOKEN", "headers": {"X-A": "1"}}) == {
+    assert mcp_client.http_headers({"token_env": "OC_TEST_TOKEN", "headers": {"X-A": "1"}}) == {
         "X-A": "1", "Authorization": "Bearer abc"}
 
 
 def test_http_mode_refuses_unsafe_setups(tmp_path):
-    script = str(ROOT / "scripts" / "ns_transfer_mcp.py")
+    script = str(ROOT / "scripts" / "oc_transfer_mcp.py")
     short = tmp_path / "short.token"
     short.write_text("abc")
     r = subprocess.run([sys.executable, script, "--http", "--token-file", str(short)], capture_output=True, text=True,

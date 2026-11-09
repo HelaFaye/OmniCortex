@@ -44,9 +44,9 @@ def test_issue_parts_split_and_parse(monkeypatch):
 
 def test_accept_verifies_commits_and_refuses(tmp_path, monkeypatch):
     monkeypatch.setattr(sc, "HOME", tmp_path / "home")
-    info = gb.init(tmp_path / "board", "someone/neuronscope")
+    info = gb.init(tmp_path / "board", "someone/omnicortex")
     board = Path(info["board"])
-    assert (board / ".github" / "workflows" / "accept.yml").read_text().count("someone/neuronscope") == 1
+    assert (board / ".github" / "workflows" / "accept.yml").read_text().count("someone/omnicortex") == 1
     assert (board / ".gitignore").read_text().strip() == "board.key"
     priv = (board / "board.key").read_text().strip()
     pub = (board / "board.pub").read_text().strip()

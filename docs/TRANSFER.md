@@ -15,13 +15,13 @@ Read [SECURITY.md](SECURITY.md) before exposing any of them beyond localhost.
 
 ```bash
 pip install -r requirements-transfer-full.txt     # aiohttp, mcp>=2.3,<3, keyring, cryptography
-python scripts/ns_transfer_router.py --help        # one entry point for all modes
+python scripts/oc_transfer_router.py --help        # one entry point for all modes
 ```
 
 ## 1. WebRTC GUI (peer to peer)
 
 ```bash
-python scripts/ns_security.py selfsigned --host transfer.lan --host 192.0.2.10   # once
+python scripts/oc_security.py selfsigned --host transfer.lan --host 192.0.2.10   # once
 python viz/transfer_lab.py --host 0.0.0.0 --tls-cert ns-cert.pem --tls-key ns-key.pem
 ```
 
@@ -69,22 +69,22 @@ sends CSP / no-referrer / frame-deny headers.
 Receiver, e.g. on the LM Studio host:
 
 ```bash
-python scripts/ns_security.py token --out ~/.config/neuronscope/transfer.token
-python scripts/ns_transfer.py serve --host 0.0.0.0 --port 8810 \
-    --root ~/.lmstudio/models/neuronscope \
-    --token-file ~/.config/neuronscope/transfer.token \
+python scripts/oc_security.py token --out ~/.config/omnicortex/transfer.token
+python scripts/oc_transfer.py serve --host 0.0.0.0 --port 8810 \
+    --root ~/.lmstudio/models/omnicortex \
+    --token-file ~/.config/omnicortex/transfer.token \
     --tls-cert ns-cert.pem --tls-key ns-key.pem
 ```
 
 Sender:
 
 ```bash
-export NS_TRANSFER_TOKEN="$(cat transfer.token)"     # or --token-file
-python scripts/ns_transfer.py send  --url https://lmstudio-host:8810 --cafile ns-cert.pem --file model.gguf
-python scripts/ns_transfer.py batch --url https://lmstudio-host:8810 --cafile ns-cert.pem --dir models/sweep --workers 2
-python scripts/ns_transfer.py watch --url https://lmstudio-host:8810 --cafile ns-cert.pem --dir models/sweep
-python scripts/ns_transfer.py status --url https://lmstudio-host:8810 --cafile ns-cert.pem
-python scripts/ns_transfer.py pull  --url https://lmstudio-host:8810 --cafile ns-cert.pem --id <id> --out back/
+export OC_TRANSFER_TOKEN="$(cat transfer.token)"     # or --token-file
+python scripts/oc_transfer.py send  --url https://lmstudio-host:8810 --cafile ns-cert.pem --file model.gguf
+python scripts/oc_transfer.py batch --url https://lmstudio-host:8810 --cafile ns-cert.pem --dir models/sweep --workers 2
+python scripts/oc_transfer.py watch --url https://lmstudio-host:8810 --cafile ns-cert.pem --dir models/sweep
+python scripts/oc_transfer.py status --url https://lmstudio-host:8810 --cafile ns-cert.pem
+python scripts/oc_transfer.py pull  --url https://lmstudio-host:8810 --cafile ns-cert.pem --id <id> --out back/
 ```
 
 How it works:
@@ -135,7 +135,7 @@ between. See [LABS.md](LABS.md) for the search strategy.
 ## 4. MCP control plane
 
 ```bash
-python scripts/ns_transfer_mcp.py        # stdio MCP server; requires mcp>=2.3,<3
+python scripts/oc_transfer_mcp.py        # stdio MCP server; requires mcp>=2.3,<3
 ```
 
 Tools: `register_target`, `remove_target`, `list_targets`, `probe_target`,
@@ -148,7 +148,7 @@ So a client's approval rules can tell them apart (Studio: Settings → Tool
 approval).
 
 - `register_target` moves the token into the OS keyring (with `keyring`
-  installed) or `~/.config/neuronscope/secrets/<name>.token` (0600). The
+  installed) or `~/.config/omnicortex/secrets/<name>.token` (0600). The
   target state file is 0600 and holds no secrets. State from older versions
   with inline tokens is migrated on first load.
 - The token reaches the CLI through the child's environment, never argv. It
@@ -165,8 +165,8 @@ starts it. To control transfers on another computer, serve it over
 streamable HTTP there:
 
 ```bash
-python scripts/ns_security.py token --out ~/.config/neuronscope/secrets/transfer-mcp-http.token
-python scripts/ns_transfer_mcp.py --http --token-file ~/.config/neuronscope/secrets/transfer-mcp-http.token
+python scripts/oc_security.py token --out ~/.config/omnicortex/secrets/transfer-mcp-http.token
+python scripts/oc_transfer_mcp.py --http --token-file ~/.config/omnicortex/secrets/transfer-mcp-http.token
 #   -> http://127.0.0.1:8765/mcp, bearer token required
 ```
 
@@ -182,15 +182,15 @@ python scripts/ns_transfer_mcp.py --http --token-file ~/.config/neuronscope/secr
 
 **Windows with Tailscale** (a ready HTTPS name, no certificates to manage).
 Run these in the OmniCortex folder, the one that contains `scripts\`. The
-token goes to `%USERPROFILE%\.config\neuronscope\secrets\transfer-mcp-http.token`,
+token goes to `%USERPROFILE%\.config\omnicortex\secrets\transfer-mcp-http.token`,
 where `--http` finds it without being told.
 
 PowerShell:
 
 ```powershell
-cd C:\path\to\neuronscope
-py -3 scripts\ns_security.py token --out "$env:USERPROFILE\.config\neuronscope\secrets\transfer-mcp-http.token"
-py -3 scripts\ns_transfer_mcp.py --http
+cd C:\path\to\omnicortex
+py -3 scripts\oc_security.py token --out "$env:USERPROFILE\.config\omnicortex\secrets\transfer-mcp-http.token"
+py -3 scripts\oc_transfer_mcp.py --http
 tailscale serve --bg 8765        # https://<machine>.<tailnet>.ts.net -> 127.0.0.1:8765
 ```
 
@@ -203,12 +203,12 @@ your tailnet. To start it at log-on, add the second command to Task
 Scheduler with the trigger *At log on*.
 
 On the controller, copy the token into a file
-(`~/.config/neuronscope/secrets/<name>.token`, mode 0600) and add the
-server to Studio's `~/.neuronscope/mcp.json` by reference:
+(`~/.config/omnicortex/secrets/<name>.token`, mode 0600) and add the
+server to Studio's `~/.omnicortex/mcp.json` by reference:
 
 ```json
 {"mcpServers": {"windows-transfer": {"url": "https://<machine>.<tailnet>.ts.net/mcp",
-                                     "token_file": "~/.config/neuronscope/secrets/windows-mcp-http.token"}}}
+                                     "token_file": "~/.config/omnicortex/secrets/windows-mcp-http.token"}}}
 ```
 
 Then press **Reconnect / reload config** and **Test** on Studio's Tools tab. Other MCP clients
@@ -219,7 +219,7 @@ take the same URL with an `Authorization: Bearer` header.
 ```text
 controller (laptop)
    ├── tuning worker over HTTPS ─────────► GPU host (builds + evaluates candidates)
-   ├── ns_transfer watch over HTTPS/VPN ─► LM Studio host (receives finished GGUFs)
+   ├── oc_transfer watch over HTTPS/VPN ─► LM Studio host (receives finished GGUFs)
    ├── WebRTC GUI ───────────────────────► ad-hoc peer
    └── MCP (stdio, or --http over a VPN) ► the agent driving all of the above
 ```

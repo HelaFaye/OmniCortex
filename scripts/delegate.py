@@ -207,7 +207,7 @@ def main():
                     "choices": [{"index": 0, "finish_reason": "stop",
                                  "message": {"role": "assistant",
                                              "content": out["answer"]}}],
-                    "x_neuronscope": {"steps": len(out["steps"]),
+                    "x_omnicortex": {"steps": len(out["steps"]),
                                       "flagged": out["flagged"]},
                 }).encode()
                 self.send_response(200)

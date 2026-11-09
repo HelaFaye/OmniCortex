@@ -16,7 +16,7 @@ them from saved chats into a CSV.
 
 ## Installing and turning on
 
-1. Put the plugin's folder in `~/.neuronscope/plugins/` (Studio's home; the
+1. Put the plugin's folder in `~/.omnicortex/plugins/` (Studio's home; the
    folder sits next to `config.json` for other workspaces). The examples in
    the repository's `plugins/` are found too.
 2. Settings → **Plugins** lists every plugin found, with what it adds.

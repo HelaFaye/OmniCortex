@@ -38,7 +38,7 @@ existing dumps, so it is the stage that runs well on modest hardware.
 Linux and Windows. PyTorch has no usable Vulkan backend, so Vulkan exists only
 inside llama.cpp here. Systems with more than one Vulkan driver installed
 (e.g. AMDVLK and RADV) sometimes pick one that fails to initialise; set
-`NS_VULKAN_ICD` to the driver JSON you want before `source env.sh`.
+`OC_VULKAN_ICD` to the driver JSON you want before `source env.sh`.
 
 **Metal**: build llama.cpp with `--backend metal`; `install.sh` installs the
 default wheel, which uses MPS.
@@ -80,8 +80,8 @@ No local toolkit, or the wrong one: build in a container.
 llama-server with CUDA 12.9 for any architecture list (default sm_50):
 
 ```bash
-docker build -f docker/llama-cuda.Dockerfile --build-arg CUDA_ARCH="50-real" -t neuronscope-llama:cuda .
-docker run --rm --gpus all -v ~/models:/models -p 8080:8080 neuronscope-llama:cuda \
+docker build -f docker/llama-cuda.Dockerfile --build-arg CUDA_ARCH="50-real" -t omnicortex-llama:cuda .
+docker run --rm --gpus all -v ~/models:/models -p 8080:8080 omnicortex-llama:cuda \
     llama-server -m /models/model.gguf -ngl 99 -sm layer --host 0.0.0.0 --port 8080
 ```
 
@@ -112,7 +112,7 @@ Verified here, without a GPU:
   CUDA reports no devices and llama.cpp falls back to the CPU, so the container's
   llama-server streams `/activations` frames that match PyTorch on every layer,
   and its cett-dump matches the host build
-  (`NS_DOCKER_IMAGE=neuronscope-llama:cuda NS_DOCKER_LIBCUDA=<stub>` runs these
+  (`OC_DOCKER_IMAGE=omnicortex-llama:cuda OC_DOCKER_LIBCUDA=<stub>` runs these
   in `tests/test_llamacpp_integration.py`).
 - The CUDA decision table is unit-tested against M10, RTX 4090 and mixed-GPU
   `nvidia-smi` output.
@@ -162,7 +162,7 @@ gets an id like `rocm:0` or `vulkan:1`.
 python scripts/accelerators.py      # devices, free memory, notes, which server drives each
 ```
 
-Configuration lives in `~/.neuronscope/hardware.json` (Studio `--hardware`):
+Configuration lives in `~/.omnicortex/hardware.json` (Studio `--hardware`):
 
 ```json
 {
@@ -226,7 +226,7 @@ is slow (untested on hardware).
 ## Sizing
 
 ```bash
-python scripts/vram_budget.py --gguf "$NS_GGUF" --ctx 32768 --vram 12
+python scripts/vram_budget.py --gguf "$OC_GGUF" --ctx 32768 --vram 12
 python scripts/hostcheck.py
 ```
 

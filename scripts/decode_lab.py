@@ -53,7 +53,7 @@ rp       Steering through a low-dimensional random projection, fitted by
 feature  clamp or add feature-dictionary features (features.py) at every token
 emotion  add an emotion-vector mix (emotions.py)
          See feature_lab.py. Both can also be given per request under
-         "neuronscope": {...}, and feature_lab's /ns/* endpoints (inspect,
+         "omnicortex": {...}, and feature_lab's /ns/* endpoints (inspect,
          compare, graph, intervene, attribute, sweep) serve Studio's Features page.
 
 Watching (any variant; scripts/live_watch.py):
@@ -358,10 +358,10 @@ def make_handler(lab: Lab):
                         for m in req.get("messages") or []]
                 stop = req.get("stop")
                 stop = [stop] if isinstance(stop, str) else (stop or None)
-                extra = req.get("neuronscope") or None
+                extra = req.get("omnicortex") or None
                 if extra:
                     import feature_lab
-                    feature_lab.validate(extra, "neuronscope")
+                    feature_lab.validate(extra, "omnicortex")
                 args = dict(max_tokens=int(req.get("max_tokens") or 256), temperature=float(req.get("temperature") or 0),
                             top_p=float(req.get("top_p") or 1), stop=stop, extra=extra)
                 cid = "decodelab-" + uuid.uuid4().hex[:10]
@@ -462,7 +462,7 @@ def main(argv=None) -> int:
             print(f"[{name}] {r['text']!r}  ({r['n_out']} tokens, mean spread "
                   f"{sum(r['spread']) / max(1, len(r['spread'])):.2f}{al}{dr})")
         return 0
-    import ns_security as sec
+    import oc_security as sec
     sec.loopback_only(a.host, "decode_lab")
     srv = ThreadingHTTPServer((a.host, a.port), make_handler(lab))
     print(f"decode_lab: {a.model} as {', '.join(variants)} at http://{a.host}:{a.port}/v1", flush=True)

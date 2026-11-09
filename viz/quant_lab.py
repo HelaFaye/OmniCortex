@@ -247,7 +247,7 @@ def main():
     ap.add_argument("--profiles-dir", default=str(ROOT / "profiles"))
     ap.add_argument("--allow-unauthenticated", action="store_true", help="permit a non-loopback bind (no auth)")
     a = ap.parse_args()
-    import ns_security as sec
+    import oc_security as sec
     sec.loopback_only(a.host, "the Quantization Lab", a.allow_unauthenticated)
     STATE["models_dir"] = os.path.expanduser(a.models_dir[0]) if a.models_dir else os.path.expanduser("~/.models")
     STATE["profiles_dir"] = os.path.expanduser(a.profiles_dir)

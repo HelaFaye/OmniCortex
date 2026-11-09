@@ -15,7 +15,7 @@ A **rule** allows, asks or denies one action on targets that match a pattern:
              drivers, users, registry, firewall, clipboard, screen, camera,
              microphone), tool (an MCP tool as server/tool), or * for any
     match    exact, prefix, glob (* within a path segment, ** across them) or regex
-    pattern  may use {workdir}, {repo}, {home}, {tmp} and {neuronscope}, filled
+    pattern  may use {workdir}, {repo}, {home}, {tmp} and {omnicortex}, filled
              in from the context of the check
 
 Allow rules are the whitelist and deny rules the blacklist. A **profile** is
@@ -50,7 +50,7 @@ import tempfile
 import threading
 from pathlib import Path
 
-DEFAULT_PATH = Path.home() / ".neuronscope" / "permissions.json"
+DEFAULT_PATH = Path.home() / ".omnicortex" / "permissions.json"
 ACTIONS = {
     "read": "files read (a path)",
     "write": "files written, changed or deleted (a path)",
@@ -81,7 +81,7 @@ _NEVER_RUN = [
     (r"\bsudo\b", "asks for administrator rights"),
 ]
 _SECRETS = ["{home}/.ssh/**", "{home}/.gnupg/**", "{home}/.aws/**", "{home}/.config/gh/**",
-            "{home}/.neuronscope/*token*", "{home}/.netrc", "**/.env", "**/*.pem", "**/id_rsa*", "**/id_ed25519*"]
+            "{home}/.omnicortex/*token*", "{home}/.netrc", "**/.env", "**/*.pem", "**/id_rsa*", "**/id_ed25519*"]
 
 
 def _r(action, effect, match, pattern, note=""):
@@ -172,7 +172,7 @@ def expand(pattern: str, ctx: dict) -> str:
     def sub(m):
         v = ctx.get(m.group(1))
         return str(v).rstrip("/") if v else "\0unset\0"        # an unset variable matches nothing
-    return re.sub(r"\{(workdir|repo|home|tmp|neuronscope)\}", sub, pattern)
+    return re.sub(r"\{(workdir|repo|home|tmp|omnicortex)\}", sub, pattern)
 
 
 def _glob_rx(g: str) -> str:
@@ -223,7 +223,7 @@ def normalise(action: str, target: str, ctx: dict) -> str:
 
 def context(**kw) -> dict:
     ctx = {"home": str(Path.home()), "tmp": tempfile.gettempdir(),
-           "neuronscope": str(Path(__file__).resolve().parent.parent)}
+           "omnicortex": str(Path(__file__).resolve().parent.parent)}
     for k, v in kw.items():
         if v:
             ctx[k] = os.path.normpath(os.path.abspath(os.path.expanduser(str(v))))
@@ -286,7 +286,7 @@ def validate(policy: dict) -> dict:
 
 class Policy:
     def __init__(self, path: str | Path | None = None):
-        self.path = Path(path or os.environ.get("NS_PERMISSIONS") or DEFAULT_PATH).expanduser()
+        self.path = Path(path or os.environ.get("OC_PERMISSIONS") or DEFAULT_PATH).expanduser()
 
     def load(self) -> dict:
         try:
@@ -464,7 +464,7 @@ def prompt_text(policy: Policy, model: str = "", job: str = "", profile: str = "
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--file", help=f"policy file (default $NS_PERMISSIONS or {DEFAULT_PATH})")
+    p.add_argument("--file", help=f"policy file (default $OC_PERMISSIONS or {DEFAULT_PATH})")
     sub = p.add_subparsers(dest="cmd")
     c = sub.add_parser("check", help="what would happen")
     c.add_argument("action", choices=sorted(ACTIONS))

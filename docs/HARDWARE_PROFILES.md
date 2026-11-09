@@ -29,7 +29,7 @@ shell metacharacters in build flags and any PyTorch index that is not
 | Source | Location | Shown as |
 |---|---|---|
 | Built-in | `profiles/hardware/` (legacy and modern NVIDIA, AMD ROCm and legacy GCN, Intel, Apple, iGPU/APU, x86 CPU, ARM) | built-in |
-| Yours | `~/.neuronscope/hw-profiles/` | yours |
+| Yours | `~/.omnicortex/hw-profiles/` | yours |
 | Community | an accepted board's `profiles/accepted/` | community |
 
 ## Using them

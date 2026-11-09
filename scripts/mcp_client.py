@@ -3,12 +3,12 @@
 MCP client for Studio: connect to MCP servers and expose their tools to chat.
 
 Servers are configured in the format LM Studio and Claude Desktop use
-(default ~/.neuronscope/mcp.json):
+(default ~/.omnicortex/mcp.json):
 
     {"mcpServers": {
         "files":  {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/me/notes"]},
         "search": {"url": "https://mcp.example.com/mcp", "headers": {"Authorization": "Bearer ..."}},
-        "remote": {"url": "https://box:8765/mcp", "token_file": "~/.config/neuronscope/secrets/box.token"},
+        "remote": {"url": "https://box:8765/mcp", "token_file": "~/.config/omnicortex/secrets/box.token"},
         "clock":  {"command": "python", "args": ["clock_server.py"], "autoApprove": ["now"]},
         "old":    {"command": "...", "disabled": true}}}
 
@@ -36,7 +36,7 @@ import threading
 from concurrent.futures import Future
 from pathlib import Path
 
-DEFAULT_CONFIG = Path.home() / ".neuronscope" / "mcp.json"
+DEFAULT_CONFIG = Path.home() / ".omnicortex" / "mcp.json"
 SEP = "__"
 MAX_RESULT_CHARS = 20000
 

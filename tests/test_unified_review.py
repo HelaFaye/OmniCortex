@@ -124,7 +124,7 @@ def test_build(tmp_path):
 def test_studio_lookup(tmp_path, monkeypatch):
     import test_studio
     studio = test_studio.studio
-    monkeypatch.setenv("NS_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("OC_HOME", str(tmp_path / "home"))
     (tmp_path / "home" / "saelens").mkdir(parents=True)
     (tmp_path / "home" / "saelens" / "pretrained_saes.yaml").write_text(
         "gemma-scope-2b-pt-res:\n  model: gemma-2-2b\n  repo_id: google/gemma-scope-2b-pt-res\n  saes:\n  - id: a\n")

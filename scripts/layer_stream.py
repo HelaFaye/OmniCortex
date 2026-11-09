@@ -68,7 +68,7 @@ def split(free_gb: list[float]) -> str:
 
 
 def find_rpc_server() -> str | None:
-    for c in (shutil.which("rpc-server"), os.environ.get("NS_LLAMA") and str(Path(os.environ["NS_LLAMA"]) / "build" / "bin" / "rpc-server"),
+    for c in (shutil.which("rpc-server"), os.environ.get("OC_LLAMA") and str(Path(os.environ["OC_LLAMA"]) / "build" / "bin" / "rpc-server"),
               str(Path.home() / "llama.cpp" / "build" / "bin" / "rpc-server"),
               str(ROOT / "build" / "llama.cpp" / "build" / "bin" / "rpc-server")):
         if c and Path(c).exists():

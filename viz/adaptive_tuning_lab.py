@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from adaptive_tuner import AdaptiveTuner, WorkerClient  # noqa: E402
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 
 STATE: dict = {}
 MAX_BODY = 64 * 1024

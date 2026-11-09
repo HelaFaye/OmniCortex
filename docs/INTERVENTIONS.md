@@ -69,4 +69,4 @@ single-component ablation does not capture. This implementation:
 - adds the deeper tools that README points to: mean ablation, position-resolved activation patching with
   clean and corrupted prompts, path patching, SAE-feature ablation and Neuronpedia lookups.
 
-It is also the reason this project is no longer called NeuronScope.
+It is also the reason this project is no longer called OmniCortex.

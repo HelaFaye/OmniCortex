@@ -190,8 +190,8 @@ def test_comfyui_addon_files():
                        cwd=ROOT / "plugins" / "comfyui")
     assert r.returncode != 0 and "install" in r.stderr
     sys.path.insert(0, str(ROOT / "plugins" / "comfyui" / "comfy_nodes"))
-    import neuronscope_nodes as NN
-    assert set(NN.NODE_CLASS_MAPPINGS) == {"NeuronScopeChat", "NeuronScopeCheck", "NeuronScopeGraph"}
+    import omnicortex_nodes as NN
+    assert set(NN.NODE_CLASS_MAPPINGS) == {"OmniCortexChat", "OmniCortexCheck", "OmniCortexGraph"}
     for c in NN.NODE_CLASS_MAPPINGS.values():
         assert c.INPUT_TYPES()["required"] and c.FUNCTION == "run"
 
@@ -212,10 +212,10 @@ def test_default_addons(studio_srv, tmp_path):  # noqa: F811
         # the Godot client: a tab, its jobs, and a download for another computer
         nav = json.loads(_get(studio_srv, "/api/addons/nav")[1])
         assert any(t["href"] == "/plugins/godot-client/" for t in nav["tabs"])
-        with urllib.request.urlopen(studio_srv + "/plugins/godot-client/download/neuronscope-godot.zip", timeout=20) as r:
+        with urllib.request.urlopen(studio_srv + "/plugins/godot-client/download/omnicortex-godot.zip", timeout=20) as r:
             z = zipfile.ZipFile(io.BytesIO(r.read()))
         names = z.namelist()
-        assert "neuronscope-godot/project.godot" in names and "neuronscope-godot/widgets/jewel.gd" in names
+        assert "omnicortex-godot/project.godot" in names and "omnicortex-godot/widgets/jewel.gd" in names
         assert not any("/.godot/" in n for n in names)
         # the theme pack's themes are listed while it is on
         assert "arcade" in json.loads(_get(studio_srv, "/api/themes")[1])["themes"]

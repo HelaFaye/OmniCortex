@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "remote"))
 sys.path.insert(0, str(ROOT / "viz"))
 sys.path.insert(0, str(ROOT / "scripts"))
-from neuronscope_remote import agent as nsr  # noqa: E402
+from omnicortex_remote import agent as nsr  # noqa: E402
 from test_studio import call, free_port, studio_srv  # noqa: E402,F401
 
 
@@ -169,10 +169,10 @@ def test_permissions_uploads_and_install(tmp_path, backend):
         assert {"file": "m-q4.gguf", "size": len(data), "partial": False} in files
         r = tool("install_model", {"file": "m-q4.gguf"})["structuredContent"]
         dest = Path(r["installed"])
-        assert dest == tmp_path / "lmstudio-models" / "neuronscope" / "m-q4" / "m-q4.gguf"
+        assert dest == tmp_path / "lmstudio-models" / "omnicortex" / "m-q4" / "m-q4.gguf"
         assert dest.read_bytes() == data
         assert tool("list_files", {"where": "models"})["structuredContent"]["files"][0]["file"] == \
-            "neuronscope/m-q4/m-q4.gguf"
+            "omnicortex/m-q4/m-q4.gguf"
         ag.cfg["allow"]["delete"] = True
         assert tool("delete_file", {"file": "../outside", "where": "models"})["isError"]
         assert not tool("delete_file", {"file": "evil.gguf"})["isError"]
@@ -264,19 +264,19 @@ def test_stdio_and_bridge(tmp_path, backend):
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
             {"jsonrpc": "2.0", "method": "notifications/initialized"},
             {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "list_models"}})) + "\n"
-        env = {**os.environ, "NSR_HOME": str(home), "PYTHONPATH": str(ROOT / "remote")}
-        out = subprocess.run([sys.executable, "-m", "neuronscope_remote", "stdio"], input=msgs, capture_output=True,
+        env = {**os.environ, "OCR_HOME": str(home), "PYTHONPATH": str(ROOT / "remote")}
+        out = subprocess.run([sys.executable, "-m", "omnicortex_remote", "stdio"], input=msgs, capture_output=True,
                              text=True, env=env, timeout=30).stdout.splitlines()
         assert [json.loads(x)["id"] for x in out] == [1, 2]
         assert json.loads(out[1])["result"]["structuredContent"]["models"][0]["id"] == "tiny-chat"
         # the controller side of the package: pair from the command line, then bridge an MCP client
         code = ag.pairing.open()["code"]
-        ctl = {**env, "NSR_HOME": str(tmp_path / "controller")}
-        r = subprocess.run([sys.executable, "-m", "neuronscope_remote", "add-host", url, "--code", code],
+        ctl = {**env, "OCR_HOME": str(tmp_path / "controller")}
+        r = subprocess.run([sys.executable, "-m", "omnicortex_remote", "add-host", url, "--code", code],
                            capture_output=True, text=True, env=ctl, timeout=30)
         assert r.returncode == 0, r.stderr
         assert "CONTROLLER" in r.stdout and '"bridge"' in r.stdout and "gpu-box" in r.stdout
-        out = subprocess.run([sys.executable, "-m", "neuronscope_remote", "bridge", "gpu-box"], input=msgs,
+        out = subprocess.run([sys.executable, "-m", "omnicortex_remote", "bridge", "gpu-box"], input=msgs,
                              capture_output=True, text=True, env=ctl, timeout=30).stdout.splitlines()
         got = {json.loads(x)["id"]: json.loads(x) for x in out}
         assert set(got) == {1, 2} and "HOST" in got[1]["result"]["instructions"]
@@ -306,7 +306,7 @@ def test_official_mcp_client(tmp_path, backend):
                 return init, tools, res
         init, tools, res = asyncio.run(go())
         g = lambda o, *names: next(getattr(o, n) for n in names if hasattr(o, n))  # noqa: E731  SDK 1.x and 2.x
-        assert g(init, "server_info", "serverInfo").name == "neuronscope-remote" and "HOST" in init.instructions
+        assert g(init, "server_info", "serverInfo").name == "omnicortex-remote" and "HOST" in init.instructions
         ann = {t.name: t.annotations for t in tools.tools}
         assert g(ann["delete_file"], "destructive_hint", "destructiveHint")
         assert g(ann["list_models"], "read_only_hint", "readOnlyHint")
@@ -355,7 +355,7 @@ def test_studio_pairs_lists_and_chats_through_a_host(studio_srv, tmp_path, backe
                 break
             time.sleep(0.05)
         assert s["sends"][0]["status"] == "done", s["sends"]
-        assert list((tmp_path / "lmstudio-models" / "neuronscope").rglob("*.gguf"))
+        assert list((tmp_path / "lmstudio-models" / "omnicortex").rglob("*.gguf"))
         st, r = call(studio_srv, "/api/remote/send", {"host": "gpu-box", "path": "/etc/passwd"})
         assert st == 400
         call(studio_srv, "/api/remote/remove", {"host": "gpu-box"})
@@ -478,7 +478,7 @@ def test_agent_stream_posts_pieces_and_stops_when_cancelled(backend):
 
 
 def test_package_is_standalone_and_downloadable(studio_srv):
-    src = (ROOT / "remote" / "neuronscope_remote" / "agent.py").read_text()
+    src = (ROOT / "remote" / "omnicortex_remote" / "agent.py").read_text()
     for line in src.splitlines():
         if line.startswith(("import ", "from ")) and "__future__" not in line:
             mod = line.split()[1].split(".")[0]
@@ -487,8 +487,8 @@ def test_package_is_standalone_and_downloadable(studio_srv):
     with urllib.request.urlopen(studio_srv + "/remote/download") as r:
         z = zipfile.ZipFile(io.BytesIO(r.read()))
     names = set(z.namelist())
-    assert {"neuronscope-remote/neuronscope_remote/agent.py", "neuronscope-remote/pyproject.toml",
-            "neuronscope-remote/README.md", "neuronscope-remote/OmniCortex Remote.bat"} <= names
+    assert {"omnicortex-remote/omnicortex_remote/agent.py", "omnicortex-remote/pyproject.toml",
+            "omnicortex-remote/README.md", "omnicortex-remote/OmniCortex Remote.bat"} <= names
     assert not any("__pycache__" in n for n in names)
 
 
@@ -550,13 +550,13 @@ def test_check_a_hosts_reply_here_or_on_the_host(studio_srv, tmp_path, backend):
         st, r = call(studio_srv, "/api/remote/classifier", {"host": "rig", "model": "tiny-chat",
                                                              "classifier": str(tmp_path / "clf.npz")})
         assert st == 200
-        ag.cfg["tracer"] = {"neuronscope": str(tmp_path / "no-neuronscope-here")}     # whatever this machine has
+        ag.cfg["tracer"] = {"omnicortex": str(tmp_path / "no-omnicortex-here")}     # whatever this machine has
         st, r = call(studio_srv, "/api/trace", ask)
         assert st == 502 and "no OmniCortex tracer" in r["error"]
         fake = tmp_path / "ns" / "scripts" / "hscore.py"
         fake.parent.mkdir(parents=True)
         fake.write_text(FAKE_TRACER.format(scripts=str(ROOT / "scripts")))
-        ag.cfg["tracer"] = {"neuronscope": str(tmp_path / "ns"), "cett": sc.binary}
+        ag.cfg["tracer"] = {"omnicortex": str(tmp_path / "ns"), "cett": sc.binary}
         st, r = call(studio_srv, "/api/trace", ask)
         assert st == 200, r
         assert r["traced_on"] == "rig" and r["pieces"] == list("abcdef") and len(r["prob"]) == 6

@@ -343,7 +343,7 @@ def cmd_build(a) -> int:
     torch.save({"names": names, "layers": layers, "vectors": V.permute(1, 0, 2).contiguous().half(),
                 "center": center.half(), "norms": norms, "mu": mu, "sd": sd, "model": a.model,
                 "default_layer": default_layer, "best_layer": best, "removed_pcs": removed,
-                "format": "neuronscope-emotions/1"}, out / "emotions.pt")
+                "format": "omnicortex-emotions/1"}, out / "emotions.pt")
     j = layers.index(default_layer)
     Uj = U[:, j]
     cos = (Uj @ Uj.t()).numpy().round(3).tolist()

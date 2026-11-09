@@ -305,7 +305,7 @@ def save(sae: SAE, out: str | Path, meta: dict | None = None) -> Path:
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     torch.save({"state": sae.state_dict(), "cfg": sae.config()}, out / "sae.pt")
-    info = {**(meta or {}), **sae.config(), "format": "neuronscope-sae/1"}
+    info = {**(meta or {}), **sae.config(), "format": "omnicortex-sae/1"}
     (out / "sae.json").write_text(json.dumps(info, indent=1))
     return out
 
@@ -371,7 +371,7 @@ def saelens_registry(cache: str | Path | None = None, url: str = SAELENS_REGISTR
     import time
     import urllib.request
     import yaml
-    p = Path(cache or Path(os.environ.get("NS_HOME") or Path.home() / ".neuronscope") / "saelens" / "pretrained_saes.yaml")
+    p = Path(cache or Path(os.environ.get("OC_HOME") or Path.home() / ".omnicortex") / "saelens" / "pretrained_saes.yaml")
     if not p.exists() or time.time() - p.stat().st_mtime > max_age:
         p.parent.mkdir(parents=True, exist_ok=True)
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "OmniCortex"}), timeout=60) as r:

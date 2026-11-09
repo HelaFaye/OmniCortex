@@ -91,7 +91,7 @@ def test_edited_model_converts_to_gguf(tmp_path):
     import subprocess
     pytest.importorskip("transformers")
     pytest.importorskip("sentencepiece")
-    llama = Path(os.environ.get("NS_LLAMA") or "~/llama.cpp").expanduser()
+    llama = Path(os.environ.get("OC_LLAMA") or "~/llama.cpp").expanduser()
     if not (llama / "convert_hf_to_gguf.py").exists():
         pytest.skip("needs llama.cpp")
     import tiny_models
@@ -105,4 +105,4 @@ def test_edited_model_converts_to_gguf(tmp_path):
                         str(out / "model"), "--out", str(tmp_path / "g"), "--gguf", "--llama", str(llama)],
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stderr[-2000:]
-    assert json.loads((tmp_path / "g" / "neuronscope-export.json").read_text())["gguf"].endswith(".gguf")
+    assert json.loads((tmp_path / "g" / "omnicortex-export.json").read_text())["gguf"].endswith(".gguf")

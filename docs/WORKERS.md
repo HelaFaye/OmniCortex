@@ -116,9 +116,9 @@ Speeds come from the server's own timings where it reports them
 counts queueing and the network.
 
 The log is JSON Lines, one file per day: `worklog/work-*.jsonl` and
-`worklog/hw-*.jsonl` next to Studio's `config.json` (or in `NS_WORK_LOG`).
+`worklog/hw-*.jsonl` next to Studio's `config.json` (or in `OC_WORK_LOG`).
 It is kept for 90 days and never leaves this computer. `--no-work-log` (or
-`NS_WORK_LOG=off`) turns it off. `python scripts/work_log.py --since 7d`
+`OC_WORK_LOG=off`) turns it off. `python scripts/work_log.py --since 7d`
 prints the same breakdown as JSON.
 
 ## API

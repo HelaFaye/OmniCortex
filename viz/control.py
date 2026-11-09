@@ -34,7 +34,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 try:
     import shell            # shared tab registry, viz/modes.json
 except ImportError:
@@ -223,7 +223,7 @@ class Handler(BaseHTTPRequestHandler):
         if raw:
             try:
                 c = http.cookies.SimpleCookie(raw)
-                if "ns" in c and hmac.compare_digest(c["ns"].value, tok):
+                if "oc" in c and hmac.compare_digest(c["oc"].value, tok):
                     return True
             except Exception:
                 pass
@@ -254,8 +254,8 @@ class Handler(BaseHTTPRequestHandler):
                              "Host", "localhost").split(":")[0],
                          "live": "http://%s:7890/" % self.headers.get(
                              "Host", "localhost").split(":")[0]}
-                page = page.replace("<!--NS_SHELL_CSS-->", shell.shell_css())
-                page = page.replace("<!--NS_TABS-->",
+                page = page.replace("<!--OC_SHELL_CSS-->", shell.shell_css())
+                page = page.replace("<!--OC_TABS-->",
                                     shell.tabs_html("control", "run", links))
             return self._send(200, page, "text/html; charset=utf-8")
         if self.path.startswith("/api/modes"):
@@ -283,7 +283,7 @@ class Handler(BaseHTTPRequestHandler):
                 body = b'{"ok":true}'
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Set-Cookie", f"ns={STATE['token']}; Path=/; "
+                self.send_header("Set-Cookie", f"oc={STATE['token']}; Path=/; "
                                                "HttpOnly; SameSite=Strict")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -358,7 +358,7 @@ PAGE = r"""<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>OmniCortex control</title>
 <style>
-<!--NS_SHELL_CSS-->
+<!--OC_SHELL_CSS-->
 *{box-sizing:border-box}
 body{margin:0;background:#0b0b10;color:#c9c9d2;font:14px system-ui;padding:14px;
 padding-top:calc(14px + env(safe-area-inset-top,0px))}
@@ -383,7 +383,7 @@ pre{background:#08080c;border:1px solid #1c1c24;border-radius:8px;padding:10px;
 font:11px ui-monospace,monospace;max-height:320px;overflow:auto;white-space:pre-wrap}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 </style>
-<!--NS_TABS-->
+<!--OC_TABS-->
 <h1>OmniCortex control</h1>
 <div class="card">
   <div class="mut">balanced pairs</div>
@@ -472,7 +472,7 @@ def main():
     sec.add_server_security_args(p)
     a = p.parse_args()
     STATE["root"] = os.path.abspath(a.root)
-    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("NS_STUDIO_TOKEN", ""))
+    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("OC_STUDIO_TOKEN", ""))
     STATE["token"] = sec.resolve_token(a.token, a.token_file) or None
     tls = bool(a.tls_cert and a.tls_key)
     try:

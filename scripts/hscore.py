@@ -175,8 +175,8 @@ class HScorer:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("--binary", default=os.environ.get("NS_CETT"))
-    p.add_argument("--gguf", default=os.environ.get("NS_GGUF"))
+    p.add_argument("--binary", default=os.environ.get("OC_CETT"))
+    p.add_argument("--gguf", default=os.environ.get("OC_GGUF"))
     p.add_argument("--classifier", required=True)
     p.add_argument("--prompt", help="the question (or --messages)")
     p.add_argument("--messages", help="a JSON file with the chat messages before the reply")

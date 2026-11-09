@@ -8,7 +8,7 @@ install and how to configure it to get the most out of it, kept separately for e
     retraining   fine-tuning and the PyTorch side: the wheel index, training precision, method
 
 A profile is a small JSON file: the built-in catalogue lives in profiles/hardware/, your own in
-~/.neuronscope/hw-profiles/, and accepted community ones come from a board's profiles/ folder.
+~/.omnicortex/hw-profiles/, and accepted community ones come from a board's profiles/ folder.
 
     python scripts/hw_profiles.py match                       # which profiles fit this computer, and why
     python scripts/hw_profiles.py plan --id nvidia-legacy-sm50-70 --purpose inference
@@ -34,7 +34,7 @@ SCHEMA = "omnicortex-hw-profile/1"
 PURPOSES = ("general", "inference", "retraining")
 BACKENDS = ("cpu", "cuda", "hip", "vulkan", "metal", "sycl")
 ID_RE = re.compile(r"[a-z0-9][a-z0-9._-]{1,63}")
-USER_DIR = Path(os.environ.get("NS_HOME") or Path.home() / ".neuronscope").expanduser() / "hw-profiles"
+USER_DIR = Path(os.environ.get("OC_HOME") or Path.home() / ".omnicortex").expanduser() / "hw-profiles"
 
 
 class ProfileError(ValueError):

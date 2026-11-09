@@ -38,7 +38,7 @@ Three ways observations arrive:
   same GGUF that wrote the replies. Vision items are skipped (their image is
   part of the prompt).
 
-Observations live in `~/.neuronscope/review/<model>/` (`index.jsonl` plus one
+Observations live in `~/.omnicortex/review/<model>/` (`index.jsonl` plus one
 small `.npy` per reply, about 30 KB for a 28-layer model). Nothing leaves the
 machine.
 

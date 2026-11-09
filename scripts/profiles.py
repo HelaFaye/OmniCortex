@@ -29,7 +29,7 @@ import time
 
 import torch
 
-from ns_common import TEXT_LAYER_RE, text_config
+from oc_common import TEXT_LAYER_RE, text_config
 
 PROFILE_VERSION = 1
 

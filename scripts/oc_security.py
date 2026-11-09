@@ -30,7 +30,7 @@ import threading
 import time
 from pathlib import Path
 
-TOKEN_ENV = "NS_TRANSFER_TOKEN"
+TOKEN_ENV = "OC_TRANSFER_TOKEN"
 TOKEN_BYTES = 32            # 256-bit bearer tokens
 MIN_TOKEN_CHARS = 32        # refuse obviously weak hand-typed tokens on remote binds
 MAX_JSON_BYTES = 64 * 1024
@@ -100,7 +100,7 @@ def read_secret_file(path: Path) -> str:
 
 
 def resolve_token(cli_token: str = "", token_file: str = "", *, warn_argv: bool = True) -> str:
-    """Pick a token from (in order) --token-file, $NS_TRANSFER_TOKEN, --token.
+    """Pick a token from (in order) --token-file, $OC_TRANSFER_TOKEN, --token.
 
     Passing the secret on the command line still works for compatibility but
     prints a warning: argv is visible to every local user via ``ps``."""
@@ -117,7 +117,7 @@ def resolve_token(cli_token: str = "", token_file: str = "", *, warn_argv: bool 
 
 # ---------------------------------------------------------------- signed results
 
-RESULT_SIG_CONTEXT = b"neuronscope-signed-result-v1"
+RESULT_SIG_CONTEXT = b"omnicortex-signed-result-v1"
 
 
 def _result_key(token: str) -> bytes:
@@ -172,12 +172,12 @@ def check_bind(host: str, token: str, *, tls: bool, allow_plaintext: bool) -> li
     if not token:
         raise SecurityConfigError(
             f"refusing to listen on {host!r} without a token. Generate one with:\n"
-            "  python scripts/ns_security.py token --out ~/.config/neuronscope/transfer.token\n"
+            "  python scripts/oc_security.py token --out ~/.config/omnicortex/transfer.token\n"
             "then pass --token-file, or bind to 127.0.0.1.")
     if len(token) < MIN_TOKEN_CHARS:
         raise SecurityConfigError(
             f"token is too short ({len(token)} chars) for a network-facing service; "
-            f"use at least {MIN_TOKEN_CHARS} characters (ns_security.py token generates 256-bit tokens).")
+            f"use at least {MIN_TOKEN_CHARS} characters (oc_security.py token generates 256-bit tokens).")
     if not tls:
         if not allow_plaintext:
             raise SecurityConfigError(
@@ -318,7 +318,7 @@ def _selfsigned(hosts: list[str], cert: str, key: str, days: int) -> int:
     except ImportError:
         print("pip install cryptography   (or use: openssl req -x509 -newkey ec "
               "-pkeyopt ec_paramgen_curve:P-256 -nodes -keyout ns-key.pem -out ns-cert.pem "
-              "-days 365 -subj /CN=neuronscope)", file=sys.stderr)
+              "-days 365 -subj /CN=omnicortex)", file=sys.stderr)
         return 2
     import datetime
     k = ec.generate_private_key(ec.SECP256R1())

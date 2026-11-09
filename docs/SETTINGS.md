@@ -13,10 +13,10 @@ A workspace says where things are, so nothing assumes a layout:
 | Pipeline data root | the folder holding the pipeline's `data/`, `models/`, `runs/`, `profiles/`, `adapters/`; jobs run here | the repository |
 | Models folders | where Studio looks for `.gguf` files | `<root>/models/gguf`, `~/models`, LM Studio's folders |
 | Downloads folder | where model downloads go | the first models folder |
-| llama.cpp checkout | binaries are looked for in its `build/bin` | `$NS_LLAMA` or `~/llama.cpp` |
+| llama.cpp checkout | binaries are looked for in its `build/bin` | `$OC_LLAMA` or `~/llama.cpp` |
 | llama-server, llama-cett-dump | explicit binaries, if they live elsewhere | from the checkout |
-| Model for the pipeline | the GGUF the H-Neuron pipeline and `doctor.py` work on | `$NS_GGUF` |
-| Studio state folder | chats, traces, review, projects, jobs, stats, documents | `~/.neuronscope` |
+| Model for the pipeline | the GGUF the H-Neuron pipeline and `doctor.py` work on | `$OC_GGUF` |
+| Studio state folder | chats, traces, review, projects, jobs, stats, documents | `~/.omnicortex` |
 | Environment | variables for jobs and model servers, e.g. `VK_DRIVER_FILES`, `HSA_OVERRIDE_GFX_VERSION` | none |
 
 Keep one per disk layout or machine: say the repository on an external drive
@@ -27,15 +27,15 @@ active one; Studio switches after a restart (the button is right there).
 workspace.
 
 Precedence, highest first: Studio's command-line flags, the `studio`
-section of `~/.neuronscope/config.json` (behaviour settings), then the
+section of `~/.omnicortex/config.json` (behaviour settings), then the
 workspace. Setup's folder fields write to the running workspace.
 
 ```bash
-python scripts/ns_workspace.py list
-python scripts/ns_workspace.py add ext --root /run/media/me/disk/neuronscope --models-dir ~/models --use
-python scripts/ns_workspace.py set ext env.VK_DRIVER_FILES /usr/share/vulkan/icd.d/radeon_icd.x86_64.json
-eval "$(python scripts/ns_workspace.py env)"      # NS_* for scripts you run by hand
-./neuronscope --workspace ext                       # or start Studio in one
+python scripts/oc_workspace.py list
+python scripts/oc_workspace.py add ext --root /run/media/me/disk/omnicortex --models-dir ~/models --use
+python scripts/oc_workspace.py set ext env.VK_DRIVER_FILES /usr/share/vulkan/icd.d/radeon_icd.x86_64.json
+eval "$(python scripts/oc_workspace.py env)"      # NS_* for scripts you run by hand
+./omnicortex --workspace ext                       # or start Studio in one
 python scripts/doctor.py --workspace ext
 ```
 
@@ -107,7 +107,7 @@ python scripts/tool_rules.py category destructive deny
 python scripts/tool_rules.py test filesystem read_file '{"path": "/home/me/notes/a.md"}' --annotations '{"readOnlyHint": true}'
 ```
 
-Stored in `~/.neuronscope/tool-rules.json` (or `$NS_TOOL_RULES`).
+Stored in `~/.omnicortex/tool-rules.json` (or `$OC_TOOL_RULES`).
 
 ## Appearance
 
@@ -144,7 +144,7 @@ average over the axes, in tenths.
 
 ## Plugins
 
-Lists the plugins found in `~/.neuronscope/plugins/` and the repository's
+Lists the plugins found in `~/.omnicortex/plugins/` and the repository's
 `plugins/`, with what each adds (jobs, reply checks, a page, MCP tools).
 Plugins run code, so each stays off until you turn it on. If its files
 change later, it switches itself off until you turn it on again.

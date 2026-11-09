@@ -43,9 +43,9 @@ from records import Recorder  # noqa: E402
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--binary", default=None,
-                   help="llama-cett-dump; defaults to $NS_CETT")
+                   help="llama-cett-dump; defaults to $OC_CETT")
     p.add_argument("--gguf", default=None,
-                   help="model file; defaults to $NS_GGUF")
+                   help="model file; defaults to $OC_GGUF")
     p.add_argument("--tokenizer",
                    help="Optional: without it the tokenizer and "
                         "chat template come from the GGUF.")
@@ -93,15 +93,15 @@ def _require_paths(args):
     numpy traceback. An empty --gguf used to surface as
     `FileNotFoundError: ''` four frames deep inside np.memmap."""
     import os as _os
-    args.gguf = args.gguf or _os.environ.get("NS_GGUF", "")
-    args.binary = args.binary or _os.environ.get("NS_CETT", "")
+    args.gguf = args.gguf or _os.environ.get("OC_GGUF", "")
+    args.binary = args.binary or _os.environ.get("OC_CETT", "")
     problems = []
     if not args.gguf:
-        problems.append("--gguf is empty and $NS_GGUF is not set")
+        problems.append("--gguf is empty and $OC_GGUF is not set")
     elif not _os.path.isfile(args.gguf):
         problems.append(f"--gguf does not exist: {args.gguf}")
     if not args.binary:
-        problems.append("--binary is empty and $NS_CETT is not set")
+        problems.append("--binary is empty and $OC_CETT is not set")
     elif not _os.access(args.binary, _os.X_OK):
         problems.append(f"--binary is not executable: {args.binary}")
     if problems:

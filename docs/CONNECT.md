@@ -31,10 +31,10 @@ OmniCortex has three MCP pieces. Pick by what should control what:
 1. Start Studio and open **Connect** (header). Copy the entry for your app.
 2. Paste it into the app's MCP settings (Cline: *MCP Servers → Configure*;
    Claude Desktop: *Settings → Developer → Edit Config*). For Cline,
-   `python scripts/ns_connect.py cline --write` does this for you.
+   `python scripts/oc_connect.py cline --write` does this for you.
 3. Restart the app's MCP servers. `studio_status` should answer.
    - Nothing to install: the HTTP entry needs only Studio running; the stdio
-     entry runs `scripts/ns_mcp.py`, which uses the standard library only.
+     entry runs `scripts/oc_mcp.py`, which uses the standard library only.
    - With a Studio token, the entry carries it; keep that file private.
 
 **B. Another computer's LLMs for an agent app**
@@ -42,24 +42,24 @@ OmniCortex has three MCP pieces. Pick by what should control what:
    (Studio → Connect → Remote hosts → *Download OmniCortex Remote*, or copy `remote/`).
    Python 3.9+, nothing else.
 2. On the computer with the agent app (the *controller*), pair it once:
-   `python -m neuronscope_remote add-host nsr://…` with the pairing link the
+   `python -m omnicortex_remote add-host nsr://…` with the pairing link the
    host's console shows. Run it in the folder that holds
-   `neuronscope_remote` (OmniCortex's `remote/`, or the unpacked Remote zip).
+   `omnicortex_remote` (OmniCortex's `remote/`, or the unpacked Remote zip).
 3. Add to the app's MCP settings:
    ```json
    {"mcpServers": {"gpu-box": {"command": "python",
-                               "args": ["-m", "neuronscope_remote", "bridge", "gpu-box"],
-                               "env": {"PYTHONPATH": "/folder/that/holds/neuronscope_remote"}}}}
+                               "args": ["-m", "omnicortex_remote", "bridge", "gpu-box"],
+                               "env": {"PYTHONPATH": "/folder/that/holds/omnicortex_remote"}}}}
    ```
    The app then has the host's tools: `list_models`, `chat`, `load_model`…
    ([REMOTE.md](REMOTE.md) lists them). The host's owner sees each call and
    can revoke the controller.
-   - For an app on the host itself: `"args": ["-m", "neuronscope_remote", "stdio"]`.
+   - For an app on the host itself: `"args": ["-m", "omnicortex_remote", "stdio"]`.
 
 **C. Tools in Studio's chat**
 1. Install the MCP client library once: Setup → Requirements (`mcp`), or
    `pip install mcp`.
-2. Write `~/.neuronscope/mcp.json` in the format LM Studio and Claude
+2. Write `~/.omnicortex/mcp.json` in the format LM Studio and Claude
    Desktop use ([STUDIO.md](STUDIO.md#tools-mcp) has an example), or turn on
    a plugin that brings an MCP server (Settings → Plugins).
 3. In the chat, tick **tools**. Each call asks first unless its tool is
@@ -85,7 +85,7 @@ compare yours (`model_stats` shows the results to an agent).
 ```json
 {
   "mcpServers": {
-    "neuronscope": {
+    "omnicortex": {
       "type": "streamableHttp",
       "url": "http://127.0.0.1:7870/mcp",
       "disabled": false,
@@ -98,25 +98,25 @@ compare yours (`model_stats` shows the results to an agent).
 }
 ```
 
-Or let OmniCortex write it: `python scripts/ns_connect.py cline --write`
+Or let OmniCortex write it: `python scripts/oc_connect.py cline --write`
 (`--editor cursor`, `codium`, `code-insiders` or `windsurf` for other
-editors). It adds only the `neuronscope` entry and keeps a backup of the file.
+editors). It adds only the `omnicortex` entry and keeps a backup of the file.
 
 `autoApprove` lists the tools that only read; Cline will ask before
 anything that chats, starts a job or changes a project. Studio must be
 running for this entry. If your Cline cannot reach Studio over HTTP, use the
 stdio entry from the Connect page (`--transport stdio` for the CLI). Cline
-then starts `scripts/ns_mcp.py` itself, which talks to Studio for it.
+then starts `scripts/oc_mcp.py` itself, which talks to Studio for it.
 
 ## Claude Desktop
 
 *Settings → Developer → Edit Config*, add the stdio entry from the Connect
-page (or `python scripts/ns_connect.py claude-desktop --write`), and restart
+page (or `python scripts/oc_connect.py claude-desktop --write`), and restart
 Claude Desktop:
 
 ```json
-{"mcpServers": {"neuronscope": {"command": "/path/to/neuronscope/venv/bin/python",
-                                "args": ["/path/to/neuronscope/scripts/ns_mcp.py", "--studio", "http://127.0.0.1:7870"]}}}
+{"mcpServers": {"omnicortex": {"command": "/path/to/omnicortex/venv/bin/python",
+                                "args": ["/path/to/omnicortex/scripts/oc_mcp.py", "--studio", "http://127.0.0.1:7870"]}}}
 ```
 
 If Studio needs a token, add `"--token-file", "/path/to/token"` to `args`.
@@ -127,9 +127,9 @@ The Connect page shows both commands with this Studio's address filled in:
 
 ```bash
 # over HTTP, while Studio runs (add --header "Authorization: Bearer <token>" if Studio has a token)
-claude mcp add --transport http --scope user neuronscope http://127.0.0.1:7870/mcp
+claude mcp add --transport http --scope user omnicortex http://127.0.0.1:7870/mcp
 # or let Claude Code start the bridge itself
-claude mcp add --scope user neuronscope -- /path/to/neuronscope/venv/bin/python /path/to/neuronscope/scripts/ns_mcp.py --studio http://127.0.0.1:7870
+claude mcp add --scope user omnicortex -- /path/to/omnicortex/venv/bin/python /path/to/omnicortex/scripts/oc_mcp.py --studio http://127.0.0.1:7870
 ```
 
 `claude mcp list` (or `/mcp` inside Claude Code) shows whether it connected.
@@ -149,7 +149,7 @@ Claude Desktop or Claude Code on a computer that can reach Studio instead.
 Open WebUI, Continue, LibreChat or your own scripts: base URL
 `http://127.0.0.1:7870/v1`, any API key unless Studio has a token, and a
 model id. Any MCP client can use `http://127.0.0.1:7870/mcp` (streamable
-HTTP) or start `scripts/ns_mcp.py` (stdio).
+HTTP) or start `scripts/oc_mcp.py` (stdio).
 
 ## The tools
 
@@ -194,7 +194,7 @@ HTTP) or start `scripts/ns_mcp.py` (stdio).
 | `review_summary` | reads | Neurons that fire more on wrong answers (or with risk, or most often) for a filter, and the error rate per day, week or month. |
 | `review_label` | changes state | Record whether a checked reply was right or wrong, so it counts in the review. |
 
-`python scripts/ns_mcp.py --list` prints the same list.
+`python scripts/oc_mcp.py --list` prints the same list.
 
 ## Tokens and safety
 
@@ -205,7 +205,7 @@ HTTP) or start `scripts/ns_mcp.py` (stdio).
   prefer the **Create a token for an app** button on the Connect page. That
   token is a paired device: it can chat, use `/v1`, check replies and read
   status, but cannot start jobs or change projects, and you can revoke it under
-  Link. Cline sends it as an `Authorization: Bearer` header; `ns_connect.py
+  Link. Cline sends it as an `Authorization: Bearer` header; `oc_connect.py
   --token-file` writes it into the settings file and makes the file
   private (0600).
 - Every tool call goes back through Studio's API with the caller's own token,
@@ -219,10 +219,10 @@ HTTP) or start `scripts/ns_mcp.py` (stdio).
 ## Without the UI
 
 ```bash
-python scripts/ns_connect.py show                     # every snippet for this Studio
-python scripts/ns_connect.py cline --write             # Cline's MCP settings
-python scripts/ns_mcp.py --list                        # the tools
-python scripts/ns_mcp.py --studio http://HOST:7870 --token-file studio.token   # stdio server, for any client
+python scripts/oc_connect.py show                     # every snippet for this Studio
+python scripts/oc_connect.py cline --write             # Cline's MCP settings
+python scripts/oc_mcp.py --list                        # the tools
+python scripts/oc_mcp.py --studio http://HOST:7870 --token-file studio.token   # stdio server, for any client
 ```
 
 ## The other direction: controlling LLMs on other computers

@@ -52,7 +52,7 @@ Everything else is submitted privately, or not at all:
   results for unlisted models* is on (Advanced);
 - even then, those cards stay private unless listed by hand.
 
-Every submission is saved in ~/.neuronscope/submissions/ exactly as sent.
+Every submission is saved in ~/.omnicortex/submissions/ exactly as sent.
 
     python scripts/score_cards.py preview --results runs/base.json --label m --model models/x/y.gguf
     python scripts/score_cards.py check --model models/org/repo/file.gguf
@@ -75,7 +75,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 CARD_VERSION = 1
-HOME = Path(os.environ.get("NS_HOME") or "~/.neuronscope").expanduser()
+HOME = Path(os.environ.get("OC_HOME") or "~/.omnicortex").expanduser()
 # Engine options that can change what a model answers (speed-only ones are left out).
 OUTPUT_OPTIONS = ("ctx", "cache_type_k", "cache_type_v", "cache_type", "flash_attn", "spec_type", "draft_max",
                   "draft_p_min", "experts", "vision", "kv_cache_dtype", "quantization", "dtype", "max_model_len")
@@ -129,7 +129,7 @@ def lineage(model_path: str) -> list[dict]:
     """Records OmniCortex writes next to models it produced: fine-tunes, exports, concept edits."""
     out = []
     d = Path(model_path).parent
-    for name in ("neuronscope-export.json", "neuronscope-finetune.json", "edit.json", "sage.json"):
+    for name in ("omnicortex-export.json", "omnicortex-finetune.json", "edit.json", "sage.json"):
         for p in (d / name, d.parent / name):
             if p.is_file():
                 try:
@@ -260,7 +260,7 @@ def build(results_path: str, label: str | None, model_path: str, settings: dict 
                      "hallucination_rate": round(tot["wrong"] / n, 4) if n else None,
                      "abstention_rate": round(tot["abstained"] / n, 4) if n else None},
             "visibility": "public" if (lst.get("listed") or public_by_hand) else "private",
-            "neuronscope": _version()}
+            "omnicortex": _version()}
     perf = performance(d, label, settings or {})
     if perf:
         card["performance"] = perf
@@ -314,8 +314,8 @@ def _version() -> str:
 
 
 def github_token() -> str | None:
-    """For a scoreboard on GitHub: NS_GITHUB_TOKEN, or the token saved in Settings → Sharing results."""
-    t = os.environ.get("NS_GITHUB_TOKEN")
+    """For a scoreboard on GitHub: OC_GITHUB_TOKEN, or the token saved in Settings → Sharing results."""
+    t = os.environ.get("OC_GITHUB_TOKEN")
     if t:
         return t.strip()
     p = HOME / "github.token"

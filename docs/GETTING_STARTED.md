@@ -63,7 +63,7 @@ python3 scripts/installer.py --yes --torch none
 ./install.sh                                  # the original Linux/macOS script, still supported
 ```
 
-Then start it from the shortcut, `OmniCortex.bat` or `./neuronscope`.
+Then start it from the shortcut, `OmniCortex.bat` or `./omnicortex`.
 Everything after that is in the browser; see [UI_AND_CLI.md](UI_AND_CLI.md)
 for where each feature lives, and the steps below for doing the same from
 a terminal.
@@ -71,7 +71,7 @@ a terminal.
 ## 1. Install
 
 ```bash
-git clone <this repo> neuronscope && cd neuronscope
+git clone <this repo> omnicortex && cd omnicortex
 ./install.sh              # creates venv/, picks a PyTorch build for your GPU, smoke-tests it
 source venv/bin/activate
 ```
@@ -98,7 +98,7 @@ python scripts/doctor.py
 ```
 
 It checks, in order, Python and packages, your GPUs and the devices Studio's
-worker models can use, your llama.cpp build, the model in `NS_GGUF`, and which
+worker models can use, your llama.cpp build, the model in `OC_GGUF`, and which
 pipeline stages already have output. Each problem comes with what it blocks
 and the fix, and it ends with what to do next: one line for using models in
 Studio, one for the H-Neuron pipeline.
@@ -121,7 +121,7 @@ build for others), and pre-Turing cards need a CUDA 12.x toolkit, or
 
 `cett-dump` is tested against current llama.cpp: on a model converted with
 llama.cpp's own converter its CETT values match the PyTorch hook path on every
-layer (`tests/test_llamacpp_integration.py`, run with `NS_LLAMA` set).
+layer (`tests/test_llamacpp_integration.py`, run with `OC_LLAMA` set).
 
 ## 3. Get a model and point OmniCortex at it
 
@@ -132,9 +132,9 @@ choice. Studio, TestQA and Projects need nothing more.
 For the H-Neuron pipeline, tell the scripts which model to study:
 
 ```bash
-export NS_GGUF=~/models/Qwen3-8B-Q6_K.gguf
-export NS_LLAMA=~/llama.cpp
-source env.sh            # derives NS_CETT, NS_LLAMA_SERVER, NS_LAYERS; checks the file
+export OC_GGUF=~/models/Qwen3-8B-Q6_K.gguf
+export OC_LLAMA=~/llama.cpp
+source env.sh            # derives OC_CETT, OC_LLAMA_SERVER, OC_LAYERS; checks the file
 ```
 
 Put those exports in `env.local.sh` (gitignored) to make them stick. Use a
@@ -146,7 +146,7 @@ sizes the pipeline measures (see [GLOSSARY.md](GLOSSARY.md#models-and-files)).
 **Run models like LM Studio, with the OmniCortex dials:**
 
 ```bash
-python viz/studio.py --models-dir ~/models --server "$NS_LLAMA_SERVER"
+python viz/studio.py --models-dir ~/models --server "$OC_LLAMA_SERVER"
 ```
 
 Open http://127.0.0.1:7870. Any OpenAI client can use http://127.0.0.1:7870/v1.
@@ -176,7 +176,7 @@ without it only under local CPU and memory limits. See [TESTQA.md](TESTQA.md).
 
 ```bash
 printf 'The capital of France is' > /tmp/seq.txt
-"$NS_CETT" -m "$NS_GGUF" -ngl 99 -b 4096 --n-layers "$NS_LAYERS" \
+"$OC_CETT" -m "$OC_GGUF" -ngl 99 -b 4096 --n-layers "$OC_LAYERS" \
     --prompt-file /tmp/seq.txt --out /tmp/d.bin
 ```
 
@@ -190,13 +190,13 @@ spans, agg = read_aggregate('/tmp/d.bin')[:2]
 print('spans x layers x neurons:', agg.shape)"
 ```
 
-The middle number must equal `$NS_LAYERS`: one averaged row of neuron
+The middle number must equal `$OC_LAYERS`: one averaged row of neuron
 activations per decoder layer. If the run fails with "capture failed (0
 records)", the architecture names its FFN output node differently. List the
 node names:
 
 ```bash
-"$NS_LLAMA"/build/bin/llama-eval-callback -m "$NS_GGUF" -p "hi" -n 1 2>&1 \
+"$OC_LLAMA"/build/bin/llama-eval-callback -m "$OC_GGUF" -p "hi" -n 1 2>&1 \
     | grep -oE '^[a-z_]+-[0-9]+' | sort -u | head -30
 ```
 

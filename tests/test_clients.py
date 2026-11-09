@@ -1,5 +1,5 @@
-"""The terminal client (scripts/ns.py) against a running Studio, and the Godot
-client's scripts (parsed when a Godot 4 binary is available: $NS_GODOT or
+"""The terminal client (scripts/oc.py) against a running Studio, and the Godot
+client's scripts (parsed when a Godot 4 binary is available: $OC_GODOT or
 godot4/godot on PATH)."""
 import os
 import shutil
@@ -12,11 +12,11 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
 from test_studio import CODER, studio_srv  # noqa: E402,F401
-import ns  # noqa: E402
+import oc  # noqa: E402
 
 
 def run(base, *args, capsys):
-    rc = ns.main(["--studio", base, *args])
+    rc = oc.main(["--studio", base, *args])
     return rc, capsys.readouterr().out
 
 
@@ -44,11 +44,11 @@ def test_terminal_client(studio_srv, capsys, tmp_path):  # noqa: F811
 
 
 def _godot():
-    g = os.environ.get("NS_GODOT") or shutil.which("godot4") or shutil.which("godot")
+    g = os.environ.get("OC_GODOT") or shutil.which("godot4") or shutil.which("godot")
     return g if g and os.path.exists(g) else None
 
 
-@pytest.mark.skipif(_godot() is None, reason="no Godot 4 binary ($NS_GODOT, godot4 or godot)")
+@pytest.mark.skipif(_godot() is None, reason="no Godot 4 binary ($OC_GODOT, godot4 or godot)")
 @pytest.mark.parametrize("script", ["studio.gd", "main.gd", "app.gd", "widgets/widget.gd", "widgets/jewel.gd",
                                     "widgets/emotion_graph.gd", "widgets/nav_gizmo.gd", "widgets/chat_box.gd"])
 def test_godot_scripts_parse(script):

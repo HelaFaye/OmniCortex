@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 import deficits  # noqa: E402
 import testqa as tq  # noqa: E402
 
-LLAMA = Path(os.environ.get("NS_LLAMA", "")).expanduser()
+LLAMA = Path(os.environ.get("OC_LLAMA", "")).expanduser()
 
 
 class Teacher(BaseHTTPRequestHandler):
@@ -119,15 +119,15 @@ def test_lora_sft_dpo_merge_gguf(run, tmp_path):
                         "--dpo", "--dpo-max-steps", "2", "--logging-steps", "1"], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr[-3000:]
     assert (adapter / "adapter_model.safetensors").exists()
-    assert json.loads((adapter / "neuronscope-finetune.json").read_text())["dpo"] is True
+    assert json.loads((adapter / "omnicortex-finetune.json").read_text())["dpo"] is True
     if not (LLAMA / "convert_hf_to_gguf.py").exists():
-        pytest.skip("set NS_LLAMA for the GGUF half")
+        pytest.skip("set OC_LLAMA for the GGUF half")
     out = tmp_path / "merged"
     r = subprocess.run([sys.executable, str(ROOT / "scripts" / "merge_export.py"), "--base", str(hf),
                         "--adapter", str(adapter), "--out", str(out), "--gguf", "Q8_0", "--dtype", "float32",
                         "--llama", str(LLAMA)], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr[-3000:]
-    meta = json.loads((out / "neuronscope-export.json").read_text())
+    meta = json.loads((out / "omnicortex-export.json").read_text())
     assert Path(meta["gguf"]).exists() and meta["gguf"].endswith("Q8_0.gguf")
     # the merged GGUF loads and tokenizes in llama.cpp
     probe = tmp_path / "m.jsonl"
@@ -217,14 +217,14 @@ def test_vision_lora_sft_dpo(vision_run, tmp_path):
         keys = list(f.keys())
     assert keys and not any("vision_tower" in k for k in keys)
     assert any("language_model" in k for k in keys)
-    assert json.loads((adapter / "neuronscope-finetune.json").read_text())["vision"] is True
+    assert json.loads((adapter / "omnicortex-finetune.json").read_text())["vision"] is True
     if not (LLAMA / "convert_hf_to_gguf.py").exists():
-        pytest.skip("set NS_LLAMA for the GGUF half")
+        pytest.skip("set OC_LLAMA for the GGUF half")
     out = tmp_path / "merged"
     r = subprocess.run([sys.executable, str(ROOT / "scripts" / "merge_export.py"), "--vision", "--base", str(hf),
                         "--adapter", str(adapter), "--out", str(out), "--gguf", "--dtype", "float32",
                         "--llama", str(LLAMA)], capture_output=True, text=True)
-    meta = json.loads((out / "neuronscope-export.json").read_text())
+    meta = json.loads((out / "omnicortex-export.json").read_text())
     assert Path(meta["gguf"]).exists(), r.stderr[-3000:]
     # llama.cpp converts projectors only for the VLM families it serves; HF-format
     # LLaVA is not one, so this tiny model must report that rather than fail silently.

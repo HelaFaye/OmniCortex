@@ -44,7 +44,7 @@ import numpy as np
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_constants import THINK_CLOSE, normalise_piece  # noqa: E402
+from oc_constants import THINK_CLOSE, normalise_piece  # noqa: E402
 
 MAGIC = b"CETT"
 FORMAT_VERSION = 1
@@ -52,8 +52,8 @@ FORMAT_VERSION = 1
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--binary", default=None, help="path to llama-cett-dump (default $NS_CETT)")
-    p.add_argument("--gguf", default=None, help="the model to extract from (default $NS_GGUF)")
+    p.add_argument("--binary", default=None, help="path to llama-cett-dump (default $OC_CETT)")
+    p.add_argument("--gguf", default=None, help="the model to extract from (default $OC_GGUF)")
     p.add_argument("--tokenizer", default=None,
                    help="HF repo or path. Optional: without it the tokenizer "
                         "is read from the GGUF, which avoids needing "
@@ -274,15 +274,15 @@ def _require_paths(args):
     numpy traceback. An empty --gguf used to surface as
     `FileNotFoundError: ''` four frames deep inside np.memmap."""
     import os as _os
-    args.gguf = args.gguf or _os.environ.get("NS_GGUF", "")
-    args.binary = args.binary or _os.environ.get("NS_CETT", "")
+    args.gguf = args.gguf or _os.environ.get("OC_GGUF", "")
+    args.binary = args.binary or _os.environ.get("OC_CETT", "")
     problems = []
     if not args.gguf:
-        problems.append("--gguf is empty and $NS_GGUF is not set")
+        problems.append("--gguf is empty and $OC_GGUF is not set")
     elif not _os.path.isfile(args.gguf):
         problems.append(f"--gguf does not exist: {args.gguf}")
     if not args.binary:
-        problems.append("--binary is empty and $NS_CETT is not set")
+        problems.append("--binary is empty and $OC_CETT is not set")
     elif not _os.access(args.binary, _os.X_OK):
         problems.append(f"--binary is not executable: {args.binary}")
     if problems:

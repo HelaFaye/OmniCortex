@@ -458,7 +458,7 @@ def cmd_export(a) -> int:
     out = Path(a.out)
     model.save_pretrained(out)
     proc.save_pretrained(out)
-    (out / "neuronscope.json").write_text(json.dumps({
+    (out / "omnicortex.json").write_text(json.dumps({
         "source": a.model, "h_neurons": str(Path(a.h_neurons).resolve()), "scale": a.scale,
         "tower": tower, "n_neurons": sum(len(v) for v in by_layer.values()),
         "method": "fc2 weight columns scaled"}, indent=2))

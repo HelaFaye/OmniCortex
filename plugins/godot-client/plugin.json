@@ -10,14 +10,14 @@
   },
   "page": "page",
   "downloads": {
-    "neuronscope-godot.zip": "client"
+    "omnicortex-godot.zip": "client"
   },
   "jobs": [
     {
       "kind": "get_godot",
       "title": "Godot client: get Godot",
       "script": "get_godot.py",
-      "help": "Download Godot 4 for this computer from the Godot project's GitHub releases, check it against the release's SHA-512 list, and keep it in ~/.neuronscope/godot.",
+      "help": "Download Godot 4 for this computer from the Godot project's GitHub releases, check it against the release's SHA-512 list, and keep it in ~/.omnicortex/godot.",
       "fields": [
         {
           "name": "version",
@@ -26,7 +26,7 @@
         },
         {
           "name": "folder",
-          "default": "~/.neuronscope/godot"
+          "default": "~/.omnicortex/godot"
         }
       ]
     },

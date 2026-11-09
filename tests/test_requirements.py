@@ -1,4 +1,4 @@
-"""ns_requirements: the feature catalog, version checks, per-OS fixes and
+"""oc_requirements: the feature catalog, version checks, per-OS fixes and
 environment snapshots."""
 import json
 import subprocess
@@ -9,7 +9,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import ns_requirements as nr  # noqa: E402
+import oc_requirements as nr  # noqa: E402
 
 
 def test_specs_come_from_the_requirements_files():
@@ -89,7 +89,7 @@ def test_install_refuses_outside_the_catalog():
 
 
 def test_cli_json():
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "ns_requirements.py"), "check", "--feature", "core",
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "oc_requirements.py"), "check", "--feature", "core",
                         "--json"], capture_output=True, text=True, timeout=120)
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout)["features"]["core"]["title"].startswith("Core")

@@ -70,10 +70,10 @@ const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=
 const post=async(u,b)=>{ const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})}); const j=await r.json().catch(()=>({error:'HTTP '+r.status})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; };
 const gb=n=>n==null?'':(n/2**30).toFixed(n>2**30*10?0:1)+' GB';
 let S=null, method=null, open=new Set();
-const OS={win:'Unzip neuronscope-remote.zip, then double-click\n  neuronscope-remote\\OmniCortex Remote.bat\n(Python from python.org or the Microsoft Store; tick "Add to PATH")',
- mac:'unzip neuronscope-remote.zip && cd neuronscope-remote\n./neuronscope-remote.sh',
- linux:'unzip neuronscope-remote.zip && cd neuronscope-remote\n./neuronscope-remote.sh',
- pip:'pip install ./neuronscope-remote          # or: pipx install ./neuronscope-remote\nneuronscope-remote                          # add [tls] for certificates without openssl'};
+const OS={win:'Unzip omnicortex-remote.zip, then double-click\n  omnicortex-remote\\OmniCortex Remote.bat\n(Python from python.org or the Microsoft Store; tick "Add to PATH")',
+ mac:'unzip omnicortex-remote.zip && cd omnicortex-remote\n./omnicortex-remote.sh',
+ linux:'unzip omnicortex-remote.zip && cd omnicortex-remote\n./omnicortex-remote.sh',
+ pip:'pip install ./omnicortex-remote          # or: pipx install ./omnicortex-remote\nomnicortex-remote                          # add [tls] for certificates without openssl'};
 document.querySelectorAll('#os button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#os button').forEach(x=>x.classList.toggle('on',x===b)); $('#osCmd').textContent=OS[b.dataset.os]; });
 $('#osCmd').textContent=OS.win;
 const METHODS=[

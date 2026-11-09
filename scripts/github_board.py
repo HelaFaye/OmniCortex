@@ -15,7 +15,7 @@ A scoreboard kept in a GitHub repository (docs/SHARING.md#a-scoreboard-on-github
   the fitted speed prediction weights (perf_predict.py), and the measurement weights
   (measure_weights.py). Studio and anyone else read it from raw.githubusercontent.com.
 
-    python scripts/github_board.py init ./my-board --neuronscope-repo owner/neuronscope   # skeleton + keys
+    python scripts/github_board.py init ./my-board --omnicortex-repo owner/omnicortex   # skeleton + keys
     python scripts/github_board.py submit --board owner/my-board --card c.json --log l.json  # (Studio does this)
     python scripts/github_board.py rebuild ./my-board
 """
@@ -37,11 +37,11 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
 
-MARK = "<!-- neuronscope-card v1 -->"
+MARK = "<!-- omnicortex-card v1 -->"
 MARK_PROFILE = "<!-- omnicortex-hw-profile v1 -->"      # a hardware support profile, for review (public: no sealing)
 MARK_REPORT = "<!-- omnicortex-hw-report v1 -->"        # "this profile worked / did not work for me"
 MARK_FEATURE = "<!-- omnicortex-feature-pack v1 -->"    # a feature pack (feature_pack.py), for review
-INFO = b"neuronscope-board-v1"
+INFO = b"omnicortex-board-v1"
 PART = 60000                         # GitHub issue bodies and comments hold 65536 characters
 CARD_MAX = 50000
 MAX_PARTS = 40
@@ -203,7 +203,7 @@ def _open(repo: str, title: str, body: str, token: str) -> dict:
 
 def _gh(method: str, path: str, token: str | None, body=None, timeout: float = 30):
     req = urllib.request.Request(API + path, method=method, data=None if body is None else json.dumps(body).encode(),
-                                 headers={"Accept": "application/vnd.github+json", "User-Agent": "neuronscope",
+                                 headers={"Accept": "application/vnd.github+json", "User-Agent": "omnicortex",
                                           **({"Authorization": f"Bearer {token}"} if token else {})})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read() or b"null")
@@ -395,7 +395,7 @@ permissions:
 concurrency: board
 jobs:
   accept:
-    if: (contains(github.event.issue.body, '<!-- neuronscope-card v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-hw-profile v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-hw-report v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-feature-pack v1 -->')) && github.event.issue.state == 'open'
+    if: (contains(github.event.issue.body, '<!-- omnicortex-card v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-hw-profile v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-hw-report v1 -->') || contains(github.event.issue.body, '<!-- omnicortex-feature-pack v1 -->')) && github.event.issue.state == 'open'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -423,11 +423,11 @@ jobs:
 """
 
 
-def init(board: Path, ns_repo: str, ns_ref: str = "main") -> dict:
+def init(board: Path, oc_repo: str, oc_ref: str = "main") -> dict:
     """A new board repository's files, and its key pair. The private key goes in the repo's BOARD_KEY secret
     and is written to board.key here for that; delete it once stored."""
-    if not REPO_RE.fullmatch(ns_repo):
-        raise ValueError("--neuronscope-repo is owner/repo")
+    if not REPO_RE.fullmatch(oc_repo):
+        raise ValueError("--omnicortex-repo is owner/repo")
     board.mkdir(parents=True, exist_ok=True)
     priv, pub = keygen()
     (board / "board.pub").write_text(pub + "\n")
@@ -437,14 +437,14 @@ def init(board: Path, ns_repo: str, ns_ref: str = "main") -> dict:
     (board / ".gitignore").write_text("board.key\n")
     wf = board / ".github" / "workflows"
     wf.mkdir(parents=True, exist_ok=True)
-    (wf / "accept.yml").write_text(WORKFLOW.replace("__NS_REPO__", ns_repo).replace("__NS_REF__", ns_ref))
+    (wf / "accept.yml").write_text(WORKFLOW.replace("__NS_REPO__", oc_repo).replace("__NS_REF__", oc_ref))
     for sub in ("cards", "profiles/pending", "profiles/accepted", "reports/hw"):
         (board / sub).mkdir(parents=True, exist_ok=True)
         (board / sub / ".keep").write_text("")
     (board / "README.md").write_text(
         "# OmniCortex scoreboard\n\nScore cards arrive as issues and are verified by the workflow in "
         "`.github/workflows/accept.yml`: replies are regraded with the TestQA bank of "
-        f"`{ns_repo}` ({ns_ref}). Accepted cards are in `cards/`; `board.json` aggregates them.\n\n"
+        f"`{oc_repo}` ({oc_ref}). Accepted cards are in `cards/`; `board.json` aggregates them.\n\n"
         "Submit from OmniCortex Studio: Settings → Sharing results → scoreboard `github:OWNER/REPO`.\n")
     rebuild(board)
     return {"board": str(board), "public_key": pub, "private_key_file": str(kp),
@@ -463,13 +463,13 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     i = sub.add_parser("init", help="a new board repository's files and keys")
     i.add_argument("board")
-    i.add_argument("--neuronscope-repo", required=True, help="owner/repo whose TestQA bank verifies cards")
-    i.add_argument("--neuronscope-ref", default="main")
+    i.add_argument("--omnicortex-repo", required=True, help="owner/repo whose TestQA bank verifies cards")
+    i.add_argument("--omnicortex-ref", default="main")
     s = sub.add_parser("submit", help="open the issue for a card")
     s.add_argument("--board", required=True, help="owner/repo")
     s.add_argument("--card", required=True)
     s.add_argument("--log", required=True)
-    s.add_argument("--token", default=os.environ.get("NS_GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN"))
+    s.add_argument("--token", default=os.environ.get("OC_GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN"))
     a = sub.add_parser("action", help="(in the board's workflow) verify one issue")
     a.add_argument("--board", required=True)
     a.add_argument("--issue", type=int, required=True)
@@ -481,7 +481,7 @@ def main(argv=None) -> int:
     args = p.parse_args(argv)
     try:
         if args.cmd == "init":
-            print(json.dumps(init(Path(args.board), args.neuronscope_repo, args.neuronscope_ref), indent=1))
+            print(json.dumps(init(Path(args.board), args.omnicortex_repo, args.omnicortex_ref), indent=1))
         elif args.cmd == "submit":
             print(json.dumps(submit(args.board, json.loads(Path(args.card).read_text()),
                                     json.loads(Path(args.log).read_text()), args.token), indent=1))

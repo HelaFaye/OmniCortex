@@ -4,7 +4,7 @@ Near-realtime activation streaming, for a phone or SBC on your network.
 
 The source is llama-server patched with llama-tools/server-activations
 (`scripts/build_llama_tools.sh --server-activations`), started with
-NS_ACTIVATIONS=sparse|binned|raw and --parallel 1. It reduces in-process and
+OC_ACTIVATIONS=sparse|binned|raw and --parallel 1. It reduces in-process and
 serves one frame per generated token at /activations; this relays those frames
 and adds auth, TLS and per-viewer backpressure. --simulate stands in when no
 patched server is running, and steps aside while frames are pushed to
@@ -44,7 +44,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 
 STATE = {"token": None, "tier": "binned", "source": None, "simulate": False}
 SUBS = []
@@ -175,7 +175,7 @@ class Handler(BaseHTTPRequestHandler):
         if raw:
             try:
                 c = http.cookies.SimpleCookie(raw)
-                if "ns_token" in c and hmac.compare_digest(c["ns_token"].value,
+                if "oc_token" in c and hmac.compare_digest(c["oc_token"].value,
                                                            tok):
                     return True
             except Exception:
@@ -222,7 +222,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Set-Cookie",
-                                 f"ns_token={STATE['token']}; Path=/; "
+                                 f"oc_token={STATE['token']}; Path=/; "
                                  "HttpOnly; SameSite=Strict; Max-Age=604800")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -341,7 +341,7 @@ line-height:1.7}
 </div>
 <div class="stat" id="stat"></div>
 <div class="tok" id="toks"></div>
-<script>/*NS_WIDGETS*/</script>
+<script>/*OC_WIDGETS*/</script>
 <script>
 const $=s=>document.querySelector(s);
 const cv=$('#cv'), cx=cv.getContext('2d'), sc=$('#sc'), sx=sc.getContext('2d'), em=$('#em'), ex=em.getContext('2d');
@@ -451,7 +451,7 @@ function draw(){
     return (scored&&t.s>1.5)?`<b>${esc(t.tok)}</b>`:esc(t.tok); }).join('');
 }
 </script>"""
-PAGE = PAGE.replace("/*NS_WIDGETS*/", __import__("widgets").WIDGETS_JS)
+PAGE = PAGE.replace("/*OC_WIDGETS*/", __import__("widgets").WIDGETS_JS)
 
 
 def main():
@@ -466,7 +466,7 @@ def main():
     sec.add_server_security_args(p)
     a = p.parse_args()
 
-    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("NS_STUDIO_TOKEN", ""))
+    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("OC_STUDIO_TOKEN", ""))
     token = sec.resolve_token(a.token, a.token_file) or None
     try:
         for w in sec.check_bind(a.host, token or "", tls=bool(a.tls_cert), allow_plaintext=a.allow_plaintext):

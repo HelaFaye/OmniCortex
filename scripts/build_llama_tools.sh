@@ -87,7 +87,7 @@ cmake --build "$DIR/build" --config Release -j "$JOBS" \
 cat <<MSG
 
 Built in $DIR/build/bin. Add to env.local.sh:
-  export NS_LLAMA="$DIR"
-  export NS_CETT="$DIR/build/bin/llama-cett-dump"
-  export NS_LLAMA_SERVER="$DIR/build/bin/llama-server"
+  export OC_LLAMA="$DIR"
+  export OC_CETT="$DIR/build/bin/llama-cett-dump"
+  export OC_LLAMA_SERVER="$DIR/build/bin/llama-server"
 MSG

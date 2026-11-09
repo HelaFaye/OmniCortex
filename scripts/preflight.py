@@ -23,7 +23,7 @@ import torch
 from transformers import AutoConfig, AutoModelForCausalLM
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import TEXT_LAYER_RE, text_config  # noqa: E402
+from oc_common import TEXT_LAYER_RE, text_config  # noqa: E402
 
 
 def parse_args():

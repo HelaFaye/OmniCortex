@@ -33,26 +33,26 @@ TARGETS = [
 
 JS = r"""
 // ---- links between pages (viz/ui_links.py)
-const NS_LINKS=__TARGETS__;
+const OC_LINKS=__TARGETS__;
 function linkify(html){ let out=String(html??'');
-  for(const [rx,href] of NS_LINKS){ out=out.replace(new RegExp('(?<![">])('+rx+')(?![^<]*</a>)','g'),`<a href="${href}">$1</a>`); }
+  for(const [rx,href] of OC_LINKS){ out=out.replace(new RegExp('(?<![">])('+rx+')(?![^<]*</a>)','g'),`<a href="${href}">$1</a>`); }
   return out; }
 // ---- themes (viz/themes.json "_studio"): UI colours, chart colours, the 3D viewer's theme
-const NS_UI_VARS=['bg','panel','fg','mut','line','acc','accfg','ok','no','warn','soft','code'];
-const NS_DEFAULT_CHART=['#6ea8e0','#ff8b7e','#5fcf8f','#e7b65c','#b48ead','#5dcaa5'];
+const OC_UI_VARS=['bg','panel','fg','mut','line','acc','accfg','ok','no','warn','soft','code'];
+const OC_DEFAULT_CHART=['#6ea8e0','#ff8b7e','#5fcf8f','#e7b65c','#b48ead','#5dcaa5'];
 function nsApplyTheme(name,t){ const d=document.documentElement; d.dataset.theme=t.base||'dark';
-  NS_UI_VARS.forEach(k=>d.style.removeProperty('--'+k));
+  OC_UI_VARS.forEach(k=>d.style.removeProperty('--'+k));
   for(const [k,v] of Object.entries(t.ui||{})) d.style.setProperty('--'+k,v);
   try{ localStorage.setItem('ns-theme',name); localStorage.setItem('ns-theme-base',t.base||'dark');
-    localStorage.setItem('ns-theme-vars',JSON.stringify(t.ui||{})); localStorage.setItem('ns-chart',JSON.stringify(t.chart||NS_DEFAULT_CHART)); }catch(e){}
-  document.cookie='ns_viz='+encodeURIComponent(t.viz||'dark')+'; path=/; SameSite=Strict; max-age=31536000';
+    localStorage.setItem('ns-theme-vars',JSON.stringify(t.ui||{})); localStorage.setItem('ns-chart',JSON.stringify(t.chart||OC_DEFAULT_CHART)); }catch(e){}
+  document.cookie='oc_viz='+encodeURIComponent(t.viz||'dark')+'; path=/; SameSite=Strict; max-age=31536000';
   window.dispatchEvent(new CustomEvent('ns-theme',{detail:{name,theme:t}})); }
-function nsChart(){ try{ return JSON.parse(localStorage.getItem('ns-chart')||'null')||NS_DEFAULT_CHART; }catch(e){ return NS_DEFAULT_CHART; } }
+function nsChart(){ try{ return JSON.parse(localStorage.getItem('ns-chart')||'null')||OC_DEFAULT_CHART; }catch(e){ return OC_DEFAULT_CHART; } }
 function nsThemeName(){ try{ return localStorage.getItem('ns-theme')||'midnight'; }catch(e){ return 'midnight'; } }
 async function nsCycleTheme(){ const j=await (await fetch('/api/themes')).json(); const names=Object.keys(j.themes);
   const cur=nsThemeName(); const nx=names[(names.indexOf(cur)+1)%names.length]; nsApplyTheme(nx,j.themes[nx]); return nx; }
 // ---- the sidebar on every page: what Studio does, in the order people use it (LM Studio-style)
-const NS_ICON={puzzle:'<path d="M9 4h3a2 2 0 1 1 4 0h3v4a2 2 0 1 1 0 4v4h-4a2 2 0 1 0-4 0H8v-4a2 2 0 1 1 0-4z"/>',chat:'<path d="M4 5h16v11H9l-5 4z"/>',box:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',
+const OC_ICON={puzzle:'<path d="M9 4h3a2 2 0 1 1 4 0h3v4a2 2 0 1 1 0 4v4h-4a2 2 0 1 0-4 0H8v-4a2 2 0 1 1 0-4z"/>',chat:'<path d="M4 5h16v11H9l-5 4z"/>',box:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',
   search:'<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',doc:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/>',
   plug:'<path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/>',play:'<path d="M7 4l13 8-13 8z"/>',
   tasks:'<path d="M10 6h10M10 12h10M10 18h10M4 6l1.2 1.2L7.5 5M4 12l1.2 1.2L7.5 11M4 18l1.2 1.2L7.5 17"/>',
@@ -70,7 +70,7 @@ const NS_ICON={puzzle:'<path d="M9 4h3a2 2 0 1 1 4 0h3v4a2 2 0 1 1 0 4v4h-4a2 2 
   spark:'<circle cx="12" cy="12" r="2.2"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><circle cx="5" cy="18" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M6.3 7l3.9 3.6M17.7 7l-3.9 3.6M6.3 17l3.9-3.6M17.7 17l-3.9-3.6"/>'};
 // tab: the Studio-page tab the item opens. mobile: also on the phone bar. kids: a group; its pages share a
 // row of tabs at the top, and the group's icon opens the page last used in it.
-const NS_NAV=[
+const OC_NAV=[
   {href:'/#chats',tab:'chats',label:'Chat',icon:'chat',tip:'Chat with your models',mobile:1},
   {label:'Models',icon:'box',tip:'Your models, and new ones to download',mobile:1,kids:[
     {href:'/#models',tab:'local',label:'My Models',tip:'Models on this computer: load, settings, measured accuracy'},
@@ -100,36 +100,36 @@ const NS_NAV=[
   {href:'/settings',label:'Settings',icon:'gear',tip:'Themes, workspaces, models per subject, tool approval, plugins',bottom:1}];
 // Add-ons change the sidebar: a removed add-on's pages go, an add-on's own tab comes (viz/addons.py).
 // The last answer is kept, so the sidebar draws at once, and redrawn if it changed.
-const NS_NAV_BASE=JSON.parse(JSON.stringify(NS_NAV));
-function nsNavApply(cfg){ NS_NAV.splice(0,NS_NAV.length,...JSON.parse(JSON.stringify(NS_NAV_BASE))); if(!cfg) return;
+const OC_NAV_BASE=JSON.parse(JSON.stringify(OC_NAV));
+function nsNavApply(cfg){ OC_NAV.splice(0,OC_NAV.length,...JSON.parse(JSON.stringify(OC_NAV_BASE))); if(!cfg) return;
   const off=new Set(cfg.off||[]);
-  for(let i=NS_NAV.length-1;i>=0;i--){ const it=NS_NAV[i];
-    if(it.kids){ it.kids=it.kids.filter(k=>!off.has(k.href)); if(!it.kids.length) NS_NAV.splice(i,1); }
-    else if(it.href&&off.has(it.href)) NS_NAV.splice(i,1); }
-  if((cfg.tabs||[]).length){ const at=NS_NAV.findIndex(x=>x.sep&&x.bottom);
-    NS_NAV.splice(at<0?NS_NAV.length:at,0,{label:'Add-ons',icon:'puzzle',tip:'Tabs added by add-ons',kids:cfg.tabs.map(t=>({href:t.href,label:t.label,tip:t.tip||''}))}); } }
+  for(let i=OC_NAV.length-1;i>=0;i--){ const it=OC_NAV[i];
+    if(it.kids){ it.kids=it.kids.filter(k=>!off.has(k.href)); if(!it.kids.length) OC_NAV.splice(i,1); }
+    else if(it.href&&off.has(it.href)) OC_NAV.splice(i,1); }
+  if((cfg.tabs||[]).length){ const at=OC_NAV.findIndex(x=>x.sep&&x.bottom);
+    OC_NAV.splice(at<0?OC_NAV.length:at,0,{label:'Add-ons',icon:'puzzle',tip:'Tabs added by add-ons',kids:cfg.tabs.map(t=>({href:t.href,label:t.label,tip:t.tip||''}))}); } }
 (function(){ let c=null; try{ c=JSON.parse(localStorage.getItem('ns-addon-nav')||'null'); }catch(e){} nsNavApply(c);
   if(/^\/(pair|login)/.test(location.pathname)||window.self!==window.top) return;
   fetch('/api/addons/nav').then(r=>r.ok?r.json():null).then(j=>{ if(!j) return; const s=JSON.stringify(j);
     let old=null; try{ old=localStorage.getItem('ns-addon-nav'); localStorage.setItem('ns-addon-nav',s); }catch(e){}
     if(s!==old){ nsNavApply(j); ['ns-rail','ns-bar','ns-more','ns-fly','ns-sub'].forEach(id=>{ const e=document.getElementById(id); if(e) e.remove(); });
       if(document.body&&document.body.classList.contains('ns-railed')) nsRail(); } }).catch(()=>{}); })();
-function nsSvg(n){ return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${NS_ICON[n]||''}</svg>`; }
+function nsSvg(n){ return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${OC_ICON[n]||''}</svg>`; }
 function nsNavActive(it){ if(it.kids) return it.kids.some(nsNavActive); const here=location.pathname.replace(/\/+$/,'')||'/';
-  if(it.tab) return here==='/'&&(window.NS_TAB||'chats')===it.tab;
+  if(it.tab) return here==='/'&&(window.OC_TAB||'chats')===it.tab;
   return here===it.href||here.startsWith(it.href+'/'); }
 // the page a group's icon opens: the one last used in it, else its first
 function nsGroupHref(g){ let h=null; try{ h=localStorage.getItem('ns-nav-'+g.label); }catch(e){} return g.kids.some(k=>k.href===h)?h:g.kids[0].href; }
-function nsSub(){ let bar=document.getElementById('ns-sub'); const g=NS_NAV.find(it=>it.kids&&nsNavActive(it));
+function nsSub(){ let bar=document.getElementById('ns-sub'); const g=OC_NAV.find(it=>it.kids&&nsNavActive(it));
   if(!g){ if(bar) bar.remove(); return; }
   const cur=g.kids.find(nsNavActive); try{ localStorage.setItem('ns-nav-'+g.label,cur.href); }catch(e){}
   if(!bar){ bar=document.createElement('nav'); bar.id='ns-sub'; document.body.prepend(bar); }
   bar.setAttribute('aria-label',g.label);
   bar.innerHTML=`<span class="g">${nsSvg(g.icon)}${nsEsc(g.label)}</span>`+g.kids.map(k=>`<a href="${k.href}" title="${nsEsc(k.tip)}" class="${k===cur?'on':''}" ${k===cur?'aria-current="page"':''}>${nsEsc(k.label)}</a>`).join('');
-  const r=document.getElementById('ns-rail'); if(r) r.querySelectorAll('a.grp').forEach(a=>{ const it=NS_NAV[+a.dataset.nav]; a.href=nsGroupHref(it); }); }
+  const r=document.getElementById('ns-rail'); if(r) r.querySelectorAll('a.grp').forEach(a=>{ const it=OC_NAV[+a.dataset.nav]; a.href=nsGroupHref(it); }); }
 function nsRailDraw(){ const r=document.getElementById('ns-rail'); if(!r) return;
-  r.querySelectorAll('[data-nav]').forEach(a=>{ const it=NS_NAV[+a.dataset.nav]; const on=nsNavActive(it); a.classList.toggle('on',on); if(on) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
-  const b=document.getElementById('ns-bar'); if(b) b.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('on',nsNavActive(NS_NAV[+a.dataset.nav])));
+  r.querySelectorAll('[data-nav]').forEach(a=>{ const it=OC_NAV[+a.dataset.nav]; const on=nsNavActive(it); a.classList.toggle('on',on); if(on) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+  const b=document.getElementById('ns-bar'); if(b) b.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('on',nsNavActive(OC_NAV[+a.dataset.nav])));
   nsSub(); }
 function nsRail(){ if(window.self!==window.top||document.getElementById('ns-rail')||/^\/(pair|login)/.test(location.pathname)) return;
   const st=document.createElement('style'); st.textContent=`
@@ -166,16 +166,16 @@ body.ns-railed aside>.tabs{display:none}
   document.head.appendChild(st);
   const item=(it,i)=>`<a class="it${it.kids?' grp':''}" href="${it.kids?nsGroupHref(it):it.href}" data-nav="${i}" title="${nsEsc(it.tip)}"${it.kids?' aria-haspopup="true"':''}>${nsSvg(it.icon)}<span>${nsEsc(it.label)}</span></a>`;
   let top='',bot='';
-  NS_NAV.forEach((it,i)=>{ const h=it.sep?'<hr>':item(it,i); if(it.bottom) bot+=h; else top+=h; });
+  OC_NAV.forEach((it,i)=>{ const h=it.sep?'<hr>':item(it,i); if(it.bottom) bot+=h; else top+=h; });
   const r=document.createElement('nav'); r.id='ns-rail'; r.setAttribute('aria-label','Studio');
   r.innerHTML=`<a class="brand" href="/#chats" title="OmniCortex Studio" aria-label="OmniCortex Studio home"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="4.5" cy="6" r="1.6"/><circle cx="19.5" cy="6" r="1.6"/><circle cx="4.5" cy="18" r="1.6"/><circle cx="19.5" cy="18" r="1.6"/><path d="M6 6.8l3.6 3.4M18 6.8l-3.6 3.4M6 17.2l3.6-3.4M18 17.2l-3.6-3.4"/></svg></a><a class="it" href="#" data-find="1" title="Search every page, setting and job (Ctrl+K)">${nsSvg('find')}<span>Search</span></a><hr>${top}<div class="grow"></div>${bot}`;
   const bar=document.createElement('nav'); bar.id='ns-bar'; bar.setAttribute('aria-label','Studio');
-  bar.innerHTML=NS_NAV.map((it,i)=>it.mobile?item(it,i):'').join('')+`<a class="it" href="#" data-more="1" aria-haspopup="true">${nsSvg('more')}<span>More</span></a>`;
+  bar.innerHTML=OC_NAV.map((it,i)=>it.mobile?item(it,i):'').join('')+`<a class="it" href="#" data-more="1" aria-haspopup="true">${nsSvg('more')}<span>More</span></a>`;
   const more=document.createElement('div'); more.id='ns-more'; more.hidden=true;
-  const kid=(k,i,j)=>`<a class="it" href="${k.href}" data-nav="${i}" data-kid="${j}" title="${nsEsc(k.tip)}">${nsSvg(NS_NAV[i].icon)}<span>${nsEsc(k.label)}</span></a>`;
+  const kid=(k,i,j)=>`<a class="it" href="${k.href}" data-nav="${i}" data-kid="${j}" title="${nsEsc(k.tip)}">${nsSvg(OC_NAV[i].icon)}<span>${nsEsc(k.label)}</span></a>`;
   // single pages first (Docs, Tools, System, Setup, Settings), then each group under its name
-  more.innerHTML=NS_NAV.map((it,i)=>it.sep||it.kids||it.mobile?'':item(it,i)).join('')+
-    NS_NAV.map((it,i)=>it.kids?`<div class="gh">${nsEsc(it.label)}</div>`+it.kids.map((k,j)=>kid(k,i,j)).join(''):'').join('');
+  more.innerHTML=OC_NAV.map((it,i)=>it.sep||it.kids||it.mobile?'':item(it,i)).join('')+
+    OC_NAV.map((it,i)=>it.kids?`<div class="gh">${nsEsc(it.label)}</div>`+it.kids.map((k,j)=>kid(k,i,j)).join(''):'').join('');
   document.body.prepend(r); document.body.append(bar,more); document.body.classList.add('ns-railed');
   bar.querySelector('[data-more]').onclick=e=>{ e.preventDefault(); more.hidden=!more.hidden; };
   r.querySelector('[data-find]').onclick=e=>{ e.preventDefault(); nsFind(); };
@@ -185,7 +185,7 @@ body.ns-railed aside>.tabs{display:none}
   // a group's pages in a flyout beside the rail, on hover or keyboard focus
   const fly=document.createElement('div'); fly.id='ns-fly'; fly.hidden=true; fly.setAttribute('role','menu'); document.body.append(fly);
   let shut=null; const close=()=>{ shut=setTimeout(()=>fly.hidden=true,180); };
-  const open=a=>{ clearTimeout(shut); const g=NS_NAV[+a.dataset.nav]; const rc=a.getBoundingClientRect();
+  const open=a=>{ clearTimeout(shut); const g=OC_NAV[+a.dataset.nav]; const rc=a.getBoundingClientRect();
     fly.innerHTML=`<div class="h">${nsEsc(g.label)}</div>`+g.kids.map(k=>`<a role="menuitem" href="${k.href}" class="${nsNavActive(k)?'on':''}">${nsEsc(k.label)}<small>${nsEsc(k.tip)}</small></a>`).join('');
     fly.hidden=false; fly.style.top=Math.max(6,Math.min(rc.top-6,innerHeight-fly.offsetHeight-6))+'px'; };
   r.querySelectorAll('a.grp').forEach(a=>{ a.addEventListener('mouseenter',()=>open(a)); a.addEventListener('mouseleave',close);
@@ -194,7 +194,7 @@ body.ns-railed aside>.tabs{display:none}
   fly.addEventListener('mouseenter',()=>clearTimeout(shut)); fly.addEventListener('mouseleave',close);
   fly.addEventListener('focusin',()=>clearTimeout(shut)); fly.addEventListener('focusout',close);
   fly.addEventListener('keydown',e=>{ if(e.key==='Escape'){ fly.hidden=true; } });
-  addEventListener('hashchange',nsRailDraw); document.addEventListener('ns-tab',e=>{ window.NS_TAB=e.detail; nsRailDraw(); });
+  addEventListener('hashchange',nsRailDraw); document.addEventListener('ns-tab',e=>{ window.OC_TAB=e.detail; nsRailDraw(); });
   nsRailDraw(); }
 (function(){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',nsRail); else nsRail(); })();
 // ---- restarting Studio: ask, then wait until it answers again and reload the page
@@ -206,7 +206,7 @@ async function nsRestart(what){ const o=document.createElement('div');
   const t0=Date.now(); await new Promise(r=>setTimeout(r,1500));
   while(Date.now()-t0<90000){ try{ const r=await fetch('/api/status',{cache:'no-store'}); if(r.ok){ const j=await r.json(); if(!j.started||j.started*1000>t0-2000){ msg.textContent='Back. Reloading…'; location.reload(); return; } } }catch(e){}
     msg.textContent=`Waiting for Studio to come back… ${Math.round((Date.now()-t0)/1000)} s`; await new Promise(r=>setTimeout(r,1000)); }
-  msg.innerHTML='Studio has not come back after 90 s. Check the terminal or log it was started from, or start it again (<code>./neuronscope</code>).'; }
+  msg.innerHTML='Studio has not come back after 90 s. Check the terminal or log it was started from, or start it again (<code>./omnicortex</code>).'; }
 // When the code on disk is newer than the running Studio, say so once per page.
 (function(){ if(window.self!==window.top||/^\/(pair|login)/.test(location.pathname)) return;
   const go=()=>fetch('/api/status',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ if(!j||!j.stale||j.role!=='owner') return;
@@ -219,7 +219,7 @@ async function nsRestart(what){ const o=document.createElement('div');
     document.body.appendChild(b); }).catch(()=>{});
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go(); })();
 // ---- search: every page, section, job and help page, and the controls on this page (Ctrl+K)
-const NS_SECTIONS=[
+const OC_SECTIONS=[
   ['Status and next step','/setup#status-card','Setup'],['Folders, ports and Studio settings','/setup#paths','Setup'],
   ['Build llama.cpp','/setup#build','Setup'],['Hardware for worker models (GPUs, devices)','/setup#hardware','Setup'],
   ['Health check (doctor)','/setup#health','Setup'],['Requirements and Python packages','/setup#requirements','Setup'],
@@ -236,7 +236,7 @@ const NS_SECTIONS=[
   ['Feature dictionaries (sparse autoencoders)','/features#dicts','Features'],['Read a reply: features, emotions, logit lens','/features#read','Features'],
   ['Attribution graph (circuit tracing)','/features#circuits','Features'],['Emotion vectors','/features#emotions','Features'],
   ['Steer with features and emotions','/features#steer','Features'],['Train a dictionary or transcoder','/jobs#kind=feat_train','Features']];
-let NS_FIND_EXTRA=null;
+let OC_FIND_EXTRA=null;
 // ---- what this person uses: page visits counted in this browser only, for "recent" in search and for
 // ordering the common tasks on the home page
 function nsUsage(){ try{ return JSON.parse(localStorage.getItem('ns-usage')||'{}'); }catch(e){ return {}; } }
@@ -245,16 +245,16 @@ function nsTrack(h,t){ try{ const u=nsUsage(); u[h]=(u[h]||0)+1; localStorage.se
   const r=nsRecentPages().filter(x=>x.h!==h); r.unshift({h,t:t||h,ts:Date.now()}); localStorage.setItem('ns-recent',JSON.stringify(r.slice(0,20))); }catch(e){} }
 (function(){ const where=()=>{ const sec=location.hash&&/^#[a-z][\w-]*$/i.test(location.hash)?location.hash:'';
     return location.pathname+(location.pathname==='/'||location.pathname==='/jobs'?sec:''); };
-  const name=()=>{ const n=NS_NAV.flatMap(it=>[it,...(it.kids||[])]).find(k=>k.href&&k.href.split('#')[0]===location.pathname&&(!k.href.includes('#')||k.href===where()));
+  const name=()=>{ const n=OC_NAV.flatMap(it=>[it,...(it.kids||[])]).find(k=>k.href&&k.href.split('#')[0]===location.pathname&&(!k.href.includes('#')||k.href===where()));
     return (n&&n.label)||document.title.replace(/^Studio\s*[·:]?\s*/,'')||location.pathname; };
   const go=()=>nsTrack(where(),name()); if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go();
   addEventListener('hashchange',()=>{ if(location.pathname==='/'||location.pathname==='/jobs') go(); }); })();
-async function nsFindIndex(){ const out=NS_SECTIONS.map(([t,h,d])=>({t,h,d}));
-  NS_NAV.forEach(it=>{ if(it.href) out.push({t:it.label,h:it.href,d:it.tip}); (it.kids||[]).forEach(k=>out.push({t:k.label,h:k.href,d:it.label+': '+k.tip})); });
-  if(!NS_FIND_EXTRA){ NS_FIND_EXTRA=[];
-    try{ const sp=await (await fetch('/api/jobs/specs')).json(); for(const [k,s] of Object.entries(sp)) NS_FIND_EXTRA.push({t:s.title,h:'/jobs#'+k,d:'Job · '+(s.group||'')+' · '+(s.help||'')}); }catch(e){}
-    try{ const hp=await (await fetch('/api/help/index')).json(); for(const x of hp.pages||[]) NS_FIND_EXTRA.push({t:x.title,h:'/help/'+x.name,d:'Help'}); }catch(e){} }
-  out.push(...NS_FIND_EXTRA);
+async function nsFindIndex(){ const out=OC_SECTIONS.map(([t,h,d])=>({t,h,d}));
+  OC_NAV.forEach(it=>{ if(it.href) out.push({t:it.label,h:it.href,d:it.tip}); (it.kids||[]).forEach(k=>out.push({t:k.label,h:k.href,d:it.label+': '+k.tip})); });
+  if(!OC_FIND_EXTRA){ OC_FIND_EXTRA=[];
+    try{ const sp=await (await fetch('/api/jobs/specs')).json(); for(const [k,s] of Object.entries(sp)) OC_FIND_EXTRA.push({t:s.title,h:'/jobs#'+k,d:'Job · '+(s.group||'')+' · '+(s.help||'')}); }catch(e){}
+    try{ const hp=await (await fetch('/api/help/index')).json(); for(const x of hp.pages||[]) OC_FIND_EXTRA.push({t:x.title,h:'/help/'+x.name,d:'Help'}); }catch(e){} }
+  out.push(...OC_FIND_EXTRA);
   // controls and sections on this page
   document.querySelectorAll('main label, main h2, main h3, main button, main summary').forEach((el,i)=>{ if(el.closest('#ns-find')) return;
     const t=(el.innerText||'').trim().split('\n')[0].slice(0,90); if(t.length<3) return;
@@ -459,7 +459,7 @@ function nsFitInput(i){
     addEventListener('resize',later); };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start(); })();
 // ---- the tour: optional, offered once, restartable from the ? button on every page
-const NS_TOUR=[
+const OC_TOUR=[
  {path:'/', sel:'header', title:'Welcome to OmniCortex Studio', body:'Studio runs your local models, lets you chat with them, and shows what happens inside them: which neurons fire, and how likely a reply is to be a confident guess. Two minutes, eleven stops. Skip any time.'},
  {path:'/', sel:'#ns-rail', title:'The sidebar', body:'Everything Studio does is one click away here, on every page, in a few groups. Models: the GGUF files in your folders (load one, see its measured accuracy, set its options) and Discover to download more. Tasks: jobs, projects and the workers that run them. Studio: the analysis tools (features and emotions, neuron review, labs). Connect: other apps, other computers, your devices. Hover a group to see its pages; inside one, tabs at the top switch between them.'},
  {path:'/', sel:'#in', title:'Chat', body:'Ask anything. The model picker below chooses which model answers; auto picks the one with the best measured record for the question.'},
@@ -476,7 +476,7 @@ function nsTourGet(){ try{ return JSON.parse(localStorage.getItem('ns-tour')||'n
 function nsTourSet(v){ try{ localStorage.setItem('ns-tour',JSON.stringify(v)); }catch(e){} }
 function nsTourEnd(state){ nsTourSet({state}); document.querySelectorAll('.ns-tour').forEach(e=>e.remove()); }
 function nsTourStart(i){ nsTourSet({state:'running',i:i||0}); nsTourShow(); }
-function nsTourShow(){ const t=nsTourGet(); if(!t||t.state!=='running') return; const st=NS_TOUR[t.i]; if(!st){ nsTourEnd('done'); return; }
+function nsTourShow(){ const t=nsTourGet(); if(!t||t.state!=='running') return; const st=OC_TOUR[t.i]; if(!st){ nsTourEnd('done'); return; }
   if(location.pathname!==st.path){ location.href=st.path; return; }
   document.querySelectorAll('.ns-tour').forEach(e=>e.remove());
   // The spotlight covers every element the step names (a comma list), or the screen's centre if none is here.
@@ -491,7 +491,7 @@ function nsTourShow(){ const t=nsTourGet(); if(!t||t.state!=='running') return; 
   const card=document.createElement('div'); card.className='ns-tour'; card.setAttribute('role','dialog'); card.setAttribute('aria-label',st.title);
   const below=rr&&rr.bottom+220<innerHeight, top=rr?(below?rr.bottom+14:Math.max(12,rr.top-14-200)):innerHeight/2-110;
   card.style.cssText=`position:fixed;z-index:9999;left:${Math.max(12,Math.min((rr?rr.left:innerWidth/2-170),innerWidth-352))}px;top:${Math.max(12,Math.min(top,innerHeight-230))}px;width:min(340px,calc(100vw - 24px));background:var(--panel,#1d1d1b);color:var(--fg,#ececea);border:1px solid var(--line,#33332f);border-radius:10px;padding:.85rem .95rem;font:14px/1.5 ui-sans-serif,system-ui;box-shadow:0 8px 30px rgba(0,0,0,.35)`;
-  const n=NS_TOUR.length;
+  const n=OC_TOUR.length;
   card.innerHTML=`<div style="font-size:11px;color:var(--mut,#9a9a94)">${t.i+1} of ${n}</div><b style="font-size:15px">${st.title}</b><div style="margin:.35rem 0 .7rem">${st.body}</div>
    <div style="display:flex;gap:.4rem;align-items:center"><button data-t="skip" style="background:none;border:none;color:var(--mut,#9a9a94);cursor:pointer;font:inherit;padding:0">End tour</button><span style="flex:1"></span>
    ${t.i?'<button data-t="back">Back</button>':''}<button data-t="next" style="background:var(--acc,#6f93ff);color:var(--accfg,#0b0b0a);border:1px solid var(--acc,#6f93ff);border-radius:6px;padding:.3rem .8rem;cursor:pointer;font:600 13px ui-sans-serif,system-ui">${t.i+1<n?'Next':'Finish'}</button></div>`;
@@ -508,7 +508,7 @@ function nsHelpButton(){ if(document.getElementById('ns-help')||window.self!==wi
   b.style.cssText='position:fixed;right:14px;bottom:'+((location.pathname==='/'?150:14)+lift)+'px;z-index:9000;width:34px;height:34px;border-radius:50%;border:1px solid var(--line,#33332f);background:var(--panel,#1d1d1b);color:var(--fg,#ececea);font:700 15px ui-sans-serif,system-ui;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25)';
   const m=document.createElement('div'); m.id='ns-help-menu'; m.hidden=true;
   m.style.cssText='position:fixed;right:14px;bottom:'+((location.pathname==='/'?190:54)+lift)+'px;z-index:9000;background:var(--panel,#1d1d1b);color:var(--fg,#ececea);border:1px solid var(--line,#33332f);border-radius:8px;padding:.35rem;font:13px ui-sans-serif,system-ui;box-shadow:0 4px 16px rgba(0,0,0,.3)';
-  const here=NS_TOUR.findIndex(s=>s.path===location.pathname);
+  const here=OC_TOUR.findIndex(s=>s.path===location.pathname);
   m.innerHTML=`<a href="#" data-h="tour" style="display:block;padding:.3rem .6rem;color:inherit">Take the tour</a>${here>=0?'<a href="#" data-h="here" style="display:block;padding:.3rem .6rem;color:inherit">This page in the tour</a>':''}<a href="/help/GETTING_STARTED" style="display:block;padding:.3rem .6rem;color:inherit">Getting started</a><a href="/help/UI_AND_CLI" style="display:block;padding:.3rem .6rem;color:inherit">Where everything is</a><a href="/help/GLOSSARY" style="display:block;padding:.3rem .6rem;color:inherit">Glossary</a><a href="/help/ROLES" style="display:block;padding:.3rem .6rem;color:inherit">Roles and ports</a><a href="/help/CREDITS" style="display:block;padding:.3rem .6rem;color:inherit">Credits</a>`;
   b.onclick=()=>{ m.hidden=!m.hidden; };
   m.querySelector('[data-h=tour]').onclick=e=>{ e.preventDefault(); m.hidden=true; nsTourStart(0); };

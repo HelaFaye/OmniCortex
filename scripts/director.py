@@ -40,7 +40,7 @@ Studio runs this (/projects, /api/projects) and starts the worker models. The
 module itself has no HTTP and starts nothing, so it is testable on its own:
 
     python scripts/director.py analyze notes.md [--repo PATH]
-    python scripts/director.py show ~/.neuronscope/projects/<id>
+    python scripts/director.py show ~/.omnicortex/projects/<id>
 """
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ import time
 import uuid
 from pathlib import Path
 
-import ns_requirements as nrq
+import oc_requirements as nrq
 import subject_classifier as sc
 
 PLAN_STATES = ("draft", "approved", "running", "paused", "done")

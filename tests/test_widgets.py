@@ -36,7 +36,7 @@ def test_pages_carry_the_widgets():
     import settings_page
     import stream
     for page in (bloom.PAGE, stream.PAGE, settings_page.PAGE):
-        assert "const NSWidgets" in page and "/*NS_WIDGETS*/" not in page
+        assert "const NSWidgets" in page and "/*OC_WIDGETS*/" not in page
     assert "id=\"jewel\"" in bloom.PAGE and "id=\"jewel\"" in stream.PAGE and "wdPrev" in settings_page.PAGE
     # Godot and web draw the same styles: the core ones, and the add-on's in both its scripts
     gd = (ROOT / "plugins" / "godot-client" / "client" / "widgets" / "jewel.gd").read_text()

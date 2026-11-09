@@ -31,7 +31,7 @@ a{color:var(--acc)}
   <div class="note">Make one from a plugin folder with <code>python viz/addons.py pack plugins/NAME</code>.</div></div></section>
 <section class="card"><h2>From a repository</h2>
   <div class="note">A repository is an <code>index.json</code> at an https address (or a path on this computer) listing packages and their SHA-256. Each download is checked against it.</div>
-  <div style="display:flex;gap:.4rem;margin:.5rem 0;flex-wrap:wrap"><input id="repo" placeholder="https://example.org/neuronscope-addons/index.json" style="flex:1;min-width:16rem"><button id="addrepo">Add repository</button></div>
+  <div style="display:flex;gap:.4rem;margin:.5rem 0;flex-wrap:wrap"><input id="repo" placeholder="https://example.org/omnicortex-addons/index.json" style="flex:1;min-width:16rem"><button id="addrepo">Add repository</button></div>
   <div id="repos" class="note"></div><div class="grid" id="cat" style="margin-top:.5rem"></div></section>
 <section class="card"><h2>Built into Studio</h2><div class="note">Removing one takes it out of Studio until you reinstall it here; nothing is downloaded either way and your data stays.</div>
   <div class="grid" id="bi" style="margin-top:.5rem"></div></section>

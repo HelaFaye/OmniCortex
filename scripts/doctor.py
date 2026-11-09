@@ -240,7 +240,7 @@ def check_llama(root):
     if not os.path.isdir(root):
         add("llama.cpp", "source tree", WARN, f"{root} not found",
             "scripts/build_llama_tools.sh --backend vulkan  (or cpu, cuda, hip, metal), or point "
-            "NS_LLAMA at an existing checkout",
+            "OC_LLAMA at an existing checkout",
             "Studio, extraction, serving, merging to GGUF")
         return
     add("llama.cpp", "source tree", OK, root)
@@ -265,7 +265,7 @@ def check_llama(root):
 
 def check_model(gguf):
     if not gguf:
-        add("model", "NS_GGUF", WARN, "not set",
+        add("model", "OC_GGUF", WARN, "not set",
             "source env.sh, or pass --gguf", "everything model-specific")
         return
     if not os.path.exists(gguf):
@@ -294,7 +294,7 @@ def check_model(gguf):
             + (f", MoE {kv(f'{arch}.expert_used_count')}/{n_exp}" if n_exp
                else ", dense"))
         if n_layers:
-            add("model", "NS_LAYERS", OK, f"pass --n-layers {n_layers} to "
+            add("model", "OC_LAYERS", OK, f"pass --n-layers {n_layers} to "
                                           "llama-cett-dump")
         names = {t.name for t in r.tensors}
         dense = any(n.startswith("blk.0.ffn_down.") for n in names)
@@ -354,7 +354,7 @@ def studio_section(r):
 
 
 def main():
-    import ns_workspace
+    import oc_workspace
     p = argparse.ArgumentParser()
     p.add_argument("--workspace", help="whose folders to check (default: the active workspace, Settings -> Workspaces)")
     p.add_argument("--gguf")
@@ -364,14 +364,14 @@ def main():
     a = p.parse_args()
     # Flags, then NS_* variables, then the workspace: no layout is assumed.
     if a.workspace:
-        if a.workspace not in ns_workspace.names():
-            print(f"no workspace {a.workspace!r}; have {', '.join(ns_workspace.names())}", file=sys.stderr)
+        if a.workspace not in oc_workspace.names():
+            print(f"no workspace {a.workspace!r}; have {', '.join(oc_workspace.names())}", file=sys.stderr)
             return 2
-        os.environ["NS_WORKSPACE"] = a.workspace
-    ws = ns_workspace.active()
-    a.gguf = a.gguf or os.environ.get("NS_GGUF") or ws["gguf"]
-    a.llama = a.llama or os.environ.get("NS_LLAMA") or ws["llama_dir"]
-    a.root = a.root or os.environ.get("NS_ROOT") or ws["root"]
+        os.environ["OC_WORKSPACE"] = a.workspace
+    ws = oc_workspace.active()
+    a.gguf = a.gguf or os.environ.get("OC_GGUF") or ws["gguf"]
+    a.llama = a.llama or os.environ.get("OC_LLAMA") or ws["llama_dir"]
+    a.root = a.root or os.environ.get("OC_ROOT") or ws["root"]
     add("core", "workspace", OK, f"{ws['name']} (root {ws['root']})")
 
     check_python()
@@ -418,7 +418,7 @@ def main():
     server = next((r["detail"] for r in results if r["name"] == "llama-server" and r["status"] == OK), None)
     print("  Use and compare models (Studio: chat, /v1 API, TestQA, Projects):")
     if server:
-        print("    ./neuronscope            (Studio in your browser; set your models folder under Settings)")
+        print("    ./omnicortex            (Studio in your browser; set your models folder under Settings)")
         print(f"    or: python viz/studio.py --models-dir ~/models --server {server}")
     else:
         print("    first build llama-server:  scripts/build_llama_tools.sh --backend vulkan  (or cpu, cuda, hip, metal)")

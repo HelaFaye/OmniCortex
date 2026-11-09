@@ -218,7 +218,7 @@ function render(){
   $('#view').innerHTML=h; wire();
 }
 
-// ---------- per-project requirements (scripts/ns_requirements.py)
+// ---------- per-project requirements (scripts/oc_requirements.py)
 function reqCard(p){
   const r=p.requirements||{items:[]}, last=r.last, byKey={};
   if(last) for(const i of last.items) byKey[i.kind+':'+i.name.toLowerCase()]=i;

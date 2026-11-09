@@ -699,7 +699,7 @@ def main(argv=None) -> int:
     p.add_argument("--show", type=int, default=8, help="regressions to print")
     p.add_argument("--out")
     p.add_argument("--record-stats", nargs="?", const="", metavar="DIR",
-                   help="append graded results to the rolling model stats (default ~/.neuronscope/stats) "
+                   help="append graded results to the rolling model stats (default ~/.omnicortex/stats) "
                         "that Studio's model \"auto\" routes on")
     p.add_argument("--publish-stats", metavar="STUDIO_URL",
                    help="send graded results to a running Studio instead (it ties them to the exact model file)")

@@ -8,16 +8,16 @@ Two ways to serve it:
   token; requests from web pages of other sites are refused; a network address
   needs TLS, or --allow-plaintext behind a VPN or a TLS proxy (tailscale serve).
 
-    python scripts/ns_transfer_mcp.py --http --token-file ~/.config/neuronscope/secrets/transfer-mcp-http.token
-    python scripts/ns_transfer_mcp.py --http --host 0.0.0.0 --port 8765 --token-file T --tls-cert C --tls-key K
+    python scripts/oc_transfer_mcp.py --http --token-file ~/.config/omnicortex/secrets/transfer-mcp-http.token
+    python scripts/oc_transfer_mcp.py --http --host 0.0.0.0 --port 8765 --token-file T --tls-cert C --tls-key K
 
 The tools act on the computer that runs this server: its targets, its files.
 
 Secrets handling:
 * the state file holds target identity only (url, CA file, hints), mode 0600;
 * each target's bearer token lives in the OS keyring when ``keyring`` is
-  installed, otherwise in a 0600 file under ~/.config/neuronscope/secrets/;
-* tokens reach the CLI through the NS_TRANSFER_TOKEN environment variable of
+  installed, otherwise in a 0600 file under ~/.config/omnicortex/secrets/;
+* tokens reach the CLI through the OC_TRANSFER_TOKEN environment variable of
   the child process, never argv, and are never returned by any tool.
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 
 MIN_MCP = (2, 3)
 
@@ -47,11 +47,11 @@ except Exception as e:  # pragma: no cover - depends on optional package
         IMPORT_ERROR = e
 
 ROOT = Path(__file__).resolve().parent
-CLI = ROOT / "ns_transfer.py"
-CONFIG = Path(os.environ.get("NS_CONFIG_DIR", str(Path.home() / ".config" / "neuronscope")))
-STATE = Path(os.environ.get("NS_TRANSFER_MCP_STATE", str(CONFIG / "transfer-mcp.json")))
+CLI = ROOT / "oc_transfer.py"
+CONFIG = Path(os.environ.get("OC_CONFIG_DIR", str(Path.home() / ".config" / "omnicortex")))
+STATE = Path(os.environ.get("OC_TRANSFER_MCP_STATE", str(CONFIG / "transfer-mcp.json")))
 SECRETS = CONFIG / "secrets"
-KEYRING_SERVICE = "neuronscope-transfer"
+KEYRING_SERVICE = "omnicortex-transfer"
 NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 
 
@@ -195,7 +195,7 @@ CHANGE = dict(read_only_hint=False, destructive_hint=False, open_world_hint=True
 DESTROY = dict(read_only_hint=False, destructive_hint=True, open_world_hint=False)
 
 if FastMCP:
-    mcp = FastMCP("neuronscope-transfer", instructions=INSTRUCTIONS)
+    mcp = FastMCP("omnicortex-transfer", instructions=INSTRUCTIONS)
 
     @mcp.tool(annotations=_ann(**CHANGE))
     def register_target(name: str, url: str, token: str = "", cafile: str = "",
@@ -253,7 +253,7 @@ if FastMCP:
                     subdir: str = "") -> dict:
         """Start a background watcher that sends new GGUFs as they appear."""
         t = get_target(target)
-        logdir = Path.home() / ".local" / "state" / "neuronscope-transfer"
+        logdir = Path.home() / ".local" / "state" / "omnicortex-transfer"
         logdir.mkdir(parents=True, exist_ok=True)
         log = logdir / f"{target}.log"
         cmd = [sys.executable, str(CLI), "watch", "--url", t["url"], "--dir", directory,
@@ -342,18 +342,18 @@ def main(argv=None) -> None:
     p = argparse.ArgumentParser(
         description="MCP server for OmniCortex transfers. Default: stdio (an MCP client on this computer starts "
                     "it; run on its own it waits silently). --http: serve over the network with a token.",
-        epilog='stdio client config: {"mcpServers": {"neuronscope-transfer": {"command": "python", '
-               '"args": ["/path/to/neuronscope/scripts/ns_transfer_mcp.py"]}}}. '
+        epilog='stdio client config: {"mcpServers": {"omnicortex-transfer": {"command": "python", '
+               '"args": ["/path/to/omnicortex/scripts/oc_transfer_mcp.py"]}}}. '
                'HTTP client config: {"mcpServers": {"transfer-box": {"url": "https://box:8765/mcp", '
-               '"token_file": "~/.config/neuronscope/secrets/transfer-box.token"}}}')
+               '"token_file": "~/.config/omnicortex/secrets/transfer-box.token"}}}')
     p.add_argument("--http", action="store_true", help="serve streamable HTTP instead of stdio")
     p.add_argument("--host", default="127.0.0.1", help="listen address (127.0.0.1: this computer, or a proxy "
                    "such as tailscale serve in front)")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--path", default="/mcp")
     p.add_argument("--token-file", default="", help="file with the bearer token (default: "
-                   "~/.config/neuronscope/secrets/transfer-mcp-http.token, else $NS_TRANSFER_MCP_TOKEN); "
-                   "make one with: python scripts/ns_security.py token --out FILE")
+                   "~/.config/omnicortex/secrets/transfer-mcp-http.token, else $OC_TRANSFER_MCP_TOKEN); "
+                   "make one with: python scripts/oc_security.py token --out FILE")
     p.add_argument("--tls-cert", default="")
     p.add_argument("--tls-key", default="")
     p.add_argument("--allow-plaintext", action="store_true",
@@ -369,10 +369,10 @@ def main(argv=None) -> None:
     tf = Path(a.token_file).expanduser() if a.token_file else (default_tok if default_tok.is_file() else None)
     if a.token_file and not tf.is_file():
         raise SystemExit(f"no token file at {tf}")
-    token = tf.read_text().strip() if tf else os.environ.get("NS_TRANSFER_MCP_TOKEN", "").strip()
+    token = tf.read_text().strip() if tf else os.environ.get("OC_TRANSFER_MCP_TOKEN", "").strip()
     if len(token) < sec.MIN_TOKEN_CHARS:
         raise SystemExit("--http needs a token of at least %d characters: put one in %s (or give --token-file, "
-                         "or set NS_TRANSFER_MCP_TOKEN). Make one: python scripts/ns_security.py token --out \"%s\""
+                         "or set OC_TRANSFER_MCP_TOKEN). Make one: python scripts/oc_security.py token --out \"%s\""
                          % (sec.MIN_TOKEN_CHARS, default_tok, default_tok))
     tls = bool(a.tls_cert and a.tls_key)
     try:
@@ -382,7 +382,7 @@ def main(argv=None) -> None:
         raise SystemExit(f"error: {e}")
     import uvicorn
     scheme = "https" if tls else "http"
-    print(f"neuronscope-transfer MCP at {scheme}://{a.host}:{a.port}{a.path} (bearer token required)", file=sys.stderr)
+    print(f"omnicortex-transfer MCP at {scheme}://{a.host}:{a.port}{a.path} (bearer token required)", file=sys.stderr)
     uvicorn.run(http_app(token, a.allowed_origin, a.path), host=a.host, port=a.port, log_level="warning",
                 ssl_certfile=a.tls_cert or None, ssl_keyfile=a.tls_key or None)
 

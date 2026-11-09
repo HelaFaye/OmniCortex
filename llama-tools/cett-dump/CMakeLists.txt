@@ -8,11 +8,11 @@ install(TARGETS ${TARGET} RUNTIME)
 # The common library was renamed: `common` on older revisions, `llama-common`
 # since llama.cpp 0.4.0-dev. Link whichever exists.
 if (TARGET llama-common)
-    set(NS_COMMON llama-common)
+    set(OC_COMMON llama-common)
 else()
-    set(NS_COMMON common)
+    set(OC_COMMON common)
 endif()
-target_link_libraries(${TARGET} PRIVATE ${NS_COMMON} llama ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(${TARGET} PRIVATE ${OC_COMMON} llama ${CMAKE_THREAD_LIBS_INIT})
 # Some llama.cpp revisions do not export common/ from the `common` target, so
 # common.h fails to resolve. Naming it explicitly is harmless when it does.
 target_include_directories(${TARGET} PRIVATE

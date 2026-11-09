@@ -4,7 +4,7 @@ The controller side of OmniCortex Remote: Studio driving LLM hosts that do not
 run OmniCortex (a Windows box with LM Studio, a server with Ollama...).
 
 Roles: this computer (Studio) is the CONTROLLER; the computer that runs the
-models and the agent (remote/neuronscope_remote) is the HOST. Everything Studio
+models and the agent (remote/omnicortex_remote) is the HOST. Everything Studio
 does on a host is an MCP tool call to the agent; chat also goes through the
 agent's OpenAI-compatible pass-through when the host is reachable directly.
 
@@ -16,7 +16,7 @@ Link methods, as Studio's Remote page offers them:
   callhome  the host connects out to this Studio and waits for instructions
 
 The pairing protocol and the pinned-certificate client are the agent's own
-(remote/neuronscope_remote/agent.py), so both sides speak exactly the same thing.
+(remote/omnicortex_remote/agent.py), so both sides speak exactly the same thing.
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ REMOTE_PKG = ROOT / "remote"
 import sys  # noqa: E402
 
 sys.path.insert(0, str(REMOTE_PKG))
-from neuronscope_remote import agent as nsr  # noqa: E402
+from omnicortex_remote import agent as nsr  # noqa: E402
 
 METHODS = ("lan", "vpn", "ssh", "tunnel", "callhome")
 CHUNK = 16 * 1024 * 1024
@@ -499,5 +499,5 @@ def package_zip() -> bytes:
         for p in sorted(REMOTE_PKG.rglob("*")):
             if p.is_file() and "__pycache__" not in p.parts and not p.name.endswith((".pyc", ".egg-info")) \
                     and ".egg-info" not in str(p) and "build" not in p.relative_to(REMOTE_PKG).parts:
-                z.write(p, "neuronscope-remote/" + p.relative_to(REMOTE_PKG).as_posix())
+                z.write(p, "omnicortex-remote/" + p.relative_to(REMOTE_PKG).as_posix())
     return buf.getvalue()

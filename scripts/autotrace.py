@@ -289,7 +289,7 @@ def main():
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--allow-unauthenticated", action="store_true", help="permit a non-loopback bind (no auth)")
     a = p.parse_args()
-    import ns_security as sec
+    import oc_security as sec
     sec.loopback_only(a.host, "the tracing proxy", a.allow_unauthenticated)
     CFG.update(vars(a))
     CFG["max_frames"] = a.max_frames

@@ -4,8 +4,8 @@ rem (OmniCortex Studio, or an MCP client) can use after you pair it.
 cd /d "%~dp0"
 where py >nul 2>nul
 if %errorlevel%==0 (
-  py -3 -m neuronscope_remote %*
+  py -3 -m omnicortex_remote %*
 ) else (
-  python -m neuronscope_remote %*
+  python -m omnicortex_remote %*
 )
 if errorlevel 1 pause

@@ -8,7 +8,7 @@ Under any reply in Studio's chat, Fix this mistake takes your correction. It kee
     neurons active on confident mistakes are counted there;
   - whether the H-neuron classifier flagged it, if the model has one.
 
-Pairs gather in ~/.neuronscope/harvest/. When enough have gathered and the computer is idle, Studio can run a
+Pairs gather in ~/.omnicortex/harvest/. When enough have gathered and the computer is idle, Studio can run a
 short micro-tune on them (finetune.py --dpo, a few dozen steps, on the base model you name). The result is an
 adapter in runs/harvest/; nothing is swapped in until you choose to (Retrain shows it like any other run).
 
@@ -32,7 +32,7 @@ DEFAULTS = {"enabled": True, "train_model": "", "min_pairs": 20, "idle_minutes":
 
 def root(home=None) -> Path:
     import os
-    return Path(home or os.environ.get("NS_HOME") or Path.home() / ".neuronscope") / "harvest"
+    return Path(home or os.environ.get("OC_HOME") or Path.home() / ".omnicortex") / "harvest"
 
 
 def _text(c) -> str:

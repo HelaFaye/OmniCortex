@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "viz"))
 sys.path.insert(0, str(ROOT / "remote"))
 import worker_registry as wr  # noqa: E402
-from neuronscope_remote import agent as nsr  # noqa: E402
+from omnicortex_remote import agent as nsr  # noqa: E402
 from test_studio import CODER, _start_director, _wait, call, free_port, studio_srv  # noqa: E402,F401
 
 

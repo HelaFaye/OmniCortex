@@ -18,11 +18,18 @@ abstain. OmniCortex extends the method in several directions:
 **The name.** This project was called NeuronScope until November 2026. It is now OmniCortex, because
 [RudrenduPaul/NeuronScope](https://github.com/RudrenduPaul/NeuronScope) is a different, earlier project with
 that name (a TransformerLens-based CLI for single-component ablation and circuit experiments, whose ideas
-OmniCortex has since taken up: [docs/INTERVENTIONS.md](docs/INTERVENTIONS.md)). Nothing else changed for
-existing installs:
-- `./neuronscope` still starts it, as does the new `./omnicortex`;
-- settings and data stay in `~/.neuronscope`;
-- the `NS_*` environment variables and the `neuronscope` MCP server name are the same.
+OmniCortex has since taken up: [docs/INTERVENTIONS.md](docs/INTERVENTIONS.md)). Everything now carries the new
+name. For an existing install:
+- start it with `./omnicortex` (`./neuronscope` is gone);
+- `~/.neuronscope` and `~/.config/neuronscope` are moved to `~/.omnicortex` and `~/.config/omnicortex` the first
+  time OmniCortex starts, unless the new folders already exist;
+- environment variables are `OC_*` (was `NS_*`), and `OCR_*` for the remote agent (was `NSR_*`): rename them in
+  `env.local.sh` and anywhere else you set them;
+- the MCP server is `omnicortex`: write the Cline / Claude Desktop entry again (Connect → MCP) or rename the
+  `neuronscope` key in its settings;
+- the route header is `X-OmniCortex-Route`, and the ComfyUI nodes are `OmniCortex…`: re-add them in saved
+  workflows;
+- the remote agent is `omnicortex-remote` (the Python package `omnicortex_remote`); update it on each host.
 
 Prebuilt binaries for Windows, macOS and Linux (x64, x86, ARM64, ARM): [docs/BINARIES.md](docs/BINARIES.md).
 
@@ -48,7 +55,7 @@ Prebuilt binaries for Windows, macOS and Linux (x64, x86, ARM64, ARM): [docs/BIN
 | **Connect** | your models as the AI of Cline, Claude Desktop or any OpenAI-compatible app; OmniCortex's harness and lab as MCP tools (models, reply checks, jobs, projects), with a Connect page that writes the settings | [docs/CONNECT.md](docs/CONNECT.md) |
 | **Neuron review** | every neuron's link to wrong answers across tests, benchmarks and checked chat replies, filtered by source, subject and time, played over time in 3D | [docs/REVIEW.md](docs/REVIEW.md) |
 | **Unified review and browser extension** | one record per model from review boards, hardware reports, SAELens and your own Studio; a Firefox/Chromium/Opera extension whose icon glows blue on Hugging Face pages that have data, with a dropdown per statistic and source | [docs/UNIFIED_REVIEW.md](docs/UNIFIED_REVIEW.md), [docs/BROWSER_EXTENSION.md](docs/BROWSER_EXTENSION.md) |
-| **Clients** | the web pages, a terminal client (`./neuronscope cli`) and a Godot client (`./neuronscope godot`) over the same API; the Godot client is a full UI with a native 3D view, built to run on another computer so drawing never takes GPU memory from the model | [docs/CLIENTS.md](docs/CLIENTS.md) |
+| **Clients** | the web pages, a terminal client (`./omnicortex cli`) and a Godot client (`./omnicortex godot`) over the same API; the Godot client is a full UI with a native 3D view, built to run on another computer so drawing never takes GPU memory from the model | [docs/CLIENTS.md](docs/CLIENTS.md) |
 | **Remote hosts** | use the models on computers that run LM Studio, Ollama or llama.cpp but not OmniCortex: a small agent there (distributed on its own) is controlled over MCP; same network, VPN (Tailscale, ZeroTier, WireGuard…), SSH, a public tunnel, or the host calling in from behind NAT; pairing with a short code, and the host's owner sees and revokes every controller | [docs/REMOTE.md](docs/REMOTE.md), [remote/](remote/README.md) |
 | **Settings** | named workspaces for every folder and binary (no fixed layout), the default model per subject for `auto`, and rules for when chat tool calls are allowed, asked or denied (by tool, kind of operation, argument regexes, rate limits) | [docs/SETTINGS.md](docs/SETTINGS.md) |
 | **Requirements** | what each feature needs (packages, programs, llama.cpp GPU backends, drivers, device access, memory), fixes for your OS, one-click Python installs, environment snapshots and diffs | [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) |
@@ -68,7 +75,7 @@ right PyTorch build for your GPU (or none), installs, and adds a shortcut
 
 ```bash
 python3 scripts/installer.py --yes   # or ./install.sh on Linux and macOS
-./neuronscope                        # or the shortcut: starts Studio and opens it in your browser
+./omnicortex                        # or the shortcut: starts Studio and opens it in your browser
 ```
 
 From there everything is in the browser: **Setup** builds llama.cpp and finds
@@ -153,10 +160,10 @@ always DTLS-encrypted and can be verified with an out-of-band code. See
 ```
 install.sh, env.sh           environment setup (env.local.sh for your paths, gitignored)
 scripts/                     pipeline stages, exporters, evaluators, transfer, security
-  ns_common.py, profiles.py    shared hooks, sequence building, portable profiles
+  oc_common.py, profiles.py    shared hooks, sequence building, portable profiles
   clip_neurons.py              vision H-Neurons; suppress_mmproj.py edits mmproj GGUFs
   testqa.py                    evaluation harness; subject_classifier.py routing
-  ns_transfer*.py, model_transfer.py, tuning_worker.py, ns_security.py
+  oc_transfer*.py, model_transfer.py, tuning_worker.py, oc_security.py
 viz/                         browser and native frontends (studio, hub, labs, explorers)
 web/                         WebRTC transfer page
 qa/                          TestQA bank (one file per subject), subject seed data

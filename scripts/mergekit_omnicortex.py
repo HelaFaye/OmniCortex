@@ -13,15 +13,15 @@ classifier trained on measured behaviour -- these specific neurons carry the
 signal that separated hallucinated answers from grounded ones. Semantic
 selection instead of magnitude selection.
 
-So this registers `neuronscope_select`, which merges the donor's contribution only
+So this registers `omnicortex_select`, which merges the donor's contribution only
 at neurons the classifier identified, and leaves everything else at the base.
 
     pip install -e /path/to/mergekit
-    export NEURONSCOPE_NEURONS=/path/to/models/h_neurons.json
+    export OMNICORTEX_NEURONS=/path/to/models/h_neurons.json
     mergekit-yaml merge.yaml ./out --allow-crimes
 
     # merge.yaml
-    merge_method: neuronscope_select
+    merge_method: omnicortex_select
     base_model: Qwen/Qwen3-8B
     models:
       - model: Qwen/Qwen3-8B
@@ -105,22 +105,22 @@ def _load_masks(path):
 
 
 def _spec_path():
-    p = os.environ.get("NEURONSCOPE_NEURONS")
+    p = os.environ.get("OMNICORTEX_NEURONS")
     if not p:
         raise SystemExit(
-            "set NEURONSCOPE_NEURONS to your h_neurons.json:\n"
-            "  export NEURONSCOPE_NEURONS=models/h_neurons.json")
+            "set OMNICORTEX_NEURONS to your h_neurons.json:\n"
+            "  export OMNICORTEX_NEURONS=models/h_neurons.json")
     if not os.path.exists(p):
-        raise SystemExit(f"NEURONSCOPE_NEURONS points at a missing file: {p}")
+        raise SystemExit(f"OMNICORTEX_NEURONS points at a missing file: {p}")
     return p
 
 
 @merge_method(
-    name="neuronscope_select",
+    name="omnicortex_select",
     pretty_name="OmniCortex Neuron Selection",
     reference_url="https://arxiv.org/abs/2512.01797",
 )
-def neuronscope_select_merge(
+def omnicortex_select_merge(
     tensors: List[torch.Tensor],
     base_tensor: torch.Tensor,
     output_weight: WeightInfo,
@@ -204,12 +204,12 @@ if __name__ == "__main__":
 
     p = argparse.ArgumentParser(
         description="Check an h_neurons.json and print a mergekit config")
-    p.add_argument("--h-neurons", default=os.environ.get("NEURONSCOPE_NEURONS"))
+    p.add_argument("--h-neurons", default=os.environ.get("OMNICORTEX_NEURONS"))
     p.add_argument("--base", default="Qwen/Qwen3-8B")
     p.add_argument("--donor", default="Qwen/Qwen3-8B")
     a = p.parse_args()
     if not a.h_neurons:
-        raise SystemExit("pass --h-neurons or set NEURONSCOPE_NEURONS")
+        raise SystemExit("pass --h-neurons or set OMNICORTEX_NEURONS")
 
     masks, nl, nn = _load_masks(a.h_neurons)
     total = sum(int(v.numel()) for v in masks.values())
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     print(f"\n# {total * 3} weight vectors will be touched "
           f"(gate/up rows + down columns)")
     print(f"""
-merge_method: neuronscope_select
+merge_method: omnicortex_select
 base_model: {a.base}
 models:
   - model: {a.donor}

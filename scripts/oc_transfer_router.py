@@ -13,9 +13,9 @@ def main():
     sub.add_parser('worker',help='remote adaptive tuning worker mode')
     sub.add_parser('mcp',help='MCP control plane')
     a,rest=p.parse_known_args()
-    if a.mode=='cli-http': return subprocess.call([sys.executable,str(ROOT/'ns_transfer.py'),*rest])
+    if a.mode=='cli-http': return subprocess.call([sys.executable,str(ROOT/'oc_transfer.py'),*rest])
     if a.mode=='webrtc': return subprocess.call([sys.executable,str(ROOT.parent/'viz'/'transfer_lab.py'),*rest])
     if a.mode=='worker': return subprocess.call([sys.executable,str(ROOT/'tuning_worker.py'),*rest])
-    if a.mode=='mcp': return subprocess.call([sys.executable,str(ROOT/'ns_transfer_mcp.py'),*rest])
+    if a.mode=='mcp': return subprocess.call([sys.executable,str(ROOT/'oc_transfer_mcp.py'),*rest])
     return 2
 if __name__=='__main__': raise SystemExit(main())

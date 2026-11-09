@@ -19,7 +19,7 @@ measures, on this hardware:
 
 and picks the fastest one whose fidelity clears the bar (--max-kld,
 --min-same-top or --min-agreement). The choice is kept per hardware in
-~/.neuronscope/quant_choices.json, so the same model can run as Q8_0 on a
+~/.omnicortex/quant_choices.json, so the same model can run as Q8_0 on a
 big GPU and Q4_K_M on a laptop. --apply writes the winner's engine settings
 into Studio's settings too.
 
@@ -59,7 +59,7 @@ BPW = {"F32": 32, "F16": 16, "BF16": 16, "Q8_0": 8.5, "Q6_K": 6.56, "Q5_K_M": 5.
        "Q2_K": 2.63, "IQ2_M": 2.7, "IQ2_S": 2.5, "IQ2_XS": 2.31, "IQ2_XXS": 2.06, "IQ1_M": 1.75, "IQ1_S": 1.56,
        "TQ2_0": 2.06, "TQ1_0": 1.69}
 TERNARY = {"TQ1_0", "TQ2_0"}
-CHOICES = Path.home() / ".neuronscope" / "quant_choices.json"
+CHOICES = Path.home() / ".omnicortex" / "quant_choices.json"
 PROMPTS = [
     "The capital of Australia is", "Water boils at sea level at a temperature of",
     "def fibonacci(n):\n    \"\"\"Return the n-th Fibonacci number.\"\"\"\n",
@@ -317,7 +317,7 @@ def main(argv=None) -> int:
     p.add_argument("--make", help="comma-separated types to make with llama-quantize, e.g. Q8_0,Q6_K,Q4_K_M,TQ2_0")
     p.add_argument("--imatrix", help="importance matrix for llama-quantize (recommended below 4 bits)")
     p.add_argument("--reference", help="the file others are compared with (default: the highest precision)")
-    p.add_argument("--server", default=os.environ.get("NS_LLAMA_SERVER") or shutil.which("llama-server") or "llama-server")
+    p.add_argument("--server", default=os.environ.get("OC_LLAMA_SERVER") or shutil.which("llama-server") or "llama-server")
     p.add_argument("--out", required=True)
     p.add_argument("--objective", choices=["gen", "prompt", "request"], default="gen")
     p.add_argument("--tune", type=int, default=0, help="Bayesian engine-option trials per file (0: defaults only)")

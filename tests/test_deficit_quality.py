@@ -205,7 +205,7 @@ def test_lora_only_on_focus_layers(tmp_path):
     with safe_open(str(out / "adapter_model.safetensors"), "pt") as f:
         layers = {int(k.split(".layers.")[1].split(".")[0]) for k in f.keys() if ".layers." in k}
     assert layers == {1, 2}
-    assert json.loads((out / "neuronscope-finetune.json").read_text())["layers"] == [1, 2]
+    assert json.loads((out / "omnicortex-finetune.json").read_text())["layers"] == [1, 2]
     r = subprocess.run([sys.executable, str(ROOT / "scripts" / "finetune.py"), "--model", str(hf), "--data",
                         str(data), "--out", str(out), "--method", "lora", "--layers", "9"],
                        capture_output=True, text=True)

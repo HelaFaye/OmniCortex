@@ -201,7 +201,7 @@ function computeSas(rec){
   // terminates DTLS separately with each side, so the two screens would differ.
   const fps=[...fingerprints(rec.pc.localDescription?.sdp), ...fingerprints(rec.pc.remoteDescription?.sdp)].sort();
   if(fps.length<2){ rec.sas='unavailable'; return; }
-  const h=sha256hex('neuronscope-sas-v1|'+fps.join('|'));
+  const h=sha256hex('omnicortex-sas-v1|'+fps.join('|'));
   const n=parseInt(h.slice(0,8),16)%1000000; rec.sas=String(n).padStart(6,'0').replace(/(\d{3})(\d{3})/,'$1 $2');
 }
 function attachChannel(rec,dc){ rec.dc=dc; dc.binaryType='arraybuffer'; dc.bufferedAmountLowThreshold=LOW_BUFFER;

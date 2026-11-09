@@ -28,22 +28,22 @@ How a controller reaches the host (the "link"):
             control. The controller must be reachable from the host.
   stdio     an MCP client on this same computer starts the agent itself.
 
-    neuronscope-remote                       # start with the saved link; opens the console
-    neuronscope-remote serve --mode lan      # choose the link
-    neuronscope-remote serve --mode vpn --bind 100.101.102.103
-    neuronscope-remote connect nsr1:...      # call home to a Studio (the invite from its Remote page)
-    neuronscope-remote pair                  # a new pairing code
-    neuronscope-remote controllers           # who may control this host; --revoke ID
-    neuronscope-remote stdio                 # MCP over stdin/stdout, for a local MCP client
+    omnicortex-remote                       # start with the saved link; opens the console
+    omnicortex-remote serve --mode lan      # choose the link
+    omnicortex-remote serve --mode vpn --bind 100.101.102.103
+    omnicortex-remote connect nsr1:...      # call home to a Studio (the invite from its Remote page)
+    omnicortex-remote pair                  # a new pairing code
+    omnicortex-remote controllers           # who may control this host; --revoke ID
+    omnicortex-remote stdio                 # MCP over stdin/stdout, for a local MCP client
 
 On a CONTROLLER that is not OmniCortex Studio (Claude Desktop, Cline...),
 the same package pairs with hosts and bridges the MCP client to them:
 
-    neuronscope-remote add-host 'nsr://192.168.1.20:47871/#c=...'   # prints the MCP client entry
-    neuronscope-remote bridge gpu-box        # what that entry runs: MCP over stdio to the host
+    omnicortex-remote add-host 'nsr://192.168.1.20:47871/#c=...'   # prints the MCP client entry
+    omnicortex-remote bridge gpu-box        # what that entry runs: MCP over stdio to the host
 
 Only the Python standard library is needed. TLS certificates are made with the
-`cryptography` package when present (pip install "neuronscope-remote[tls]") or
+`cryptography` package when present (pip install "omnicortex-remote[tls]") or
 the openssl command.
 """
 from __future__ import annotations
@@ -114,14 +114,31 @@ class LinkError(Exception):
 
 # ------------------------------------------------------------------ files
 
+def _migrate_old_home(new: Path) -> None:
+    """One-time move from the folder this agent used under its former name (NeuronScope Remote)."""
+    old_name = "Neuron" + "ScopeRemote" if sys.platform in ("win32", "darwin") else "neuron" + "scope-remote"
+    old = new.with_name(old_name)
+    if old.exists() and not new.exists():
+        try:
+            old.rename(new)
+        except OSError:
+            pass
+
+
 def default_home() -> Path:
-    if os.environ.get("NSR_HOME"):
-        return Path(os.environ["NSR_HOME"]).expanduser()
+    p = _default_home()
+    _migrate_old_home(p)
+    return p
+
+
+def _default_home() -> Path:
+    if os.environ.get("OCR_HOME"):
+        return Path(os.environ["OCR_HOME"]).expanduser()
     if sys.platform == "win32":
-        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "NeuronScopeRemote"
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "OmniCortexRemote"
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "NeuronScopeRemote"
-    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "neuronscope-remote"
+        return Path.home() / "Library" / "Application Support" / "OmniCortexRemote"
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "omnicortex-remote"
 
 
 class Store:
@@ -317,7 +334,7 @@ def ensure_cert(home: Path, names: list[str]) -> tuple[str, str] | None:
                 sans.append(x509.IPAddress(ipaddress.ip_address(h)))
             except ValueError:
                 sans.append(x509.DNSName(h))
-        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "neuronscope-remote")])
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "omnicortex-remote")])
         now = datetime.datetime.now(datetime.timezone.utc)
         crt = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(k.public_key())
                .serial_number(x509.random_serial_number())
@@ -337,7 +354,7 @@ def ensure_cert(home: Path, names: list[str]) -> tuple[str, str] | None:
     if not exe:
         return None
     r = subprocess.run([exe, "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256", "-nodes",
-                        "-keyout", str(key), "-out", str(cert), "-days", "3650", "-subj", "/CN=neuronscope-remote"],
+                        "-keyout", str(key), "-out", str(cert), "-days", "3650", "-subj", "/CN=omnicortex-remote"],
                        capture_output=True, text=True)
     if r.returncode != 0 or not cert.exists():
         return None
@@ -970,19 +987,19 @@ class Agent:
         mdir = self.models_dir()
         inc = self.incoming()
         free = shutil.disk_usage(inc).free
-        return {"role": "host", "you_are": "controller", "name": self.cfg["name"], "agent": f"neuronscope-remote {VERSION}",
+        return {"role": "host", "you_are": "controller", "name": self.cfg["name"], "agent": f"omnicortex-remote {VERSION}",
                 "os": f"{platform.system()} {platform.release()}", "machine": platform.machine(),
                 "cpus": os.cpu_count(), "ram_gb": _ram_gb(), "gpus": _gpus(),
                 "backends": [b.describe() for b in self.backends(refresh=True)],
                 "incoming_dir": str(inc), "incoming_free_gb": round(free / 2**30, 1),
                 "models_dir": str(mdir) if mdir else None, "allowed": self.cfg["allow"], "link": self.link["mode"],
-                "jobs": bool(self.cfg["allow"].get("jobs") and self.neuronscope_dir()),
+                "jobs": bool(self.cfg["allow"].get("jobs") and self.omnicortex_dir()),
                 "tracer": self.tracer()}
 
     # -- OmniCortex jobs on this host (off unless the host owner allows "jobs")
-    def neuronscope_dir(self) -> Path | None:
+    def omnicortex_dir(self) -> Path | None:
         """The OmniCortex folder jobs run from: configured, or the one this agent was started from."""
-        cand = [self.cfg.get("neuronscope_dir")] if self.cfg.get("neuronscope_dir") else []
+        cand = [self.cfg.get("omnicortex_dir")] if self.cfg.get("omnicortex_dir") else []
         cand.append(str(Path(__file__).resolve().parents[2]))
         for c in cand:
             p = Path(c).expanduser()
@@ -994,7 +1011,7 @@ class Agent:
         if not self.cfg["allow"].get("jobs"):
             raise ToolError("this host does not run jobs: its owner can allow them in the agent's console "
                             "(Allow: run OmniCortex jobs)")
-        root = self.neuronscope_dir()
+        root = self.omnicortex_dir()
         if root is None:
             raise ToolError("no OmniCortex folder on this host: set one in the agent's console, or start the agent "
                             "from inside a OmniCortex folder")
@@ -1006,7 +1023,7 @@ class Agent:
             for sub in ("scripts", "viz"):
                 if str(root / sub) not in sys.path:
                     sys.path.insert(0, str(root / sub))
-            spec = importlib.util.spec_from_file_location("ns_host_jobs", root / "viz" / "jobs.py")
+            spec = importlib.util.spec_from_file_location("oc_host_jobs", root / "viz" / "jobs.py")
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             runner = mod.JobRunner(self.store.home / "jobs", int(self.cfg.get("max_jobs") or 1),
@@ -1015,8 +1032,8 @@ class Agent:
             return mod, runner
 
     def t_jobs_info(self, a):
-        root = self.neuronscope_dir()
-        info = {"allowed": bool(self.cfg["allow"].get("jobs")), "neuronscope_dir": str(root) if root else None,
+        root = self.omnicortex_dir()
+        info = {"allowed": bool(self.cfg["allow"].get("jobs")), "omnicortex_dir": str(root) if root else None,
                 "python": sys.executable}
         if info["allowed"] and root:
             mod, _ = self._jobs()
@@ -1218,10 +1235,10 @@ class Agent:
     def tracer(self) -> dict:
         """OmniCortex's tracer on this host: its scripts folder and llama-cett-dump, if present."""
         t = dict(self.cfg.get("tracer") or {})
-        root = Path(t.get("neuronscope") or Path(__file__).resolve().parents[2]).expanduser()
-        cett = t.get("cett") or os.environ.get("NS_CETT") or shutil.which("llama-cett-dump") or ""
+        root = Path(t.get("omnicortex") or Path(__file__).resolve().parents[2]).expanduser()
+        cett = t.get("cett") or os.environ.get("OC_CETT") or shutil.which("llama-cett-dump") or ""
         ok = (root / "scripts" / "hscore.py").is_file() and bool(cett) and Path(cett).is_file()
-        return {"available": ok, "neuronscope": str(root), "cett": cett, "python": t.get("python") or sys.executable}
+        return {"available": ok, "omnicortex": str(root), "cett": cett, "python": t.get("python") or sys.executable}
 
     def t_trace_reply(self, a):
         self.need("trace")
@@ -1230,7 +1247,7 @@ class Agent:
         tr = self.tracer()
         if not tr["available"]:
             raise ToolError("this host has no OmniCortex tracer: install OmniCortex here and build llama.cpp with "
-                            "cett-dump, then set tracer in config.json (neuronscope folder, cett binary)")
+                            "cett-dump, then set tracer in config.json (omnicortex folder, cett binary)")
         f = self.find_gguf(a["model"], a.get("backend", ""))
         import tempfile
         with tempfile.TemporaryDirectory(prefix="ns-trace-") as work:
@@ -1238,7 +1255,7 @@ class Agent:
             (w / "clf.npz").write_bytes(base64.b64decode(a["classifier"]))
             (w / "msgs.json").write_text(json.dumps(a.get("messages") or []), encoding="utf-8")
             (w / "reply.txt").write_text(a["text"], encoding="utf-8")
-            cmd = [tr["python"], str(Path(tr["neuronscope"]) / "scripts" / "hscore.py"), "--binary", tr["cett"],
+            cmd = [tr["python"], str(Path(tr["omnicortex"]) / "scripts" / "hscore.py"), "--binary", tr["cett"],
                    "--gguf", str(f), "--classifier", str(w / "clf.npz"), "--messages", str(w / "msgs.json"),
                    "--response-file", str(w / "reply.txt"), "--trace-out", str(w / "trace.npz"),
                    "--ngl", str(int(a.get("ngl", 99)))]
@@ -1355,7 +1372,7 @@ class Agent:
         root = self.models_dir()
         if not root:
             raise ToolError("LM Studio's models folder was not found; set models_dir in the host console")
-        pub = re.sub(r"[^A-Za-z0-9._-]+", "-", a.get("publisher") or "neuronscope")
+        pub = re.sub(r"[^A-Za-z0-9._-]+", "-", a.get("publisher") or "omnicortex")
         folder = re.sub(r"[^A-Za-z0-9._-]+", "-", a.get("name") or stem)
         dest = _inside(root, f"{pub}/{folder}/{src.name}")
         if dest.exists() and not a.get("overwrite"):
@@ -1494,7 +1511,7 @@ class Agent:
         if method == "initialize":
             res = {"protocolVersion": params.get("protocolVersion") or PROTOCOL_VERSION,
                    "capabilities": {"tools": {"listChanged": False}},
-                   "serverInfo": {"name": "neuronscope-remote", "title": f"OmniCortex Remote host: {self.cfg['name']}",
+                   "serverInfo": {"name": "omnicortex-remote", "title": f"OmniCortex Remote host: {self.cfg['name']}",
                                   "version": VERSION},
                    "instructions": self.instructions()}
         elif method == "ping":
@@ -1520,7 +1537,7 @@ class Agent:
                 "pairing": {"code": fmt_code(p["code"]), "expires": p["expires"],
                             "link": self.pair_link(p["code"])} if p else None,
                 "controllers": self.controllers.list(), "allow": self.cfg["allow"], "allow_text": ALLOW_TEXT,
-                "neuronscope_dir": str(self.neuronscope_dir() or ""), "neuronscope_dir_set": self.cfg.get("neuronscope_dir", ""),
+                "omnicortex_dir": str(self.omnicortex_dir() or ""), "omnicortex_dir_set": self.cfg.get("omnicortex_dir", ""),
                 "yield": self.presence.cfg() if self.presence is not None else dict(self.cfg.get("yield") or {}),
                 "presence": self.presence.last if self.presence is not None else None, "busy": self.busy,
                 "backends": [b.describe() for b in self.backends()], "configured_backends": self.cfg["backends"],
@@ -1565,7 +1582,7 @@ class Throttle:
 
 
 class ApiHandler(BaseHTTPRequestHandler):
-    server_version = "neuronscope-remote"
+    server_version = "omnicortex-remote"
     agent: Agent = None
     throttle = Throttle()
 
@@ -1835,11 +1852,11 @@ class ConsoleHandler(BaseHTTPRequestHandler):
                     ag.set_busy(None)
                     if ag.presence is not None:
                         ag.presence.last_seen = 0
-            elif self.path == "/api/neuronscope-dir":
+            elif self.path == "/api/omnicortex-dir":
                 d = str(req.get("dir", "")).strip()
                 if d and not (Path(d).expanduser() / "viz" / "jobs.py").is_file():
                     raise ValueError(f"{d} is not a OmniCortex folder (no viz/jobs.py in it)")
-                ag.cfg["neuronscope_dir"] = d
+                ag.cfg["omnicortex_dir"] = d
                 ag._jobs_cache = None
                 ag.save_config()
             elif self.path == "/api/name":
@@ -2066,7 +2083,7 @@ def bridge(store: Store, name: str) -> int:
     clients that only start local servers (Claude Desktop) or cannot pin a certificate."""
     rec = next((h for h in controller_hosts(store) if h["name"] == name), None)
     if rec is None:
-        print(f"no host {name!r}: pair first with: neuronscope-remote add-host LINK", file=sys.stderr)
+        print(f"no host {name!r}: pair first with: omnicortex-remote add-host LINK", file=sys.stderr)
         return 2
     trust = (rec.get("fingerprint") or None) if rec["url"].startswith("https://") else None
     out_lock = threading.Lock()
@@ -2320,9 +2337,9 @@ def stdio(a) -> int:
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(prog="neuronscope-remote", description=ROLE_LINE,
+    p = argparse.ArgumentParser(prog="omnicortex-remote", description=ROLE_LINE,
                                 epilog="Run with no command to start with the saved settings and open the console.")
-    p.add_argument("--home", help="the agent's folder (default: per-user app data; $NSR_HOME)")
+    p.add_argument("--home", help="the agent's folder (default: per-user app data; $OCR_HOME)")
     sub = p.add_subparsers(dest="cmd")
     s = sub.add_parser("serve", help="run the host agent")
     s.add_argument("--mode", choices=MODES, help="how controllers reach this host (saved for next time)")
@@ -2408,7 +2425,7 @@ def main(argv=None) -> int:
             print(f"{r['name']:<20} {r['url']}" + (f"  certificate {short_fp(r['fingerprint'])}" if r.get("fingerprint")
                                                     else ""))
         if not rows:
-            print("This computer controls no hosts. Pair one with: neuronscope-remote add-host LINK")
+            print("This computer controls no hosts. Pair one with: omnicortex-remote add-host LINK")
         return 0
     if a.cmd == "remove-host":
         ag.store.write("hosts.json", [h for h in controller_hosts(ag.store) if h["name"] != a.host])
@@ -2419,7 +2436,7 @@ def main(argv=None) -> int:
         try:
             url = (ag.store.home / "console-url.txt").read_text().strip()
         except FileNotFoundError:
-            print("the agent is not running; start it with: neuronscope-remote", file=sys.stderr)
+            print("the agent is not running; start it with: omnicortex-remote", file=sys.stderr)
             return 1
         webbrowser.open(url)
         print(url)
@@ -2508,7 +2525,7 @@ const ysend=async(extra)=>{ try{ S=await api('/api/yield',{enabled:$('#yon').che
   vr:$('#yvr').checked,cooldown:+$('#ycool').value||0,stop_jobs:$('#yjobs').checked,...(extra||{})}); render(); }catch(e){} };
 ['#yon','#ypad','#yvr','#yjobs','#yidle','#ycool'].forEach(s=>$(s).onchange=()=>ysend());
 $('#yfree').onclick=()=>ysend({free_now:true});
-$('#nsdirsave').onclick=async()=>{ try{ S=await api('/api/neuronscope-dir',{dir:$('#nsdir').value.trim()}); render(); }catch(e){} };
+$('#nsdirsave').onclick=async()=>{ try{ S=await api('/api/omnicortex-dir',{dir:$('#nsdir').value.trim()}); render(); }catch(e){} };
 function extra(){ const m=pick; let h='';
   if(m==='vpn') h=`VPN address of this computer: <input id="xbind" value="${esc(S.link.mode==='vpn'?S.link.bind:(S.addresses.find(a=>a.kind.startsWith('vpn'))||{}).address||'')}" placeholder="100.x.y.z"> <span class="mut">Tailscale: <code>tailscale ip -4</code></span>`;
   if(m==='ssh') h=`<div class="mut">On the controller: <code>ssh -N -L 47871:127.0.0.1:${S.link.port||47871} you@${esc((S.addresses[0]||{}).address||'this-computer')}</code>, then add the host at <code>http://127.0.0.1:47871</code>. OmniCortex Studio can run the tunnel for you.</div>`;
@@ -2542,13 +2559,13 @@ function render(){ const s=S; $('#hname').textContent='“'+s.name+'”'; $('#ho
   $('#gpus').innerHTML=(th.tripped?`<div class="bad" style="color:#c0392b"><b>Paused: ${esc(th.tripped.gpu)} reached ${f(th.tripped.temp)}°C</b></div>`:'')+(T.gpus.length?T.gpus.map(g=>g.error?esc(g.error):`<div><b>${esc(g.name)}</b> · edge ${f(g.temp_c)}°C · junction ${f(g.junction_c)}°C · memory ${f(g.mem_c)}°C · VRAM ${g.vram_used_mb==null?'?':(g.vram_used_mb/1024).toFixed(1)}/${g.vram_total_mb==null?'?':(g.vram_total_mb/1024).toFixed(1)} GB · load ${f(g.util)}%${g.power_w!=null?' · '+f(g.power_w)+' W':''} <span class="mut">(${esc(g.source)})</span></div>`).join(''):'No GPU sensors found (nvidia-smi, rocm-smi or Linux amdgpu sensors).');
   if(document.activeElement?.id?.startsWith('th')!==true){ $('#thOn').checked=!!th.enabled; $('#thLim').value=th.limit_c??95; $('#thMar').value=th.margin_c??10; $('#thUnl').checked=th.unload!==false; }
   ['thOn','thLim','thMar','thUnl'].forEach(id=>$('#'+id).onchange=async()=>{ S=await api('/api/thermal',{enabled:$('#thOn').checked,limit_c:+$('#thLim').value,margin_c:+$('#thMar').value,unload:$('#thUnl').checked}); render(); });
-  if(document.activeElement!==$('#nsdir')) $('#nsdir').value=s.neuronscope_dir_set||'';
+  if(document.activeElement!==$('#nsdir')) $('#nsdir').value=s.omnicortex_dir_set||'';
   { const y=s.yield||{}; if(!['yidle','ycool'].includes(document.activeElement&&document.activeElement.id)){ $('#yidle').value=y.idle_under??60; $('#ycool').value=y.cooldown??300; }
     $('#yon').checked=!!y.enabled; $('#ypad').checked=y.gamepad!==false; $('#yvr').checked=y.vr!==false; $('#yjobs').checked=!!y.stop_jobs; $('#ybox').style.opacity=y.enabled?1:.55;
     const p=s.presence||{}; const known=p.idle_s!=null||p.gamepad!=null||p.vr!=null;
     $('#ystate').textContent=(s.busy?'Busy now: '+s.busy.why+'. ':'Taking work. ')+(known?`Last input ${p.idle_s!=null?Math.round(p.idle_s)+' s ago':'unknown'}${p.vr?', VR running':''}${p.gamepad?', controller in use':''}.`:'This computer cannot tell when it is in use (no desktop session visible to the agent).');
     $('#yfree').hidden=!(s.busy&&s.busy.source==='owner'); }
-  $('#nsdirmsg').textContent=s.neuronscope_dir?('jobs run from '+s.neuronscope_dir):'no OmniCortex folder found';
+  $('#nsdirmsg').textContent=s.omnicortex_dir?('jobs run from '+s.omnicortex_dir):'no OmniCortex folder found';
   $('#allow').innerHTML=Object.keys(s.allow).map(k=>`<label style="display:block"><input type="checkbox" data-al="${k}" ${s.allow[k]?'checked':''}> ${esc(s.allow_text[k])}</label>`).join('');
   document.querySelectorAll('[data-al]').forEach(c=>c.onchange=async()=>{ S=await api('/api/allow',{allow:{[c.dataset.al]:c.checked}}); render(); });
   $('#bks').innerHTML=s.backends.length?'<table>'+s.backends.map(b=>`<tr><td>${esc(b.kind)}</td><td><code>${esc(b.url)}</code></td><td class="ok">running</td><td>${b.source==='configured'?`<button data-rb="${esc(b.url)}">Remove</button>`:''}</td></tr>`).join('')+'</table>':'<span class="err">No LLM server found. Start LM Studio\'s server (Developer → Start server), Ollama, or llama-server.</span>';
@@ -2560,7 +2577,7 @@ $('#apply').onclick=async()=>{ const b={mode:pick}; if(pick==='vpn') b.bind=$('#
   S=await api('/api/link',b); render(); };
 $('#badd').onclick=async()=>{ S=await api('/api/backends',{url:$('#burl').value.trim(),kind:$('#bkind').value}); $('#burl').value=''; render(); };
 async function tick(){ try{ S=await api('/api/state'); render(); }catch(e){} }
-if(!key) $('#err').textContent='Open the console from the link the agent printed (or run: neuronscope-remote console).';
+if(!key) $('#err').textContent='Open the console from the link the agent printed (or run: omnicortex-remote console).';
 else { tick(); setInterval(()=>{ if(!document.querySelector('input:focus')) tick(); },4000); }
 </script>"""
 

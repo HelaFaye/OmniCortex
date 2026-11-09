@@ -9,14 +9,14 @@ Two connections, set up separately in most apps:
     on your local models (Cline: API Provider "OpenAI Compatible");
   * the MCP server: OmniCortex's harness and lab as tools (list and route
     models, check replies for hallucination risk, run TestQA and retraining
-    jobs, plan and review projects). See scripts/ns_mcp.py.
+    jobs, plan and review projects). See scripts/oc_mcp.py.
 
-    python scripts/ns_connect.py show                  # every snippet, for this Studio
-    python scripts/ns_connect.py cline --write         # add OmniCortex to Cline's MCP settings
-    python scripts/ns_connect.py cline --write --editor cursor --transport stdio
-    python scripts/ns_connect.py claude-desktop --write
+    python scripts/oc_connect.py show                  # every snippet, for this Studio
+    python scripts/oc_connect.py cline --write         # add OmniCortex to Cline's MCP settings
+    python scripts/oc_connect.py cline --write --editor cursor --transport stdio
+    python scripts/oc_connect.py claude-desktop --write
 
---write merges one "neuronscope" entry into the app's config (a backup is kept
+--write merges one "omnicortex" entry into the app's config (a backup is kept
 next to it) and leaves every other server untouched. Studio's Connect page
 (/connect) shows the same settings with copy buttons.
 """
@@ -32,7 +32,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-NAME = "neuronscope"
+NAME = "omnicortex"
 CLINE_EXT = "saoudrizwan.claude-dev"
 EDITORS = {"code": "Code", "code-insiders": "Code - Insiders", "codium": "VSCodium", "cursor": "Cursor",
            "windsurf": "Windsurf"}
@@ -57,8 +57,8 @@ def claude_desktop_path() -> Path:
 
 def read_only_tools() -> list[str]:
     sys.path.insert(0, str(HERE))
-    import ns_mcp
-    return [n for n, _, _, ann, _ in ns_mcp.TOOLS if ann.get("readOnlyHint")]
+    import oc_mcp
+    return [n for n, _, _, ann, _ in oc_mcp.TOOLS if ann.get("readOnlyHint")]
 
 
 def mcp_http_entry(studio: str, token: str | None = None) -> dict:
@@ -71,8 +71,8 @@ def mcp_http_entry(studio: str, token: str | None = None) -> dict:
 
 
 def mcp_stdio_entry(studio: str, token_file: str | None = None, python: str | None = None) -> dict:
-    """An entry that starts scripts/ns_mcp.py; works in every MCP client."""
-    args = [str(HERE / "ns_mcp.py"), "--studio", studio.rstrip("/")]
+    """An entry that starts scripts/oc_mcp.py; works in every MCP client."""
+    args = [str(HERE / "oc_mcp.py"), "--studio", studio.rstrip("/")]
     if token_file:
         args += ["--token-file", str(Path(token_file).expanduser())]
     return {"command": python or sys.executable, "args": args, "disabled": False,
@@ -85,7 +85,7 @@ def _q(word: str) -> str:
 
 
 def claude_code_commands(studio: str, token: str | None = None, token_file: str | None = None) -> dict:
-    """`claude mcp add` lines for Claude Code: over HTTP to Studio's /mcp, or starting ns_mcp.py."""
+    """`claude mcp add` lines for Claude Code: over HTTP to Studio's /mcp, or starting oc_mcp.py."""
     base = studio.rstrip("/")
     http = f"claude mcp add --transport http --scope user {NAME} {base}/mcp"
     if token:
@@ -117,7 +117,7 @@ def snippets(studio: str, token: str | None = None, token_file: str | None = Non
 
 
 def merge_into(path: Path, entry: dict) -> Path | None:
-    """Add or replace mcpServers.neuronscope in a JSON config. -> backup path."""
+    """Add or replace mcpServers.omnicortex in a JSON config. -> backup path."""
     cfg, backup = {}, None
     if path.exists():
         try:
@@ -138,7 +138,7 @@ def merge_into(path: Path, entry: dict) -> Path | None:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("--studio", default=os.environ.get("NS_STUDIO_URL", "http://127.0.0.1:7870"))
+    p.add_argument("--studio", default=os.environ.get("OC_STUDIO_URL", "http://127.0.0.1:7870"))
     p.add_argument("--token-file", help="Studio's token (or a paired device's), if Studio needs one")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("show", help="print every connection snippet")
@@ -146,7 +146,7 @@ def main(argv=None) -> int:
     c.add_argument("--editor", choices=sorted(EDITORS), default="code")
     c.add_argument("--transport", choices=["http", "stdio"], default="http",
                    help="http: Cline talks to Studio's /mcp (Studio must be running); stdio: Cline starts "
-                        "scripts/ns_mcp.py")
+                        "scripts/oc_mcp.py")
     c.add_argument("--write", action="store_true", help="merge into Cline's cline_mcp_settings.json")
     d = sub.add_parser("claude-desktop", help="Claude Desktop's config (stdio)")
     d.add_argument("--write", action="store_true", help="merge into claude_desktop_config.json")

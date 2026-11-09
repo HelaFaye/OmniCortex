@@ -471,7 +471,7 @@ source env.sh
 
 It infers LM Studio's model root from the base model's location, lays the file
 out as `<publisher>/<repo>/<file>.gguf` so the GUI picks it up on rescan, refuses
-to overwrite, checks free space first, and drops an `neuronscope.json` beside the
+to overwrite, checks free space first, and drops an `omnicortex.json` beside the
 model recording which adapter and scale produced it. The tag goes in the name
 because several suppression strengths will coexist in the model list and are
 otherwise indistinguishable.

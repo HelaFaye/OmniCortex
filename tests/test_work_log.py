@@ -128,7 +128,7 @@ def test_studio_predict_measures_and_github_sharing(srv, tmp_path, monkeypatch):
     base, ts = srv
     import score_cards
     monkeypatch.setattr(score_cards, "HOME", tmp_path / "home")
-    monkeypatch.delenv("NS_GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("OC_GITHUB_TOKEN", raising=False)
     code, p = ts.call(base, "/api/work/predict")
     assert code == 200 and p["samples"] == {"this computer": 0, "scoreboard": 0}
     assert {r["model"] for r in p["rows"]} >= {"coder-gguf/coder-7b-q4_k_m"}

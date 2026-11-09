@@ -2,7 +2,7 @@
 
 ComfyUI (https://github.com/comfy-org/ComfyUI) is GPL-3.0 and is downloaded from its own repository at
 install time; nothing of it is shipped here. Where it went and how it runs is remembered in
-~/.neuronscope/comfyui.json, outside this add-on's folder (changing files here would turn the add-on off
+~/.omnicortex/comfyui.json, outside this add-on's folder (changing files here would turn the add-on off
 until it is reviewed again).
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ TORCH_INDEX = {
     "xpu": "https://download.pytorch.org/whl/xpu",
     "cpu": "https://download.pytorch.org/whl/cpu",
 }
-STATE = Path.home() / ".neuronscope" / "comfyui.json"
+STATE = Path.home() / ".omnicortex" / "comfyui.json"
 HERE = Path(__file__).resolve().parent
 
 
@@ -58,7 +58,7 @@ def save_state(**kw):
 
 
 def folder(arg: str) -> Path:
-    return Path(os.path.expanduser(arg or "~/.neuronscope/comfyui")).resolve()
+    return Path(os.path.expanduser(arg or "~/.omnicortex/comfyui")).resolve()
 
 
 def venv_python(root: Path) -> Path:
@@ -110,9 +110,9 @@ def install_torch(root: Path, kind: str):
         pip(root, "torch", "torchvision", "torchaudio", "--index-url", TORCH_INDEX[kind])
 
 
-def neuronscope_nodes(root: Path):
-    src = HERE / "comfy_nodes" / "neuronscope_nodes"
-    dst = root / "custom_nodes" / "neuronscope_nodes"
+def omnicortex_nodes(root: Path):
+    src = HERE / "comfy_nodes" / "omnicortex_nodes"
+    dst = root / "custom_nodes" / "omnicortex_nodes"
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst)

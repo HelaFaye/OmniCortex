@@ -383,7 +383,7 @@ def cmd_collect(a) -> int:
     meta = {"model": a.model, "points": [f"{s}.{l}" for s, l in points], "dims": dims, "n_layers": n_layers,
             "tokens": total, "windows": n_win, "ctx": a.ctx, "skip": a.skip, "corpus": a.corpus,
             "field": a.field, "split": a.split, "seconds": round(time.time() - t0, 1),
-            "created": time.strftime("%Y-%m-%d %H:%M:%S"), "format": "neuronscope-acts/1"}
+            "created": time.strftime("%Y-%m-%d %H:%M:%S"), "format": "omnicortex-acts/1"}
     (out / "meta.json").write_text(json.dumps(meta, indent=1))
     size = sum(f.stat().st_size for f in out.rglob("*.npy")) / 2 ** 30
     print(f"recorded {total} tokens from {n_win} windows at {', '.join(meta['points'])} "

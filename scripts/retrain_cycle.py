@@ -65,16 +65,16 @@ def free_port() -> int:
 
 
 def llama_dir(a) -> Path:
-    return Path(a.llama or os.environ.get("NS_LLAMA") or "~/llama.cpp").expanduser()
+    return Path(a.llama or os.environ.get("OC_LLAMA") or "~/llama.cpp").expanduser()
 
 
 def server_bin(a) -> str:
-    cands = [a.llama_server, os.environ.get("NS_LLAMA_SERVER"), str(llama_dir(a) / "build" / "bin" / "llama-server"),
+    cands = [a.llama_server, os.environ.get("OC_LLAMA_SERVER"), str(llama_dir(a) / "build" / "bin" / "llama-server"),
              shutil.which("llama-server")]
     for c in cands:
         if c and Path(c).expanduser().exists():
             return str(Path(c).expanduser())
-    raise SystemExit("no llama-server: pass --llama-server, set NS_LLAMA_SERVER, or build llama.cpp "
+    raise SystemExit("no llama-server: pass --llama-server, set OC_LLAMA_SERVER, or build llama.cpp "
                      "(Setup → Build llama.cpp)")
 
 
@@ -265,13 +265,13 @@ class Cycle:
                 return rec
             rec["focus_layers"] = fl["layers"]
         adapter, merged = d / "adapter", d / "merged"
-        if not self.done(f"train/{name}", adapter / "neuronscope-finetune.json"):
+        if not self.done(f"train/{name}", adapter / "omnicortex-finetune.json"):
             cmd = [sys.executable, HERE / "finetune.py", "--model", a.base_model, "--data", self.out / "data",
                    "--out", adapter, "--method", a.method, "--layers", name, "--seed", str(a.seed), *a.finetune_arg]
             if a.dpo:
                 cmd.append("--dpo")
             self.run(f"train/{name}", cmd)
-        meta = merged / "neuronscope-export.json"
+        meta = merged / "omnicortex-export.json"
         if not self.done(f"convert/{name}", meta):
             self.run(f"convert/{name}", [sys.executable, HERE / "merge_export.py", "--base", a.base_model,
                                          "--adapter", adapter, "--out", merged, "--gguf", a.quant,
@@ -392,7 +392,7 @@ def main(argv=None) -> int:
     p.add_argument("--allow-exec", action="store_true")
     p.add_argument("--sandbox", choices=["none", "docker", "podman"], default="docker")
     p.add_argument("--alpha", type=float, default=0.05)
-    p.add_argument("--llama", help="llama.cpp checkout (default $NS_LLAMA or ~/llama.cpp)")
+    p.add_argument("--llama", help="llama.cpp checkout (default $OC_LLAMA or ~/llama.cpp)")
     p.add_argument("--llama-server", help="llama-server binary (default from the checkout)")
     p.add_argument("--server-arg", action="append", default=[], metavar="ARG",
                    help="extra llama-server argument, repeatable, e.g. --server-arg=-ngl --server-arg=99")

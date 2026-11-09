@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "viz"))
 import engine_options as eo  # noqa: E402
 
-LLAMA = Path(os.environ.get("NS_LLAMA") or "~/llama.cpp").expanduser() / "build" / "bin" / "llama-server"
+LLAMA = Path(os.environ.get("OC_LLAMA") or "~/llama.cpp").expanduser() / "build" / "bin" / "llama-server"
 NEW = {"-fa", "-ctk", "-ctv", "--spec-type", "--spec-draft-n-max", "--spec-draft-n-min", "-md", "--keep",
        "--context-shift", "--cache-reuse", "-Cr", "-lm", "--rpc", "-dev"}
 OLD = {"-fa", "-ctk", "-ctv", "--draft-max", "--draft-min", "-md", "--mlock", "--no-mmap"}

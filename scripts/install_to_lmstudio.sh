@@ -12,16 +12,16 @@
 #       --lora adapters/suppress-lora.gguf \
 #       --alpha 1.0 --tag s010
 #
-# Reads NS_GGUF and NS_LLAMA from env.sh. Override with --base / --llama.
+# Reads OC_GGUF and OC_LLAMA from env.sh. Override with --base / --llama.
 
 set -euo pipefail
 
-BASE="${NS_GGUF:-}"
-LLAMA="${NS_LLAMA:-$HOME/llama.cpp}"
+BASE="${OC_GGUF:-}"
+LLAMA="${OC_LLAMA:-$HOME/llama.cpp}"
 LORA=""
 ALPHA="1.0"
 TAG=""
-PUBLISHER="neuronscope"
+PUBLISHER="omnicortex"
 MODELS_DIR=""
 DRY=0
 
@@ -104,7 +104,7 @@ echo "merging..."
 
 # Provenance beside the model: six months from now the tag alone will not tell
 # you which neuron set or which sweep produced this file.
-cat > "${DEST_DIR}/neuronscope.json" <<EOF
+cat > "${DEST_DIR}/omnicortex.json" <<EOF
 {
   "base_model": "$(basename "$BASE")",
   "adapter": "$(basename "$LORA")",

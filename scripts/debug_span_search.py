@@ -4,11 +4,11 @@ import json, os, subprocess, sys, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gguf_tokenizer
 
-if len(sys.argv) > 1 or not os.environ.get("NS_GGUF") or not os.environ.get("NS_CETT"):
+if len(sys.argv) > 1 or not os.environ.get("OC_GGUF") or not os.environ.get("OC_CETT"):
     raise SystemExit("usage: source env.sh && python scripts/debug_span_search.py\n"
                      "Re-runs the answer-span search for the first training qid in\n"
-                     "data/train_qids.json using cett-dump's tokenizer (needs NS_GGUF, NS_CETT).")
-GGUF = os.environ["NS_GGUF"]; CETT = os.environ["NS_CETT"]
+                     "data/train_qids.json using cett-dump's tokenizer (needs OC_GGUF, OC_CETT).")
+GGUF = os.environ["OC_GGUF"]; CETT = os.environ["OC_CETT"]
 
 qid = json.load(open("data/train_qids.json"))["t"][0]
 rec = None

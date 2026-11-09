@@ -42,7 +42,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px;bord
 <section class="card"><h2>Batch + scratch</h2>
 <label>Models per batch</label><input id="batch" type="number" min="1" value="1">
 <label>Scratch strategy</label><select id="scratch"><option value="auto">AUTO — RAM if it fits</option><option value="ram">RAM only</option><option value="disk">Disk temp</option><option value="none">Direct output</option></select>
-<label>Scratch root (optional)</label><input id="scratchRoot" placeholder="/dev/shm/neuronscope">
+<label>Scratch root (optional)</label><input id="scratchRoot" placeholder="/dev/shm/omnicortex">
 <div id="scratchInfo" class="status">Scratch not checked.</div></section>
 <section class="card"><h2>Evaluation + pruning</h2>
 <label>Baseline score (0–1)</label><input id="baseline" type="number" min="0" max="1" step="0.001" placeholder="0.80">
@@ -127,7 +127,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--host',default='127.0.0.1');ap.add_argument('--port',type=int,default=8797);ap.add_argument('--allow-unauthenticated',action='store_true',help='permit a non-loopback bind (no auth)');a=ap.parse_args()
-    import ns_security as sec; sec.loopback_only(a.host,'the Scale Sweep Lab',a.allow_unauthenticated)
+    import oc_security as sec; sec.loopback_only(a.host,'the Scale Sweep Lab',a.allow_unauthenticated)
     s=ThreadingHTTPServer((a.host,a.port),Handler);print(f'OmniCortex Scale Sweep Lab: http://{a.host}:{a.port}')
     try:s.serve_forever()
     except KeyboardInterrupt:pass

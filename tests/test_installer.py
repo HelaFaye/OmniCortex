@@ -16,7 +16,7 @@ import installer as ins  # noqa: E402
 
 
 def fake(system="Linux", machine="x86_64", nvidia=(), amd=(), gfx=None, kfd=False, apple=False, py_ok=True,
-         venv_ok=True, free=200, like="ubuntu debian", root="/home/me/neuronscope"):
+         venv_ok=True, free=200, like="ubuntu debian", root="/home/me/omnicortex"):
     d = {"system": system, "release": "x", "machine": machine, "python": "/usr/bin/python3",
          "python_version": "3.12.0" if py_ok else "3.9.6", "python_ok": py_ok, "store_python": False,
          "venv": "/tmp/v", "venv_exists": False, "free_gb": free, "root": root, "venv_ok": venv_ok,

@@ -43,7 +43,7 @@ with open(_THEME_PATH) as _f:
     # Keys starting with "_" (the UI palette) are not viewer themes.
     THEMES = {k: v for k, v in json.load(_f).items() if not k.startswith("_")}
 # Theme add-ons (plugins/*/plugin.json with "themes": a file like this one), bundled or installed, add more.
-for _d in (os.path.join(os.path.dirname(_THEME_PATH), "..", "plugins"), os.path.expanduser("~/.neuronscope/plugins")):
+for _d in (os.path.join(os.path.dirname(_THEME_PATH), "..", "plugins"), os.path.expanduser("~/.omnicortex/plugins")):
     for _m in sorted(glob.glob(os.path.join(_d, "*", "plugin.json"))):
         try:
             with open(_m) as _f:

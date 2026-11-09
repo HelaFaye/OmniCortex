@@ -7,7 +7,7 @@ value each source gave and filters by source and group.
 
 ```bash
 python scripts/unified_review.py lookup Qwen/Qwen2.5-7B-Instruct --board github:owner/omnicortex-board
-python scripts/unified_review.py lookup org/name --board-file board.json --saelens --review-dir ~/.neuronscope/review --json
+python scripts/unified_review.py lookup org/name --board-file board.json --saelens --review-dir ~/.omnicortex/review --json
 ```
 
 ## Sources

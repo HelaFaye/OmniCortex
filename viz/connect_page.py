@@ -1,5 +1,5 @@
 """Studio's /connect page: settings for Cline, Claude Desktop and OpenAI
-clients, built from scripts/ns_connect.py so the page and the CLI agree."""
+clients, built from scripts/oc_connect.py so the page and the CLI agree."""
 
 PAGE = r"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Studio Connect Apps</title><script>try{const d=document.documentElement,t=localStorage.getItem('ns-theme')||'dark';d.dataset.theme=localStorage.getItem('ns-theme-base')||(t==='light'?'light':'dark');const v=JSON.parse(localStorage.getItem('ns-theme-vars')||'{}');for(const k in v)d.style.setProperty('--'+k,v[k])}catch{document.documentElement.dataset.theme='dark'}</script>
@@ -51,7 +51,7 @@ ol{margin:.3rem 0 .3rem 1.2rem;padding:0}
 <h3>2 · Tools: Cline → MCP Servers → Configure (opens cline_mcp_settings.json), paste inside "mcpServers"</h3>
 <div class="note">Studio serves MCP itself; Studio must be running.</div><pre id="mcphttp"></pre>
 <details><summary class="note">If your Cline cannot reach Studio over HTTP: let Cline start a local process instead (stdio)</summary><pre id="mcpstdio"></pre></details>
-<div class="note">Or have OmniCortex write it for you: <code>python scripts/ns_connect.py cline --write</code> (add <code>--editor cursor</code>, <code>codium</code>…). It keeps a backup and touches only the neuronscope entry.</div>
+<div class="note">Or have OmniCortex write it for you: <code>python scripts/oc_connect.py cline --write</code> (add <code>--editor cursor</code>, <code>codium</code>…). It keeps a backup and touches only the omnicortex entry.</div>
 </section>
 
 <section class="card" id="claude"><h2>Claude</h2>
@@ -59,7 +59,7 @@ ol{margin:.3rem 0 .3rem 1.2rem;padding:0}
 <div class="ctabs" role="tablist"><button role="tab" data-ct="desktop" class="on">Claude Desktop</button><button role="tab" data-ct="code">Claude Code</button><button role="tab" data-ct="web">claude.ai (web, mobile)</button></div>
 <div data-cp="desktop">
 <ol class="steps"><li>In Claude Desktop open <b>Settings → Developer → Edit Config</b>. That opens <code>claude_desktop_config.json</code>.</li>
-<li>Paste this inside <code>"mcpServers"</code> (or have OmniCortex write it: <code>python scripts/ns_connect.py claude-desktop --write</code>, which keeps a backup).</li></ol>
+<li>Paste this inside <code>"mcpServers"</code> (or have OmniCortex write it: <code>python scripts/oc_connect.py claude-desktop --write</code>, which keeps a backup).</li></ol>
 <pre id="claudeDesk"></pre>
 <ol class="steps" start="3"><li>Quit Claude Desktop completely and start it again. OmniCortex's tools appear under the tools (slider) button in a chat.</li>
 <li>Claude asks before it uses a tool; Studio's own <a href="/settings#tools">Tool approval</a> applies on top.</li></ol>

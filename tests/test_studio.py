@@ -45,9 +45,9 @@ def studio_srv(tmp_path):
         "settings_path": str(tmp_path / "studio.json"), "chats_dir": str(tmp_path / "chats"),
         "token": None, "stats": model_stats.StatsStore(tmp_path / "stats"), "min_graded": 20,
         "min_subject": 5, "halluc_cost": 1.0, "cett": None, "idle_ttl": 0, "jit": True, "backend_port": free_port(), "tls": False,
-        "jobs": studio.ns_jobs.JobRunner(tmp_path / "jobs", 1), "jobs_off": None,
+        "jobs": studio.oc_jobs.JobRunner(tmp_path / "jobs", 1), "jobs_off": None,
         "rag": None, "rag_dir": str(tmp_path / "rag"), "rag_embed": None, "rag_embed_gguf": None,
-        "devices": studio.ns_pairing.DeviceRegistry(tmp_path / "devices.json"),
+        "devices": studio.oc_pairing.DeviceRegistry(tmp_path / "devices.json"),
         "links_path": str(tmp_path / "links.json"), "fingerprint": None,
         "review_dir": str(tmp_path / "review"), "review": None,
         "tool_rules_path": str(tmp_path / "tool-rules.json"), "subject_models": {},
@@ -241,7 +241,7 @@ def test_jobs_run_log_and_reject_injection(studio_srv, tmp_path):
 
 def test_jobs_cancel_and_off_on_network_bind(studio_srv, tmp_path, monkeypatch):
     runner = studio.STATE["jobs"]
-    monkeypatch.setitem(studio.ns_jobs.SPECS, "sleep", {"title": "sleep", "group": "t", "help": "",
+    monkeypatch.setitem(studio.oc_jobs.SPECS, "sleep", {"title": "sleep", "group": "t", "help": "",
                         "argv": ["-c", "import time; time.sleep(30)"], "fields": []})
     code, job = call(studio_srv, "/api/jobs", {"kind": "sleep", "values": {}})
     assert code == 200
@@ -469,10 +469,10 @@ def remote_studio(tmp_path):
     d = tmp_path / "remote"
     (d / "models" / "acme" / "Big-GGUF").mkdir(parents=True)
     (d / "models" / "acme" / "Big-GGUF" / "big-70b-Q4_K_M.gguf").write_bytes(b"GGUF" + b"\0" * 64)
-    sec = __import__("ns_security")
+    sec = __import__("oc_security")
     token = sec.generate_token()
     sec.write_secret_file(d / "token", token)
-    subprocess.run([sys.executable, str(ROOT / "scripts" / "ns_security.py"), "selfsigned", "--host", "127.0.0.1",
+    subprocess.run([sys.executable, str(ROOT / "scripts" / "oc_security.py"), "selfsigned", "--host", "127.0.0.1",
                     "--cert", str(d / "c.pem"), "--key", str(d / "k.pem")], check=True, capture_output=True)
     port = free_port()
     proc = subprocess.Popen([sys.executable, str(ROOT / "viz" / "studio.py"), "--models-dir", str(d / "models"),
@@ -485,11 +485,11 @@ def remote_studio(tmp_path):
                              "--chats-dir", str(d / "chats"), "--stats-dir", str(d / "stats")],
                             stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     base = f"https://127.0.0.1:{port}"
-    import ns_pairing
-    fp = ns_pairing.cert_fingerprint(str(d / "c.pem"))
+    import oc_pairing
+    fp = oc_pairing.cert_fingerprint(str(d / "c.pem"))
     for _ in range(100):
         try:
-            ns_pairing.request(base, "GET", "/api/status", token=token, fingerprint=fp, timeout=2)
+            oc_pairing.request(base, "GET", "/api/status", token=token, fingerprint=fp, timeout=2)
             break
         except Exception:
             time.sleep(0.1)
@@ -499,10 +499,10 @@ def remote_studio(tmp_path):
 
 
 def test_pairing_and_linked_host(studio_srv, remote_studio):
-    import ns_pairing
+    import oc_pairing
     base, token, fp = remote_studio
     # the owner creates a link; it carries the certificate fingerprint
-    r = ns_pairing.request(base, "POST", "/api/pair/start", {}, token=token, fingerprint=fp)
+    r = oc_pairing.request(base, "POST", "/api/pair/start", {}, token=token, fingerprint=fp)
     assert r["fingerprint"] == fp and f"fp={fp}" in r["link"]
     link = r["link"].replace(r["link"].split("/pair")[0], base)
     # a wrong fingerprint is refused before the code is ever sent
@@ -523,39 +523,39 @@ def test_pairing_and_linked_host(studio_srv, remote_studio):
     assert code == 200 and "big" in out["choices"][0]["message"]["content"]
     # the code was single use
     with pytest.raises(RuntimeError, match="403"):
-        ns_pairing.claim(link, "again")
+        oc_pairing.claim(link, "again")
     # the device token works for models but not for owner actions
     links = json.loads(open(studio.STATE["links_path"]).read())["links"]
     dev_tok = links[0]["token"]
-    assert ns_pairing.request(base, "GET", "/v1/models", token=dev_tok, fingerprint=fp)["data"]
+    assert oc_pairing.request(base, "GET", "/v1/models", token=dev_tok, fingerprint=fp)["data"]
     with pytest.raises(RuntimeError, match="403"):
-        ns_pairing.request(base, "POST", "/api/pair/start", {}, token=dev_tok, fingerprint=fp)
+        oc_pairing.request(base, "POST", "/api/pair/start", {}, token=dev_tok, fingerprint=fp)
     for path, body in [("/api/jobs", {"kind": "swe_import", "values": {}}), ("/api/load", {"id": "x"}),
                        ("/api/download", {"repo": "a/b"}), ("/api/mcp/reload", {})]:
         with pytest.raises(RuntimeError, match="403"):
-            ns_pairing.request(base, "POST", path, body, token=dev_tok, fingerprint=fp)
+            oc_pairing.request(base, "POST", path, body, token=dev_tok, fingerprint=fp)
     with pytest.raises(RuntimeError, match="403"):
-        ns_pairing.request(base, "GET", "/api/jobs", token=dev_tok, fingerprint=fp)
+        oc_pairing.request(base, "GET", "/api/jobs", token=dev_tok, fingerprint=fp)
     # revoking the device cuts the link off
-    devs = ns_pairing.request(base, "GET", "/api/devices", token=token, fingerprint=fp)["devices"]
+    devs = oc_pairing.request(base, "GET", "/api/devices", token=token, fingerprint=fp)["devices"]
     assert [d["name"] for d in devs] == ["studio"]
-    ns_pairing.request(base, "POST", "/api/devices/revoke", {"id": devs[0]["id"]}, token=token, fingerprint=fp)
+    oc_pairing.request(base, "POST", "/api/devices/revoke", {"id": devs[0]["id"]}, token=token, fingerprint=fp)
     with pytest.raises(RuntimeError, match="401"):
-        ns_pairing.request(base, "GET", "/v1/models", token=dev_tok, fingerprint=fp)
+        oc_pairing.request(base, "GET", "/v1/models", token=dev_tok, fingerprint=fp)
     # the token file on this side is private
     assert oct(os.stat(studio.STATE["links_path"]).st_mode & 0o777) == "0o600"
 
 
 def test_device_registry_codes_expire_and_are_hashed(tmp_path, monkeypatch):
-    import ns_pairing
-    reg = ns_pairing.DeviceRegistry(tmp_path / "d.json")
+    import oc_pairing
+    reg = oc_pairing.DeviceRegistry(tmp_path / "d.json")
     code, _, _ = reg.new_code()
     assert reg.claim("WRONGCODE000", "x") is None
     r = reg.claim(code.lower()[:4] + "-" + code[4:], "laptop")          # dashes and case do not matter
     assert r and reg.check(r["token"])["name"] == "laptop"
     assert r["token"] not in (tmp_path / "d.json").read_text()          # only the hash is stored
     code2, _, _ = reg.new_code()
-    monkeypatch.setattr(ns_pairing.time, "time", lambda: 10 ** 12)      # far future
+    monkeypatch.setattr(oc_pairing.time, "time", lambda: 10 ** 12)      # far future
     assert reg.claim(code2, "late") is None
 
 
@@ -607,11 +607,11 @@ def test_multi_gpu_flags_and_vram_fit(studio_srv, monkeypatch):
 
 def test_pairing_policy_persistent_and_temporary(tmp_path, monkeypatch):
     import json as _json
-    import ns_pairing
+    import oc_pairing
     clock = [1_000_000.0]
-    monkeypatch.setattr(ns_pairing.time, "time", lambda: clock[0])
-    pol = ns_pairing.PairingPolicy(code_ttl="2m", presets=["1h", "8h", "7d"], max_ttl="30d")
-    reg = ns_pairing.DeviceRegistry(tmp_path / "d.json", pol)
+    monkeypatch.setattr(oc_pairing.time, "time", lambda: clock[0])
+    pol = oc_pairing.PairingPolicy(code_ttl="2m", presets=["1h", "8h", "7d"], max_ttl="30d")
+    reg = oc_pairing.DeviceRegistry(tmp_path / "d.json", pol)
     # persistent (the default) and temporary pairings side by side
     c1, code_exp, acc = reg.new_code()
     assert acc is None and code_exp == clock[0] + 120
@@ -640,7 +640,7 @@ def test_pairing_policy_persistent_and_temporary(tmp_path, monkeypatch):
             raise AssertionError(kw)
         except ValueError:
             pass
-    strict = ns_pairing.DeviceRegistry(tmp_path / "s.json", ns_pairing.PairingPolicy(allow_persistent=False))
+    strict = oc_pairing.DeviceRegistry(tmp_path / "s.json", oc_pairing.PairingPolicy(allow_persistent=False))
     try:
         strict.new_code(persistent=True)
         raise AssertionError("persistent allowed")
@@ -656,41 +656,41 @@ def test_pairing_policy_persistent_and_temporary(tmp_path, monkeypatch):
     # long-expired devices are pruned on the next pairing
     c4, _, _ = reg.new_code(persistent=False, ttl="1h")
     gone = reg.claim(c4, "short")
-    clock[0] += 3600 + ns_pairing.EXPIRED_KEEP + 1
+    clock[0] += 3600 + oc_pairing.EXPIRED_KEEP + 1
     reg.claim(reg.new_code()[0], "next")
     assert "short" not in {d["name"] for d in reg.list()}
     # device files from before expiry existed load as persistent
     (tmp_path / "old.json").write_text(_json.dumps({"devices": [{"id": "a", "name": "old", "token_sha256": "x",
                                                                  "created": 1, "last_seen": None}]}))
-    assert ns_pairing.DeviceRegistry(tmp_path / "old.json").list()[0]["persistent"]
-    assert ns_pairing.parse_duration("90m") == 5400 and ns_pairing.fmt_duration(7 * 86400) == "7d"
+    assert oc_pairing.DeviceRegistry(tmp_path / "old.json").list()[0]["persistent"]
+    assert oc_pairing.parse_duration("90m") == 5400 and oc_pairing.fmt_duration(7 * 86400) == "7d"
 
 
 def test_temporary_pairing_end_to_end(remote_studio):
-    import ns_pairing
+    import oc_pairing
     base, token, fp = remote_studio
-    r = ns_pairing.request(base, "POST", "/api/pair/start", {"persistent": False, "ttl": "2h"},
+    r = oc_pairing.request(base, "POST", "/api/pair/start", {"persistent": False, "ttl": "2h"},
                            token=token, fingerprint=fp)
     assert r["access_seconds"] == 7200 and not r["persistent"] and "&a=2h" in r["link"]
-    code = ns_pairing.parse_link(r["link"].replace(r["link"].split("/pair")[0], base))[1]
-    resp = ns_pairing.request(base, "POST", "/api/pair/claim", {"code": code, "name": "tablet", "cookie": True},
+    code = oc_pairing.parse_link(r["link"].replace(r["link"].split("/pair")[0], base))[1]
+    resp = oc_pairing.request(base, "POST", "/api/pair/claim", {"code": code, "name": "tablet", "cookie": True},
                               fingerprint=fp, stream=True)
     cookie = resp.getheader("Set-Cookie")
     claimed = json.loads(resp.read())
     assert 7100 < int(cookie.split("Max-Age=")[1].split(";")[0]) <= 7200      # the cookie ends with the access
-    assert claimed["expires"] and ns_pairing.request(base, "GET", "/v1/models", token=claimed["token"],
+    assert claimed["expires"] and oc_pairing.request(base, "GET", "/v1/models", token=claimed["token"],
                                                      fingerprint=fp)["data"]
-    devs = ns_pairing.request(base, "GET", "/api/devices", token=token, fingerprint=fp)
+    devs = oc_pairing.request(base, "GET", "/api/devices", token=token, fingerprint=fp)
     (dev,) = [d for d in devs["devices"] if d["name"] == "tablet"]
     assert not dev["persistent"] and devs["policy"]["allow_persistent"]
-    up = ns_pairing.request(base, "POST", "/api/devices/update", {"id": dev["id"], "persistent": True},
+    up = oc_pairing.request(base, "POST", "/api/devices/update", {"id": dev["id"], "persistent": True},
                             token=token, fingerprint=fp)
     assert up["persistent"] and up["expires"] is None
     with pytest.raises(RuntimeError, match="400"):          # beyond the host's --pair-max (90d)
-        ns_pairing.request(base, "POST", "/api/pair/start", {"persistent": False, "ttl": "400d"},
+        oc_pairing.request(base, "POST", "/api/pair/start", {"persistent": False, "ttl": "400d"},
                            token=token, fingerprint=fp)
     with pytest.raises(RuntimeError, match="403"):          # a device cannot change its own access
-        ns_pairing.request(base, "POST", "/api/devices/update", {"id": dev["id"], "persistent": True},
+        oc_pairing.request(base, "POST", "/api/devices/update", {"id": dev["id"], "persistent": True},
                            token=claimed["token"], fingerprint=fp)
 
 
@@ -825,8 +825,8 @@ def test_checked_replies_feed_the_review_page(studio_srv, tmp_path):
 
 
 def test_requirements_api(studio_srv, tmp_path, monkeypatch):
-    import ns_requirements
-    monkeypatch.setattr(ns_requirements, "SNAP_DIR", tmp_path / "env")
+    import oc_requirements
+    monkeypatch.setattr(oc_requirements, "SNAP_DIR", tmp_path / "env")
     code, r = call(studio_srv, "/api/requirements")
     assert code == 200 and r["features"]["core"]["status"] in ("ok", "warn") and "hardware" in r
     assert call(studio_srv, "/api/requirements/diff", {})[0] == 400          # no snapshots yet
@@ -992,7 +992,7 @@ def test_mcp_over_http(studio_srv, tmp_path):
                                 "params": {"protocolVersion": "2025-03-26", "capabilities": {},
                                            "clientInfo": {"name": "t", "version": "0"}}})
     assert code == 200 and r["result"]["protocolVersion"] == "2025-03-26"
-    assert r["result"]["serverInfo"]["name"] == "neuronscope" and "tools" in r["result"]["capabilities"]
+    assert r["result"]["serverInfo"]["name"] == "omnicortex" and "tools" in r["result"]["capabilities"]
     assert _rpc(studio_srv, {"jsonrpc": "2.0", "method": "notifications/initialized"})[0] == 202
     code, r = _rpc(studio_srv, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
     tools = {t["name"]: t for t in r["result"]["tools"]}
@@ -1065,7 +1065,7 @@ def test_mcp_and_connect_with_tokens(studio_srv, tmp_path):
         req = urllib.request.Request(studio_srv + "/api/connect", headers={"Authorization": f"Bearer {owner}"})
         sn = json.loads(urllib.request.urlopen(req, timeout=10).read())
         assert sn["token_required"] and sn["cline_provider"]["API Provider"] == "OpenAI Compatible"
-        entry = sn["cline_mcp_http"]["mcpServers"]["neuronscope"]
+        entry = sn["cline_mcp_http"]["mcpServers"]["omnicortex"]
         assert entry["url"].endswith("/mcp") and entry["headers"]["Authorization"].startswith("Bearer <")
         assert "list_models" in entry["autoApprove"] and "start_job" not in entry["autoApprove"]
     finally:
@@ -1088,29 +1088,29 @@ def test_mcp_with_the_official_client(studio_srv):
 
     for tr in (streamable_http_client(studio_srv + "/mcp"),
                stdio_client(StdioServerParameters(command=sys.executable, args=[
-                   str(ROOT / "scripts" / "ns_mcp.py"), "--studio", studio_srv]))):
+                   str(ROOT / "scripts" / "oc_mcp.py"), "--studio", studio_srv]))):
         names, out = asyncio.run(run(tr))
         assert "check_reply" in names and out["subjects"] == ["systems"]
 
 
 def test_connect_writes_cline_settings_and_keeps_others(tmp_path, monkeypatch):
-    import ns_connect
+    import oc_connect
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
     monkeypatch.setenv("APPDATA", str(tmp_path / "AppData"))
-    path = ns_connect.cline_settings_path("cursor")
+    path = oc_connect.cline_settings_path("cursor")
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps({"mcpServers": {"other": {"command": "x"}}}))
-    assert ns_connect.main(["--studio", "http://127.0.0.1:9", "cline", "--editor", "cursor", "--write"]) == 0
+    assert oc_connect.main(["--studio", "http://127.0.0.1:9", "cline", "--editor", "cursor", "--write"]) == 0
     cfg = json.loads(path.read_text())
     assert cfg["mcpServers"]["other"] == {"command": "x"}
-    assert cfg["mcpServers"]["neuronscope"]["url"] == "http://127.0.0.1:9/mcp"
+    assert cfg["mcpServers"]["omnicortex"]["url"] == "http://127.0.0.1:9/mcp"
     assert list(path.parent.glob("*.bak-*"))
     tok = tmp_path / "tok"
     tok.write_text("secret-token\n")
-    ns_connect.main(["--studio", "http://127.0.0.1:9", "--token-file", str(tok), "cline", "--editor", "cursor",
+    oc_connect.main(["--studio", "http://127.0.0.1:9", "--token-file", str(tok), "cline", "--editor", "cursor",
                      "--write"])
-    e = json.loads(path.read_text())["mcpServers"]["neuronscope"]
+    e = json.loads(path.read_text())["mcpServers"]["omnicortex"]
     assert e["headers"] == {"Authorization": "Bearer secret-token"}
     assert oct(path.stat().st_mode & 0o777) == "0o600"
 

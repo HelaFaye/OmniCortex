@@ -25,3 +25,4 @@ ns-key.pem
 # CI build output
 /dist/
 /build/
+.godot/

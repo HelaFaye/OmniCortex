@@ -24,7 +24,7 @@ Which page to use:
 |---|---|
 | an LLM server (LM Studio, Ollama, llama.cpp…) but not OmniCortex | **Remote** (this page) |
 | OmniCortex Studio | **Link** (Studio to Studio pairing, [SECURITY.md](SECURITY.md)) |
-| nothing yet; you want to copy GGUFs to it as they are made | the transfer watcher (`scripts/ns_transfer.py`), or Remote's *Send model* once the agent runs there |
+| nothing yet; you want to copy GGUFs to it as they are made | the transfer watcher (`scripts/oc_transfer.py`), or Remote's *Send model* once the agent runs there |
 
 Which computer controls and which does the work, for every connection and port: [ROLES.md](ROLES.md).
 
@@ -35,7 +35,7 @@ Open Studio → **Remote** (*Remote* in the sidebar) → **Add a host**.
 1. **Put the agent on the host.** Click **Download OmniCortex Remote**,
    copy the zip to the host, and start it:
    - Windows: double-click `OmniCortex Remote.bat`;
-   - macOS and Linux: `./neuronscope-remote.sh`.
+   - macOS and Linux: `./omnicortex-remote.sh`.
 
    It needs Python 3.9+ and nothing else. Its console opens in the host's
    browser.
@@ -71,7 +71,7 @@ Open Studio → **Remote** (*Remote* in the sidebar) → **Add a host**.
       tunnel. The wizard warns when Studio listens on its own computer
       only.
    2. On the host, paste the invite into the console's **Join** box, or run
-      `neuronscope-remote connect nsr1:…`.
+      `omnicortex-remote connect nsr1:…`.
 
    The host shows up in Studio's list as *connected* once it joins, and
    reconnects by itself whenever the agent runs.
@@ -103,7 +103,7 @@ Open Studio → **Remote** (*Remote* in the sidebar) → **Add a host**.
     stopped, and the host checks the SHA-256 before keeping the file.
   - A host that calls in downloads the file instead, from a one-time
     Studio link.
-  - `install_model` puts it at `<LM Studio models>/neuronscope/<name>/`,
+  - `install_model` puts it at `<LM Studio models>/omnicortex/<name>/`,
     which is where LM Studio looks, or creates an Ollama model.
 - **Everything over MCP.** Each of these is a call to one of the host's
   tools. Other programs reach the same tools through Studio's MCP server:
@@ -112,8 +112,8 @@ Open Studio → **Remote** (*Remote* in the sidebar) → **Add a host**.
     `{"host": "gpu-box", "tool": "load_model", "args": {"model": "qwen3-8b"}}`.
 
   From a terminal:
-  `./neuronscope cli remote-hosts` and
-  `./neuronscope cli remote-call --host gpu-box --tool host_info`.
+  `./omnicortex cli remote-hosts` and
+  `./omnicortex cli remote-call --host gpu-box --tool host_info`.
 
 The host's tools are:
 - `host_info`
@@ -181,10 +181,10 @@ picks the place:
    the host runs OmniCortex's tracer and sends back the per-token trace
    (a few MB). The host needs:
    - OmniCortex installed (the agent finds it when it runs from a
-     OmniCortex folder; otherwise set `tracer.neuronscope` in the agent's
+     OmniCortex folder; otherwise set `tracer.omnicortex` in the agent's
      `config.json`);
    - `llama-cett-dump` built there (Setup → Build llama.cpp on that machine,
-     then set `tracer.cett`, or put it on `PATH`, or set `NS_CETT`);
+     then set `tracer.cett`, or put it on `PATH`, or set `OC_CETT`);
    - *check replies with OmniCortex's tracer* allowed in the host's
      console (on by default).
 

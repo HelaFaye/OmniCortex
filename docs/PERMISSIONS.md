@@ -33,7 +33,7 @@ A rule allows, asks or denies one action (or `*`) on targets matching a
 pattern: `exact`, `prefix`, `glob` (`*` within a folder, `**` across folders)
 or `regex`. Allow rules are the whitelist and deny rules the blacklist.
 Patterns may use `{workdir}`, `{repo}`, `{home}`, `{tmp}` and
-`{neuronscope}`.
+`{omnicortex}`.
 
 A profile is a set of rules plus a default per action. A check stacks:
 
@@ -89,7 +89,7 @@ Batch jobs have no one to ask, so they treat ask as no.
 ## Command line
 
 ```bash
-python scripts/permissions.py                                   # the policy (~/.neuronscope/permissions.json, or $NS_PERMISSIONS)
+python scripts/permissions.py                                   # the policy (~/.omnicortex/permissions.json, or $OC_PERMISSIONS)
 python scripts/permissions.py presets
 python scripts/permissions.py check run "git apply fix.patch" --job swe_evaluate --repo /work/repo
 python scripts/permissions.py bind '*coder*' developer

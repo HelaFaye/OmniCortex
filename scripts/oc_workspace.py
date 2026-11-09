@@ -10,17 +10,17 @@ Studio, its jobs, doctor.py and the launcher all read the active one, so a
 repository on an external drive, models on another disk, or a second machine
 layout is a setting, not a code change.
 
-Stored in ~/.neuronscope/config.json ($NS_CONFIG) next to Studio's settings:
+Stored in ~/.omnicortex/config.json ($OC_CONFIG) next to Studio's settings:
 
     {"active_workspace": "laptop",
-     "workspaces": {"laptop": {"root": "/run/media/me/disk/neuronscope", "models_dirs": ["~/models"], …}}}
+     "workspaces": {"laptop": {"root": "/run/media/me/disk/omnicortex", "models_dirs": ["~/models"], …}}}
 
-    python scripts/ns_workspace.py                      # the active workspace, resolved
-    python scripts/ns_workspace.py list
-    python scripts/ns_workspace.py add ext --root /mnt/ext/ns --models-dir /mnt/ext/models --llama-dir ~/llama.cpp
-    python scripts/ns_workspace.py set ext env.VK_DRIVER_FILES /usr/share/vulkan/icd.d/radeon_icd.x86_64.json
-    python scripts/ns_workspace.py use ext
-    eval "$(python scripts/ns_workspace.py env)"        # NS_* variables for scripts run by hand
+    python scripts/oc_workspace.py                      # the active workspace, resolved
+    python scripts/oc_workspace.py list
+    python scripts/oc_workspace.py add ext --root /mnt/ext/ns --models-dir /mnt/ext/models --llama-dir ~/llama.cpp
+    python scripts/oc_workspace.py set ext env.VK_DRIVER_FILES /usr/share/vulkan/icd.d/radeon_icd.x86_64.json
+    python scripts/oc_workspace.py use ext
+    eval "$(python scripts/oc_workspace.py env)"        # NS_* variables for scripts run by hand
 """
 from __future__ import annotations
 
@@ -38,8 +38,8 @@ NAME_RX = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,40}")
 ENV_RX = re.compile(r"[A-Z_][A-Z0-9_]{0,63}")
 # Variables a workspace may not set: they would change how Python, the shell or
 # OmniCortex itself run rather than where things are.
-ENV_DENY = {"PATH", "PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "HOME", "SHELL", "NS_STUDIO_TOKEN",
-            "NS_CONFIG", "BASH_ENV", "ENV"}
+ENV_DENY = {"PATH", "PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "HOME", "SHELL", "OC_STUDIO_TOKEN",
+            "OC_CONFIG", "BASH_ENV", "ENV"}
 
 # name: (kind, help). kind: dir, newdir (created when needed; its parent must exist), dirs, file, exe, env, text
 FIELDS = {
@@ -60,7 +60,7 @@ STATE_SUBDIRS = {"chats_dir": "chats", "traces_dir": "traces", "review_dir": "re
 
 
 def config_path() -> Path:
-    return Path(os.path.expanduser(os.environ.get("NS_CONFIG", "~/.neuronscope/config.json")))
+    return Path(os.path.expanduser(os.environ.get("OC_CONFIG", "~/.omnicortex/config.json")))
 
 
 def _load(path: Path | None = None) -> dict:
@@ -101,9 +101,9 @@ def names(path: Path | None = None) -> list[str]:
 
 
 def active_name(path: Path | None = None, use_env: bool = True) -> str:
-    """The workspace in use: $NS_WORKSPACE (set by --workspace, and passed to
+    """The workspace in use: $OC_WORKSPACE (set by --workspace, and passed to
     Studio's jobs) or else the file's active_workspace."""
-    env = os.environ.get("NS_WORKSPACE") if use_env else None
+    env = os.environ.get("OC_WORKSPACE") if use_env else None
     d = _load(path)
     name = env or d.get("active_workspace") or DEFAULT_NAME
     return name if name in names(path) else DEFAULT_NAME
@@ -121,16 +121,16 @@ def raw(name: str | None = None, path: Path | None = None) -> dict:
 def resolve(ws: dict) -> dict:
     """Fill in defaults and expand ~: the paths everything else uses."""
     root = _x(ws.get("root")) or str(REPO)
-    llama = _x(ws.get("llama_dir")) or _x(os.environ.get("NS_LLAMA")) or os.path.expanduser("~/llama.cpp")
+    llama = _x(ws.get("llama_dir")) or _x(os.environ.get("OC_LLAMA")) or os.path.expanduser("~/llama.cpp")
     bin_dir = os.path.join(llama, "build", "bin")
     models = [_x(m) for m in (ws.get("models_dirs") or []) if m] or [
         os.path.join(root, "models", "gguf"), os.path.expanduser("~/models"),
         os.path.expanduser("~/.lmstudio/models"), os.path.expanduser("~/.cache/lm-studio/models")]
-    state = _x(ws.get("state_dir")) or os.path.expanduser("~/.neuronscope")
+    state = _x(ws.get("state_dir")) or os.path.expanduser("~/.omnicortex")
     out = {"root": root, "models_dirs": models, "download_dir": _x(ws.get("download_dir")), "llama_dir": llama,
            "server": _x(ws.get("server")) or os.path.join(bin_dir, "llama-server"),
            "cett": _x(ws.get("cett")) or os.path.join(bin_dir, "llama-cett-dump"),
-           "gguf": _x(ws.get("gguf")) or _x(os.environ.get("NS_GGUF")), "state_dir": state,
+           "gguf": _x(ws.get("gguf")) or _x(os.environ.get("OC_GGUF")), "state_dir": state,
            "env": {k: str(v) for k, v in (ws.get("env") or {}).items()}, "note": ws.get("note") or ""}
     for k, sub in STATE_SUBDIRS.items():
         out[k] = os.path.join(state, sub)
@@ -145,16 +145,16 @@ def active(path: Path | None = None) -> dict:
 
 def env_for(ws: dict) -> dict:
     """NS_* variables (what the scripts read) plus the workspace's own environment."""
-    out = {"NS_ROOT": ws["root"], "NS_LLAMA": ws["llama_dir"], "NS_WORKSPACE": ws.get("name") or ""}
+    out = {"OC_ROOT": ws["root"], "OC_LLAMA": ws["llama_dir"], "OC_WORKSPACE": ws.get("name") or ""}
     if ws.get("server") and os.path.exists(ws["server"]):
-        out["NS_LLAMA_SERVER"] = ws["server"]
+        out["OC_LLAMA_SERVER"] = ws["server"]
     if ws.get("cett") and os.path.exists(ws["cett"]):
-        out["NS_CETT"] = ws["cett"]
+        out["OC_CETT"] = ws["cett"]
     if ws.get("gguf"):
-        out["NS_GGUF"] = ws["gguf"]
-    out["NS_MODELS_DIRS"] = os.pathsep.join(ws["models_dirs"])
-    out["NS_STATS_DIR"] = ws["stats_dir"]
-    out["NS_REVIEW_DIR"] = ws["review_dir"]
+        out["OC_GGUF"] = ws["gguf"]
+    out["OC_MODELS_DIRS"] = os.pathsep.join(ws["models_dirs"])
+    out["OC_STATS_DIR"] = ws["stats_dir"]
+    out["OC_REVIEW_DIR"] = ws["review_dir"]
     out.update(ws.get("env") or {})
     return out
 
@@ -288,7 +288,7 @@ def main(argv=None) -> int:
     s_.add_argument("value", nargs="?", default="")
     sub.add_parser("use").add_argument("name")
     sub.add_parser("delete").add_argument("name")
-    e_ = sub.add_parser("env", help="export lines for the shell: eval \"$(python scripts/ns_workspace.py env)\"")
+    e_ = sub.add_parser("env", help="export lines for the shell: eval \"$(python scripts/oc_workspace.py env)\"")
     e_.add_argument("name", nargs="?")
     a = p.parse_args(argv)
     try:

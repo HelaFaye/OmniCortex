@@ -3,7 +3,7 @@ from pathlib import Path
 from http.server import ThreadingHTTPServer
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-import ns_transfer as nt
+import oc_transfer as nt
 
 def server(tmp, token=''):
     nt.Handler.receiver=nt.Receiver(tmp); nt.Handler.token=token

@@ -21,8 +21,8 @@ and a machine in the middle cannot take the code. The claim returns a device
 token of its own: revocable on the host without touching anything else, and
 stored there only as a hash.
 
-    python scripts/ns_pairing.py claim 'https://studio.lan:7870/pair#c=…&fp=…' --name laptop \\
-        --out ~/.config/neuronscope/studio-laptop.token
+    python scripts/oc_pairing.py claim 'https://studio.lan:7870/pair#c=…&fp=…' --name laptop \\
+        --out ~/.config/omnicortex/studio-laptop.token
 
 A browser opening the link is paired the same way and logged in. Another
 Studio can claim it as a *linked host* and then serve the remote's models
@@ -46,7 +46,7 @@ import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"   # no 0/O, 1/I/L
 CODE_LEN = 12                                        # ~59 bits; single use, short-lived, throttled

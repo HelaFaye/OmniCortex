@@ -7,7 +7,7 @@ frames go to the live viewer (viz/stream.py, POST /api/push) as tokens are gener
 be saved as a trace session that the 3D replay (viz/bloom.py), the timeline and the Godot client scrub,
 with emotion and feature tracks alongside the neurons.
 
-    CETT(layer, neuron) = |a| x ||W_down[:, neuron]|| / ||down_proj output||   (ns_common.CETTManager)
+    CETT(layer, neuron) = |a| x ||W_down[:, neuron]|| / ||down_proj output||   (oc_common.CETTManager)
 
 Only the newest position is read at each step, so the cost is a few vector operations per layer.
 """

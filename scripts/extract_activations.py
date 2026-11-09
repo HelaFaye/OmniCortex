@@ -2,7 +2,7 @@
 """
 Stage 4: CETT activation extraction.
 
-Replaces scripts/extract_activations.py from the upstream repo. See ns_common.py
+Replaces scripts/extract_activations.py from the upstream repo. See oc_common.py
 for the substantive differences (device-safe hooks, text-layer filtering, exact
 sequence construction, think-block-aware region indexing).
 
@@ -25,7 +25,7 @@ import torch
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import CETTManager, build_sequence, find_regions, load_model  # noqa: E402
+from oc_common import CETTManager, build_sequence, find_regions, load_model  # noqa: E402
 
 
 def parse_args():

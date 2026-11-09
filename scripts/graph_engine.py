@@ -114,10 +114,10 @@ class Env:
         if json_mode:
             body["response_format"] = {"type": "json_object"}
         if endpoint:
-            import ns_mcp
+            import oc_mcp
             url, _, m = endpoint.partition("@")
             body["model"] = m or body["model"]
-            st = ns_mcp.Studio(url.rstrip("/").removesuffix("/v1"))
+            st = oc_mcp.Studio(url.rstrip("/").removesuffix("/v1"))
             r = st.call("POST", "/v1/chat/completions", body, timeout=1800)
         else:
             r = self.need_studio().call("POST", "/v1/chat/completions", body, timeout=1800)
@@ -1047,7 +1047,7 @@ def main(argv=None) -> int:
     e.add_argument("--output", default="result")
     e.add_argument("--grade", choices=["contains", "exact", "regex"], default="contains")
     for x in (r, e):
-        x.add_argument("--studio", default=os.environ.get("NS_STUDIO_URL", "http://127.0.0.1:7870"))
+        x.add_argument("--studio", default=os.environ.get("OC_STUDIO_URL", "http://127.0.0.1:7870"))
         x.add_argument("--token-file")
         x.add_argument("--model", default="")
         x.add_argument("--profile", default="")
@@ -1063,9 +1063,9 @@ def main(argv=None) -> int:
     if a.cmd not in ("run", "eval"):
         p.print_help()
         return 0
-    import ns_mcp
-    tok = Path(a.token_file).read_text().strip() if a.token_file else os.environ.get("NS_STUDIO_TOKEN")
-    env = Env(ns_mcp.Studio(a.studio, tok), model=a.model, profile=a.profile, workdir=a.workdir)
+    import oc_mcp
+    tok = Path(a.token_file).read_text().strip() if a.token_file else os.environ.get("OC_STUDIO_TOKEN")
+    env = Env(oc_mcp.Studio(a.studio, tok), model=a.model, profile=a.profile, workdir=a.workdir)
     g = json.loads(Path(a.graph).read_text())
     if a.cmd == "run":
         run = Runner(g, env).start(dict(x.split("=", 1) for x in a.input))

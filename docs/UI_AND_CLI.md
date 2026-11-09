@@ -1,7 +1,7 @@
 # Every feature: in the UI, on the command line, and for agents
 
 After `./install.sh`, nothing needs a terminal: start **OmniCortex** from the
-app menu (or `./neuronscope`, or `OmniCortex.bat` on Windows) and Studio opens
+app menu (or `./omnicortex`, or `OmniCortex.bat` on Windows) and Studio opens
 in your browser. Everything below is also scriptable, for people who prefer a
 shell and for automation; and the third column is what an AI agent (Cline,
 Claude Desktop) can do through OmniCortex's MCP server ([CONNECT.md](CONNECT.md)).
@@ -29,27 +29,27 @@ from typed forms: no free-form command line, values cannot smuggle in flags,
 each run keeps its log, and the form's fields are tested against the script's
 own options.
 
-The terminal client (`scripts/ns.py`, `./neuronscope cli`) and the Godot
-client (`./neuronscope godot`) reach a running Studio, here or on another
+The terminal client (`scripts/oc.py`, `./omnicortex cli`) and the Godot
+client (`./omnicortex godot`) reach a running Studio, here or on another
 machine; [CLIENTS.md](CLIENTS.md) compares the three.
 
 ## Setting up
 
 | feature | in the UI | command line | MCP tool |
 |---|---|---|---|
-| Start Studio and open it | app menu → OmniCortex | `./neuronscope`, `python scripts/launch.py` | — |
-| Models folder, llama-server, vLLM, cett-dump, unloading, routing thresholds, workers and jobs, document search, MCP config | **Setup → Settings** | `~/.neuronscope/config.json`, or Studio's flags | — |
+| Start Studio and open it | app menu → OmniCortex | `./omnicortex`, `python scripts/launch.py` | — |
+| Models folder, llama-server, vLLM, cett-dump, unloading, routing thresholds, workers and jobs, document search, MCP config | **Setup → Settings** | `~/.omnicortex/config.json`, or Studio's flags | — |
 | Listen address, port, token, TLS, pairing limits | **Setup → Settings → Advanced** (refuses an address Studio could not start on) | `--host`, `--port`, `--token-file`, `--tls-cert/--tls-key`, `--pair-*` | — |
 | Build llama.cpp with cett-dump | **Setup → Build**, or Jobs → Setup | `scripts/build_llama_tools.sh --backend vulkan` | `start_job build_llama` |
 | Health check (packages, GPUs, build, model, pipeline) | **Setup → Health check** | `python scripts/doctor.py` | `doctor` |
-| Hardware for worker models (ROCm, Vulkan, CUDA, Metal, CPU) | **Setup → Hardware** | `~/.neuronscope/hardware.json`, `python scripts/accelerators.py` | `devices` |
+| Hardware for worker models (ROCm, Vulkan, CUDA, Metal, CPU) | **Setup → Hardware** | `~/.omnicortex/hardware.json`, `python scripts/accelerators.py` | `devices` |
 | Restart Studio | **Setup → Restart Studio** | stop and start it | — |
-| Where models, llama.cpp, pipeline data and Studio's state live; switch layouts by name | **Settings → Workspaces** | `python scripts/ns_workspace.py`, `--workspace` on Studio, the launcher and doctor.py | — |
+| Where models, llama.cpp, pipeline data and Studio's state live; switch layouts by name | **Settings → Workspaces** | `python scripts/oc_workspace.py`, `--workspace` on Studio, the launcher and doctor.py | — |
 | The model `auto` uses for a subject | **Settings → Models per subject** | `subject_models` in `config.json` | — |
 | When chat tool calls are allowed, asked or denied (rules, kinds, argument regexes, limits) | **Settings → Tool approval**; *always…* on an approval card | `python scripts/tool_rules.py` | — |
-| What each feature needs (packages, programs, llama.cpp backends, drivers, devices, memory), with fixes for this OS | **Setup → Requirements** | `python scripts/ns_requirements.py` | `requirements` |
-| Install a missing Python package | **Setup → Requirements → Install**, or Jobs → Setup | `python scripts/ns_requirements.py install <pkg>` | `start_job install_package` |
-| Environment snapshots and what changed | **Setup → Requirements → snapshots** | `ns_requirements.py snapshot`, `diff`, `freeze` | `start_job env_snapshot` |
+| What each feature needs (packages, programs, llama.cpp backends, drivers, devices, memory), with fixes for this OS | **Setup → Requirements** | `python scripts/oc_requirements.py` | `requirements` |
+| Install a missing Python package | **Setup → Requirements → Install**, or Jobs → Setup | `python scripts/oc_requirements.py install <pkg>` | `start_job install_package` |
+| Environment snapshots and what changed | **Setup → Requirements → snapshots** | `oc_requirements.py snapshot`, `diff`, `freeze` | `start_job env_snapshot` |
 
 Network exposure (binding beyond this computer, tokens, TLS, remote jobs) is
 deliberately not on the Setup page: set it in `config.json` or with flags
@@ -66,10 +66,10 @@ deliberately not on the Setup page: set it in `config.json` or with flags
 | `auto` routing by measured skill | model picker → auto | `"model": "auto"`; `python scripts/model_stats.py rank "…"` | `route_prompt` |
 | Check a reply for hallucination risk, 3D view of it | chat → **check** | `POST /api/trace` | `check_reply` |
 | Chat with documents (RAG) | Studio → **Docs** | `python scripts/rag.py` | — |
-| MCP tools inside chat | Studio → **Tools** | `~/.neuronscope/mcp.json`, `python scripts/mcp_client.py` | — |
+| MCP tools inside chat | Studio → **Tools** | `~/.omnicortex/mcp.json`, `python scripts/mcp_client.py` | — |
 | Other devices and linked machines | **Connect → Devices** | `/api/pair/*`, `/api/links/*` | — |
-| Computers running LM Studio, Ollama or llama.cpp without OmniCortex (remote hosts): pair, models, load/unload, send and install models | **Remote** | the agent: `neuronscope-remote` ([REMOTE.md](REMOTE.md)); `/api/remote/*` | `remote_hosts`, `remote_call` |
-| Cline, Claude Desktop, OpenAI apps | **Connect** | `python scripts/ns_connect.py` | — |
+| Computers running LM Studio, Ollama or llama.cpp without OmniCortex (remote hosts): pair, models, load/unload, send and install models | **Remote** | the agent: `omnicortex-remote` ([REMOTE.md](REMOTE.md)); `/api/remote/*` | `remote_hosts`, `remote_call` |
+| Cline, Claude Desktop, OpenAI apps | **Connect** | `python scripts/oc_connect.py` | — |
 
 ## Measuring and improving models
 
@@ -98,7 +98,7 @@ deliberately not on the Setup page: set it in `config.json` or with flags
 | Attribution graph, interventions, what drives a completion | **Features → Circuits** | `python scripts/feature_circuits.py graph / intervene / attribute` | `start_job feat_graph` |
 | Emotion vectors: stories, vectors, trace, scan, sweep | **Features → Emotions** | `python scripts/emotions.py stories / build / trace / scan / sweep` | `start_job emo_*` |
 | Steer with features and emotions; as a decoding-lab variant; as a llama.cpp control vector | **Features → Steer** | `decode_lab.py --variant`, `emotions.py steer / cvec` | `start_job emo_steer`, `emo_cvec` |
-| A project's own requirements (toolchain, libraries, packages, hardware), inferred from its build files, checked before Start | **Projects → Requirements** | `python scripts/ns_requirements.py project <dir>` | `project_requirements`, `set_project_requirements`, `scan_project_requirements` |
+| A project's own requirements (toolchain, libraries, packages, hardware), inferred from its build files, checked before Start | **Projects → Requirements** | `python scripts/oc_requirements.py project <dir>` | `project_requirements`, `set_project_requirements`, `scan_project_requirements` |
 | Projects split by skill, worker models, review | **Projects** | `python scripts/director.py analyze`, `/api/projects` | `create_project`, `get_project`, `review_task`, … |
 
 ## Finding and editing H-Neurons
@@ -128,7 +128,7 @@ deliberately not on the Setup page: set it in `config.json` or with flags
 | feature | in the UI | command line | MCP tool |
 |---|---|---|---|
 | Browser-to-browser encrypted transfer | **Lab → Model transfer** | `python viz/transfer_lab.py` | — |
-| Resumable HTTPS transfer, watch mode | — | `python scripts/ns_transfer.py` | (`ns_transfer_mcp.py`) |
+| Resumable HTTPS transfer, watch mode | — | `python scripts/oc_transfer.py` | (`oc_transfer_mcp.py`) |
 | Remote tuning worker | Lab → Adaptive tuning | `python scripts/tuning_worker.py` on the worker | — |
 
 The worker side of a remote transfer or tuning run is started on the other

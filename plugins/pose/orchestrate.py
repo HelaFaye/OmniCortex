@@ -5,7 +5,7 @@ pairs have accumulated, runs one refinement cycle:
   1. pause      creates <staging>/PAUSE; stream.py --staging holds while it exists
   2. export     the approved pairs as a dataset (staging.py export)
   3. sweep      finetune.py --dpo (QLoRA, NF4, bf16 where the GPU has it) for every --lrs x --alphas pair,
-                each a short run; reads each run's training log (neuronscope-finetune.json, or TensorBoard
+                each a short run; reads each run's training log (omnicortex-finetune.json, or TensorBoard
                 event files with --report-to tensorboard)
   4. pick       the run with the largest final reward margin (chosen minus rejected) whose loss stayed finite
                 and never rose above --explode x its first value; ties go to the lower learning rate
@@ -47,7 +47,7 @@ SCRIPTS = HERE.parents[1] / "scripts"
 
 def dpo_curve(run: Path) -> list[dict]:
     """[{step, loss, margin}] from finetune.py's log, else from TensorBoard event files."""
-    meta = run / "neuronscope-finetune.json"
+    meta = run / "omnicortex-finetune.json"
     rows = []
     if meta.exists():
         log = (json.loads(meta.read_text()).get("log") or {}).get("dpo") or []

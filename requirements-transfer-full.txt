@@ -1,9 +1,9 @@
-# Reliable CLI transfer (ns_transfer.py) uses only the Python standard library.
+# Reliable CLI transfer (oc_transfer.py) uses only the Python standard library.
 # WebRTC GUI signaling server:
 aiohttp>=3.10,<4
 # Optional MCP control plane. Older releases have published security advisories.
 mcp>=2.3,<3
 # Optional: store MCP target tokens in the OS credential store instead of 0600 files.
 keyring>=24
-# Optional: `ns_security.py selfsigned` for LAN TLS certificates.
+# Optional: `oc_security.py selfsigned` for LAN TLS certificates.
 cryptography>=42

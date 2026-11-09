@@ -5,15 +5,15 @@ extends Node3D
 ## uses. All thresholding and flagging happened in Python; this only draws, so
 ## the frontends cannot drift on what counts as a flagged token or cell.
 ##
-##   NS_API=http://127.0.0.1:7880 godot --path plugins/godot-client/client
-##   NS_FRAME=146 NS_PAUSED=1 ...    # open on one token, paused (for screenshots)
-##   NS_API=https://studio:7870/viz/<id> NS_TOKEN=... godot --path plugins/godot-client/client   # a reply checked in Studio
+##   OC_API=http://127.0.0.1:7880 godot --path plugins/godot-client/client
+##   OC_FRAME=146 OC_PAUSED=1 ...    # open on one token, paused (for screenshots)
+##   OC_API=https://studio:7870/viz/<id> OC_TOKEN=... godot --path plugins/godot-client/client   # a reply checked in Studio
 ##
 ## MultiMesh keeps the whole field in one draw call, and glow runs at half
 ## resolution, because the GPU is usually also running the model.
 ##
 ## The full client (app.gd) embeds this scene and calls open() with a trace or
-## a neuron-review view from Studio; run on its own, it reads NS_API.
+## a neuron-review view from Studio; run on its own, it reads OC_API.
 ##
 ## Layout: x = neuron column (ordered by classifier weight when the trace has a
 ## classifier, so the H-neurons form a band at the left), y = layer. Flagged
@@ -131,10 +131,10 @@ func _ready() -> void:
 	if not standalone:
 		hud.text = "pick a trace or a review view"
 		return
-	api = OS.get_environment("NS_API")
+	api = OS.get_environment("OC_API")
 	if api == "":
 		api = DEFAULT_API
-	open(api, OS.get_environment("NS_TOKEN"))
+	open(api, OS.get_environment("OC_TOKEN"))
 
 
 ## Load a payload: base is a URL serving api/meta, api/theme and api/trace
@@ -323,7 +323,7 @@ func _fetch(path: String, cb: Callable, binary := false) -> void:
 		func(_res, code, _h, body):
 			r.queue_free()
 			if code != 200:
-				hud.text = "backend returned %d for %s\nis viz/bloom.py (or Studio) running, and NS_TOKEN set if needed?" % [code, path]
+				hud.text = "backend returned %d for %s\nis viz/bloom.py (or Studio) running, and OC_TOKEN set if needed?" % [code, path]
 				return
 			cb.call(body if binary else JSON.parse_string(body.get_string_from_utf8()))
 	)
@@ -378,10 +378,10 @@ func _on_trace(body: PackedByteArray) -> void:
 	intensity = body.slice(o, o + T * N * 4).to_float32_array()
 	o += T * N * 4
 	state = body.slice(o, o + T * N)
-	var start := OS.get_environment("NS_FRAME")
+	var start := OS.get_environment("OC_FRAME")
 	if start.is_valid_int():
 		frame = clampi(start.to_int(), 0, max(0, T - 1))
-	playing = OS.get_environment("NS_PAUSED") != "1"
+	playing = OS.get_environment("OC_PAUSED") != "1"
 	hud.text = ""
 	context.visible = true
 	n_layers = L

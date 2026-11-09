@@ -56,7 +56,7 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-DEFAULT_ROOT = Path(os.environ.get("NS_REVIEW_DIR") or Path.home() / ".neuronscope" / "review")
+DEFAULT_ROOT = Path(os.environ.get("OC_REVIEW_DIR") or Path.home() / ".omnicortex" / "review")
 BINS = 512
 VERDICTS = ("correct", "wrong", "abstained", "unknown")
 KINDS = ("test", "benchmark", "observed")
@@ -503,10 +503,10 @@ def _subjects(text: str, given=None) -> list[str]:
 
 def _scorer(a):
     from hscore import HScorer
-    binary = a.binary or os.environ.get("NS_CETT")
-    gguf = a.gguf or os.environ.get("NS_GGUF")
+    binary = a.binary or os.environ.get("OC_CETT")
+    gguf = a.gguf or os.environ.get("OC_GGUF")
     if not binary or not gguf:
-        raise SystemExit("need --binary (llama-cett-dump) and --gguf, or $NS_CETT and $NS_GGUF")
+        raise SystemExit("need --binary (llama-cett-dump) and --gguf, or $OC_CETT and $OC_GGUF")
     return HScorer(binary, gguf, a.classifier, ngl=a.ngl)
 
 
@@ -560,12 +560,12 @@ def testqa_items(results_path: str, endpoint: str | None = None, bank=None) -> t
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--root", default=str(DEFAULT_ROOT), help="review store (default ~/.neuronscope/review)")
+    common.add_argument("--root", default=str(DEFAULT_ROOT), help="review store (default ~/.omnicortex/review)")
     sub = p.add_subparsers(dest="cmd", required=True)
     for name in ("ingest-testqa", "ingest-items"):
         q = sub.add_parser(name, parents=[common])
-        q.add_argument("--gguf", help="the model that wrote the replies (default $NS_GGUF)")
-        q.add_argument("--binary", help="llama-cett-dump (default $NS_CETT)")
+        q.add_argument("--gguf", help="the model that wrote the replies (default $OC_GGUF)")
+        q.add_argument("--binary", help="llama-cett-dump (default $OC_CETT)")
         q.add_argument("--classifier", help="classifier.npz, to record each reply's risk too")
         q.add_argument("--model-id", help="the model's id in Studio (default: Studio's id for --gguf)")
         q.add_argument("--ngl", type=int, default=99)

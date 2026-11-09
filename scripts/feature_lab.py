@@ -2,7 +2,7 @@
 Feature dictionaries and emotion vectors inside the decoding lab (decode_lab.py): steering while it
 generates, and the analysis endpoints Studio's Features page calls.
 
-Variant options (also accepted per request under "neuronscope": {...}):
+Variant options (also accepted per request under "omnicortex": {...}):
 
 feature  clamp or add dictionary features at every token, as in Scaling Monosemanticity: the
          activation is split into the dictionary's reconstruction and its error; the reconstruction

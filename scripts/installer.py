@@ -144,7 +144,7 @@ def platform_notes(d: dict) -> list[dict]:
         if len(d["root"]) > 120:
             n.append({"level": "warn", "text": "The folder path is long; Windows limits paths to 260 characters "
                       "unless long paths are turned on. Move OmniCortex closer to the drive's root (e.g. "
-                      "C:\\neuronscope) if installing fails with 'path too long'."})
+                      "C:\\omnicortex) if installing fails with 'path too long'."})
         if g["amd"] and not g["nvidia"]:
             n.append({"level": "info", "text": "AMD GPU on Windows: PyTorch has no ROCm build for Windows, so it "
                       "installs for the CPU. Serving models still uses the GPU, through llama.cpp's Vulkan build "
@@ -270,18 +270,18 @@ def make_shortcut(d: dict) -> str:
             '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
             '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict>'
             "<key>CFBundleName</key><string>OmniCortex</string>"
-            "<key>CFBundleIdentifier</key><string>org.neuronscope.studio</string>"
+            "<key>CFBundleIdentifier</key><string>org.omnicortex.studio</string>"
             "<key>CFBundleExecutable</key><string>OmniCortex</string>"
             "<key>CFBundlePackageType</key><string>APPL</string></dict></plist>\n")
         exe = app / "Contents" / "MacOS" / "OmniCortex"
-        exe.write_text(f'#!/bin/bash\nexec "{root}/neuronscope"\n')
+        exe.write_text(f'#!/bin/bash\nexec "{root}/omnicortex"\n')
         exe.chmod(0o755)
         return str(app)
     apps = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "applications"
     apps.mkdir(parents=True, exist_ok=True)
-    f = apps / "neuronscope.desktop"
+    f = apps / "omnicortex.desktop"
     f.write_text("[Desktop Entry]\nType=Application\nName=OmniCortex\nComment=Run, test and look inside local "
-                 f"models\nExec={root / 'neuronscope'}\nTerminal=false\nCategories=Development;Science;\n")
+                 f"models\nExec={root / 'omnicortex'}\nTerminal=false\nCategories=Development;Science;\n")
     return str(f)
 
 
@@ -578,7 +578,7 @@ def main(argv=None) -> int:
     r = Run(d, steps)
     r.subs.append(_Printer())
     ok = r.run()
-    print("\nDone. Start it from the shortcut, or: " + ("OmniCortex.bat" if SYSTEM == "Windows" else "./neuronscope")
+    print("\nDone. Start it from the shortcut, or: " + ("OmniCortex.bat" if SYSTEM == "Windows" else "./omnicortex")
           if ok else "\nNot finished; the output above says why.")
     return 0 if ok else 1
 

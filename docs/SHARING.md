@@ -49,7 +49,7 @@ server:
 
 **Never sent:** chats, prompts you typed, file paths, user or computer
 names, tokens, anything about other models. Every submission is saved on
-your computer exactly as sent (`~/.neuronscope/submissions/`) and listed in
+your computer exactly as sent (`~/.omnicortex/submissions/`) and listed in
 Settings.
 
 ## Public or private
@@ -89,7 +89,7 @@ submissions:
 A board can also live in a GitHub repository, with no server to host:
 
 ```bash
-python scripts/github_board.py init ./my-board --neuronscope-repo OWNER/neuronscope
+python scripts/github_board.py init ./my-board --omnicortex-repo OWNER/omnicortex
 ```
 
 `init` writes these files:
