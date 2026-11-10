@@ -123,6 +123,9 @@ The check only reads. Reflashing a VBIOS can brick a card. If you decide to, do 
     first and adding Proxmox on top is the fallback.
   - Its kernel has to be rebuilt with the non-coherent GTT patch.
 - **The community port (PXVirt) on Armbian:** keeps your own patched Armbian kernel.
+- **For the M10:** its patched module has only been built against Linux 6.18, and the official arm64 kernel is
+  7.0, so PXVirt on Armbian with a 6.18 kernel is the safer route for now. m10-arm's `docs/PROXMOX.md` has the
+  host and container steps.
 
 The mi50-arm guide (`docs/PROXMOX.md` there) has the steps for both. OmniCortex starts once the host's driver works.
 
