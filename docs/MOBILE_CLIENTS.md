@@ -1,7 +1,8 @@
 # Plan: phones and other cross-platform clients
 
-This is a plan, not a feature yet. It was prompted by
-[orailnoor/cross-platform-llm-client](https://github.com/orailnoor/cross-platform-llm-client) ("PrivateLM",
+This is a plan, not a feature yet. OmniCortex's own client will use Python and Kivy, not Flutter.
+
+It was prompted by [orailnoor/cross-platform-llm-client](https://github.com/orailnoor/cross-platform-llm-client) ("PrivateLM",
 MIT): a Flutter app for Android and iOS (web is cloud-only) that does two things:
 - runs GGUF models on the device through a llama.cpp plugin (Vulkan on Android, Metal on iOS);
 - calls OpenAI, Anthropic, Gemini and Kimi.
@@ -30,17 +31,28 @@ It has no custom server address yet, so it cannot talk to an OmniCortex Studio.
    - Apple A- and M-series through Metal.
 
    The unified review's speed reports per hardware can then include phones.
-5. **On-device models that report back (M).** A client that runs models on the phone can still send its TestQA
-   results and speed to the review board. Activations need llama.cpp's eval callback on the device, which these
-   Flutter plugins do not expose, so phones contribute results, not neuron data.
-6. **An OmniCortex Flutter client (L).** Only if 1–3 fall short: chat, the reply checks (risk strip, Fix This
-   Mistake), the emotion jewel and the review lookup on a phone, through Studio's API. The Godot client already
-   covers desktop and VR.
+5. **An OmniCortex client in Kivy (M).** Python and [Kivy](https://kivy.org), so the client shares code with the
+   rest of OmniCortex (`scripts/plugin_api.py`, the TestQA grader, the review lookup) instead of rewriting it in
+   another language:
+   - desktop (Linux, Windows, macOS) runs it with `pip install kivy`;
+   - Android builds with Buildozer (python-for-android);
+   - iOS builds with kivy-ios, which needs a Mac and Xcode.
+
+   It covers chat, the reply checks (risk strip, Fix This Mistake), the emotion jewel and the review lookup, all
+   through Studio's API and a paired device token. The Godot client still covers 3D and VR.
+6. **On-device models that report back (L).** The Kivy client can also run a GGUF on the phone through
+   llama-cpp-python, which python-for-android can build (a recipe for it, with Vulkan off at first). It sends its
+   TestQA results and speed to the review board. Because llama-cpp-python exposes llama.cpp's eval callback
+   (`cb_eval`), a Python client could in principle capture activations on the device too, which the Flutter
+   wrappers do not allow. Whether that is fast enough on a phone is untested; start with results only.
 
 ## What to watch for
 
 - **Tokens on phones:** use paired device tokens (revocable, per device), never the master token.
 - **Over the internet:** Studio behind its TLS plus pairing, or reached over WireGuard or Tailscale. Do not expose
   llama-server directly.
-- **On-device models and OmniCortex's interpretability tools:** those tools need activations, which mobile
-  llama.cpp wrappers do not expose. The phone is a client of the analysis, not a place to run it.
+- **On-device models and OmniCortex's interpretability tools:** those tools need activations. Flutter's llama.cpp
+  wrappers do not expose them; a Kivy client with llama-cpp-python might, but treat the phone as a client of the
+  analysis until that is measured.
+- **Kivy builds:** pin the python-for-android and kivy-ios versions, and keep native code (llama.cpp) in recipes,
+  so a build does not depend on what happens to be on the build machine.

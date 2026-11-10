@@ -99,6 +99,19 @@ python scripts/extract_activations.py \
 The slow stage. With `--gpu_mem` set, layers split across GPU and CPU; omit it
 for pure CPU. Writes fp16 `.npy` per sample plus `neuron_index.json`.
 
+`--capture` sets how activations leave the GPU. Every mode gives the same numbers:
+
+| Mode | What it does | When |
+|---|---|---|
+| `auto` (default) | `device` if this sequence fits in free GPU memory, else `stream`; `sync` on the CPU | almost always |
+| `device` | activations stay on the GPU in the model's precision; CETT and the per-region averages are computed there, and only those results (layers × neurons) are copied back | GPUs with room to spare |
+| `stream` | each layer's activations are copied on a side stream into reused page-locked buffers, so the copy overlaps the next layer's compute | long sequences on a full GPU |
+| `sync` | each layer is copied to the CPU, as float32, while the GPU waits (the original behaviour) | debugging |
+
+Activations keep the model's own precision until CETT is computed in float32. They are not cast down to fp16,
+because bf16 values can exceed fp16's range. The forward pass runs under `torch.inference_mode()`.
+`score_tokens.py` takes the same flag.
+
 Repeat with `--ids_path data/test_qids.json --output_root data/activations_test`.
 
 ### 5. Train and identify

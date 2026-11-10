@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Changed (faster activation capture)
+
+- `CETTManager` (oc_common.py) has capture modes (`--capture` in extract_activations.py and score_tokens.py):
+  - `device` keeps activations on the GPU and copies back only the per-region results;
+  - `stream` copies asynchronously into page-locked buffers, overlapping compute;
+  - `auto` picks between them.
+
+  Layer output norms are reduced on the GPU, extraction computes only the spans it saves, and forward passes run
+  under `torch.inference_mode()`. The numbers are unchanged; tests/test_capture_modes.py checks that.
+- docs/MOBILE_CLIENTS.md: OmniCortex's own client is planned in Python and Kivy (desktop, Android through Buildozer, iOS through kivy-ios).
+
 ### Added (looped models: NVIDIA Dory)
 
 - Studio recognises looped models (`<arch>.num_loops`), tags them, and offers Loops and Recurrent KV cache settings (passed as `--override-kv`); Dory also gets `--jinja` and `--reasoning on` as its card recommends.
