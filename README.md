@@ -56,6 +56,7 @@ Prebuilt binaries for Windows, macOS and Linux (x64, x86, ARM64, ARM): [docs/BIN
 | **Neuron review** | every neuron's link to wrong answers across tests, benchmarks and checked chat replies, filtered by source, subject and time, played over time in 3D | [docs/REVIEW.md](docs/REVIEW.md) |
 | **Unified review and browser extension** | one record per model from review boards, hardware reports, SAELens and your own Studio; a Firefox/Chromium/Opera extension whose icon glows blue on Hugging Face pages that have data, with a dropdown per statistic and source | [docs/UNIFIED_REVIEW.md](docs/UNIFIED_REVIEW.md), [docs/BROWSER_EXTENSION.md](docs/BROWSER_EXTENSION.md) |
 | **Looped models (NVIDIA Dory)** | serve a looped model with its loop count and KV mode as settings; sweep the loop count against TestQA (accuracy, confident mistakes, speed); a per-loop lens showing which pass decides the answer and where the H-neurons fire; a NeMo Gym environment whose reward charges for confident mistakes | [docs/DORY.md](docs/DORY.md) |
+| **Truth probes** | does the model believe what it said? A probe on every layer, for Hugging Face models or any GGUF, flags replies whose activations favour another answer ("knows but says otherwise"), with a per-layer trajectory; a signal, not proof of intent | [docs/TRUTH_PROBE.md](docs/TRUTH_PROBE.md) |
 | **Clients** | the web pages, a terminal client (`./omnicortex cli`) and a Godot client (`./omnicortex godot`) over the same API; the Godot client is a full UI with a native 3D view, built to run on another computer so drawing never takes GPU memory from the model | [docs/CLIENTS.md](docs/CLIENTS.md) |
 | **Remote hosts** | use the models on computers that run LM Studio, Ollama or llama.cpp but not OmniCortex: a small agent there (distributed on its own) is controlled over MCP; same network, VPN (Tailscale, ZeroTier, WireGuard…), SSH, a public tunnel, or the host calling in from behind NAT; pairing with a short code, and the host's owner sees and revokes every controller | [docs/REMOTE.md](docs/REMOTE.md), [remote/](remote/README.md) |
 | **Settings** | named workspaces for every folder and binary (no fixed layout), the default model per subject for `auto`, and rules for when chat tool calls are allowed, asked or denied (by tool, kind of operation, argument regexes, rate limits) | [docs/SETTINGS.md](docs/SETTINGS.md) |
@@ -178,6 +179,9 @@ docs/                        guides
 ```bash
 pip install pytest && python -m pytest -q
 ```
+
+Set `OC_TEST_CACHE=~/.cache/omnicortex-tests` to build the tiny test models once and reuse them; CI caches that
+folder. With `OC_LLAMA` pointing at a llama.cpp build with cett-dump, the llama.cpp integration tests run too.
 
 ## Licence
 

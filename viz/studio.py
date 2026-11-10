@@ -497,6 +497,9 @@ DEFAULTS = {"ngl": 99, "ctx": 8192, "batch": 2048, "threads": 0,
             "vision": True,
             # classifier.npz for this model: enables per-reply activation stats
             "classifier": "",
+            # truth probe for this model (scripts/truth_probe.py, gguf backend): /api/truth checks whether the
+            # model's activations agree with what it wrote
+            "truth_probe": "",
             # Several GPUs (a Tesla M10 is four): which ones this model may use
             # (CUDA_VISIBLE_DEVICES), how llama-server splits it (layer | row |
             # none), the per-GPU proportions ("1,1,1,1") and the main GPU.
@@ -922,7 +925,7 @@ def stop_server():
 
 # What a paired device may POST. Everything else needs the owner's token.
 DEVICE_POSTS = {"/v1/chat/completions", "/v1/completions", "/v1/embeddings", "/api/chat", "/api/chats",
-                "/api/chats/delete", "/api/rag/search", "/api/tools/approve", "/api/trace",
+                "/api/chats/delete", "/api/rag/search", "/api/tools/approve", "/api/trace", "/api/truth",
                 "/mcp", "/api/route", "/api/context"}
 
 LINKS = {"cache": {}, "lock": threading.Lock()}
@@ -2534,6 +2537,31 @@ def trace_reply(model, messages, text, threshold=0.5, source="chat-check"):
     msgs = [m for m in messages if m.get("role") != "system"] or messages
     r = _scorer(model, clf).trace(msgs, text)
     return save_trace(model["name"], model["id"], msgs, text, r, threshold, source)
+
+
+_PROBES = {}
+
+
+def truth_reply(model, messages, text, alternatives=()):
+    """Does the model's own activations agree with its reply? (scripts/truth_probe.py, docs/TRUTH_PROBE.md)
+    The question is the last user message; `alternatives` are other answers to compare against."""
+    path = load_settings().get(_key(model["path"]), {}).get("truth_probe")
+    if not path:
+        raise ValueError(f"{model['id']} has no truth probe set (Studio -> Models, the model's settings: truth probe)")
+    if not STATE["cett"]:
+        raise ValueError("truth checks need llama-cett-dump: Setup -> Build llama.cpp, "
+                         "or point Settings -> Workspaces at an existing build")
+    import truth_probe
+    path = os.path.expanduser(path)
+    key = (path, os.path.getmtime(path))
+    if key not in _PROBES:
+        _PROBES.clear()
+        _PROBES[key] = truth_probe.Probe.load(path)
+    question = next((str(m.get("content") or "") for m in reversed(messages or []) if m.get("role") == "user"), "")
+    if isinstance(question, list):
+        question = " ".join(c.get("text", "") for c in question if isinstance(c, dict))
+    feat = truth_probe.GGUFFeatures(model["path"], STATE["cett"], scorer=_scorer(model, None))
+    return truth_probe.check(feat, _PROBES[key], question, text, [str(a) for a in alternatives][:8])
 
 
 def save_trace(model_name, model_id, msgs, text, r, threshold=0.5, source="chat-check", extra=None):
@@ -6431,6 +6459,29 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                         links = [{"href": "/setup#build", "label": "build llama.cpp with cett-dump"},
                                  {"href": "/settings#workspaces", "label": "use an existing build"}]
                     return self._json(400, {"error": str(e), "links": links})
+
+            if self.path == "/api/truth":
+                req = self._read(MAX_BODY)
+                ref, text = req.get("model"), str(req.get("text") or "")
+                if not text.strip():
+                    return self._json(400, {"error": "nothing to check"})
+                if ref and LINK_SEP in ref and link_target(ref) is not None:
+                    return self._json(400, {"error": "truth checks of a linked Studio's models run in that Studio"})
+                model = find_model(ref) if ref and ref != "auto" else PROC["model"]
+                if model is None:
+                    return self._json(404, {"error": "no such model"})
+                try:
+                    return self._json(200, truth_reply(model, req.get("messages") or [], text,
+                                                       req.get("alternatives") or []))
+                except (ValueError, FileNotFoundError) as e:
+                    links = []
+                    if "truth probe" in str(e):
+                        links = [{"href": f"/#model={urllib.parse.quote(model['id'])}&field=truth_probe",
+                                  "label": "set this model's truth probe"},
+                                 {"href": "/jobs#kind=truth_train", "label": "train one"}]
+                    return self._json(400, {"error": str(e), "links": links})
+                except Exception as e:
+                    return self._json(502, {"error": f"{type(e).__name__}: {e}"})
 
             if self.path.startswith("/api/rag/"):
                 return self._rag_post()

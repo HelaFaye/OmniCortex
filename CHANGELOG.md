@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Added (truth probes)
+
+- `scripts/truth_probe.py`: a linear probe on every layer that reads whether the model takes an answer to be true.
+  `check` flags replies where the model's activations rate another answer true and its own false
+  ("knows but says otherwise"), with a per-layer trajectory. It is a signal, not proof of intent.
+  - Backends: Hugging Face weights (each layer, and each pass of a looped model, is a stage) and any GGUF through
+    llama-cett-dump.
+  - Training data: `qa/truth` (a starter set), TestQA banks, or question/answer/wrong files.
+  - Studio: a per-model Truth probe setting and `POST /api/truth`.
+  - Jobs: Truth probe: train and Truth probe: does the model believe its answer?
+  - See docs/TRUTH_PROBE.md.
+
+### Added (CI)
+
+- `.github/workflows/tests.yml` runs the test suite with caches for pip, the tiny test models and a llama.cpp build
+  with cett-dump, so the llama.cpp integration tests run in CI instead of skipping.
+- `OC_TEST_CACHE`: tests/tiny_models.py builds each test model once into that folder and copies it after that.
+
 ### Changed (faster activation capture)
 
 - `CETTManager` (oc_common.py) has capture modes (`--capture` in extract_activations.py and score_tokens.py):

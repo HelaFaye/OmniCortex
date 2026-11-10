@@ -26,3 +26,5 @@ ns-key.pem
 /dist/
 /build/
 .godot/
+.test-cache/
+.test-cache-key

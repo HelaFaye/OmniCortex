@@ -3,7 +3,12 @@ BPE tokenizer that both transformers (fast tokenizer) and llama.cpp's
 converter (tokenizer.model) understand, with identical token ids."""
 from __future__ import annotations
 
+import functools
+import hashlib
 import json
+import os
+import shutil
+import uuid
 from pathlib import Path
 
 import numpy as np
@@ -43,6 +48,40 @@ def fast_tokenizer_from_spm(model_file: str):
     return t, sp
 
 
+def cached(fn):
+    """With OC_TEST_CACHE set (CI caches that folder), build each model once per set of arguments and copy it.
+
+    The key covers this file's source and the transformers, tokenizers, sentencepiece and torch versions, so a
+    change to any of them builds afresh. Without the variable, models are built every time, as before."""
+    @functools.wraps(fn)
+    def wrapper(out: Path, *args, **kw):
+        root = os.environ.get("OC_TEST_CACHE")
+        if not root:
+            return fn(out, *args, **kw)
+        import importlib.metadata as md
+        vers = []
+        for pkg in ("transformers", "tokenizers", "sentencepiece", "torch"):
+            try:
+                vers.append(f"{pkg}={md.version(pkg)}")
+            except md.PackageNotFoundError:
+                vers.append(f"{pkg}=-")
+        key = hashlib.sha256(json.dumps([fn.__name__, args, sorted(kw.items()), vers,
+                                         Path(__file__).read_text()], default=str).encode()).hexdigest()[:20]
+        entry = Path(root).expanduser() / f"{fn.__name__}-{key}"
+        if not (entry / "hf").is_dir():
+            tmp = entry.with_name(f"{entry.name}.{uuid.uuid4().hex[:8]}.tmp")
+            fn(tmp, *args, **kw)
+            try:
+                tmp.rename(entry)                    # atomic: parallel test workers never see half a model
+            except OSError:                          # another worker got there first
+                shutil.rmtree(tmp, ignore_errors=True)
+        Path(out).mkdir(parents=True, exist_ok=True)
+        shutil.copytree(entry, out, dirs_exist_ok=True)
+        return Path(out) / "hf"
+    return wrapper
+
+
+@cached
 def make_tiny_llama(out: Path, layers: int = 4, hidden: int = 64, ff: int = 128, seed: int = 0) -> Path:
     """Random Llama + tokenizer saved in HF format at out/hf. Returns that path."""
     import sentencepiece as spm
@@ -76,6 +115,7 @@ LLAVA_TEMPLATE = ("{% for m in messages %}<|{{ m['role'] }}|>"
                   "{% if add_generation_prompt %}<|assistant|>{% endif %}")
 
 
+@cached
 def make_tiny_llava(out: Path, seed: int = 0) -> Path:
     """Random Llava (tiny CLIP vision tower + tiny Llama) with a processor, at out/hf."""
     import sentencepiece as spm

@@ -13,8 +13,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 POSE = ROOT / "plugins" / "pose"
-sys.path.insert(0, str(POSE))
-sys.path.insert(0, str(POSE / "engine" / "blender" / "omnicortex_pose"))
+_PATHS = [str(POSE), str(POSE / "engine" / "blender" / "omnicortex_pose")]
+sys.path[:0] = _PATHS
 import orchestrate as O  # noqa: E402
 import pose_core as P  # noqa: E402
 import pose_stress as PS  # noqa: E402
@@ -23,16 +23,26 @@ import staging as ST  # noqa: E402
 import stream as SM  # noqa: E402
 
 
-@pytest.fixture(autouse=True, scope="module")
-def _isolate_modules():
-    """These add-ons' scripts have generic names (stream, plan, check, ...): forget them and their folders after
-    this file, so later tests import OmniCortex's own modules of the same names."""
-    paths = list(sys.path)
-    yield
+def _forget():
+    """These add-ons' scripts have generic names (stream, plan, check, ...): drop them and their folders, so other
+    test files import OmniCortex's own modules of the same names. Done right after the imports above (collection
+    imports every test file before any test runs) and again after this file's tests."""
     for name, mod in list(sys.modules.items()):
         f = getattr(mod, "__file__", "") or ""
         if f and "plugins" in Path(f).parts:
             del sys.modules[name]
+    sys.path[:] = [p for p in sys.path if p not in _PATHS]
+
+
+_forget()
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _isolate_modules():
+    paths = list(sys.path)
+    sys.path[:0] = _PATHS
+    yield
+    _forget()
     sys.path[:] = paths
 
 

@@ -1,0 +1,103 @@
+# The pytest suite, with what it needs cached between runs so most runs install and build nothing:
+#   - pip downloads (setup-python's pip cache, keyed on the requirements files)
+#   - the tiny test models (tests/tiny_models.py builds each once into OC_TEST_CACHE; keyed on that file)
+#   - a llama.cpp build with cett-dump and server activations, keyed on the llama.cpp tag and on
+#     llama-tools/ and the build script, so the llama.cpp integration tests run instead of skipping
+#
+# The llama.cpp tag is the latest release, looked up each run (or the one given when run by hand). A new
+# release means one rebuild; after that the cache serves it.
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      llama_ref:
+        description: "llama.cpp tag for the integration tests (empty: latest release)"
+        required: false
+        default: ""
+permissions:
+  contents: read
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  OC_TEST_CACHE: ${{ github.workspace }}/.test-cache
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  pytest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements*.txt
+            .github/workflows/tests.yml
+      - name: install
+        run: |
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements.txt pytest sentencepiece peft trl mcp cryptography uvicorn
+          python -m pip freeze | grep -iE "^(torch|transformers|tokenizers|sentencepiece)==" | tee .test-cache-key
+      - uses: actions/cache@v4
+        with:
+          path: .test-cache
+          key: tiny-models-${{ hashFiles('tests/tiny_models.py', '.test-cache-key') }}
+      - name: pytest
+        run: python -m pytest -q -p no:cacheprovider -rs tests
+
+  llamacpp:
+    name: llama.cpp integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements*.txt
+            .github/workflows/tests.yml
+      - name: llama.cpp tag
+        id: ref
+        env:
+          WANT: ${{ github.event.inputs.llama_ref }}
+        run: |
+          ref="$WANT"
+          if [ -z "$ref" ]; then
+            ref=$(git ls-remote --tags --refs --sort=-v:refname https://github.com/ggml-org/llama.cpp 'refs/tags/b[0-9]*' \
+                  | head -1 | sed 's#.*refs/tags/##')
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "llama.cpp $ref"
+      - uses: actions/cache@v4
+        id: llama
+        with:
+          path: ~/llama.cpp
+          key: llama-${{ steps.ref.outputs.ref }}-${{ hashFiles('llama-tools/**', 'scripts/build_llama_tools.sh') }}
+      - name: build llama.cpp with cett-dump
+        if: steps.llama.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake ninja-build
+          bash scripts/build_llama_tools.sh --portable --server-activations --ref "${{ steps.ref.outputs.ref }}" --dir ~/llama.cpp
+      - name: install
+        run: |
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements.txt pytest sentencepiece
+          python -m pip install -e ~/llama.cpp/gguf-py || true
+          python -m pip freeze | grep -iE "^(torch|transformers|tokenizers|sentencepiece)==" | tee .test-cache-key
+      - uses: actions/cache@v4
+        with:
+          path: .test-cache
+          key: tiny-models-llama-${{ hashFiles('tests/tiny_models.py', '.test-cache-key') }}
+      - name: integration tests
+        run: |
+          export OC_LLAMA=~/llama.cpp
+          test -x "$OC_LLAMA/build/bin/llama-cett-dump"
+          python -m pytest -q -p no:cacheprovider -rs tests/test_llamacpp_integration.py tests/test_truth_probe.py

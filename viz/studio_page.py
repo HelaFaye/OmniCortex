@@ -293,6 +293,7 @@ section.chat{position:relative}
     <label>Extra flags</label><input id="extra" placeholder="--override-tensor '\.ffn_.*_exps\.=CPU'">
     <label id="visionrow" style="display:none"><input type="checkbox" id="vision" checked> load vision projector <span id="mmname"></span></label>
     <label>H-Neuron classifier (optional, enables activation stats)</label><input id="classifier" placeholder="models/classifier.npz for this model">
+    <label title="scripts/truth_probe.py train --gguf: lets /api/truth check whether the model's activations agree with its reply">Truth probe (optional)</label><input id="truth_probe" placeholder="models/this-model.truth.npz">
     <button id="load" class="pri" style="margin-top:.7rem;width:100%">Load</button>
     <div id="radarBox" style="display:none"><div class="row2" style="align-items:end"><div><label>Compare with (2P)</label><select id="vsPick"></select></div><div class="note" id="radarNote"></div></div><div id="radar"></div></div>
     <div id="statsbox"></div>
@@ -341,8 +342,8 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let models=[], sel=null, busy=false, ctrl=null, status_={}, pendingImgs=[];
 let chat={id:null,title:'New chat',messages:[]};
-const F=["ngl","ctx","batch","threads","experts","served_name","lora","extra","classifier","gpus","split_mode","tensor_split","main_gpu","rpc","loops","loop_kv"];
-const TEXT_FIELDS=["served_name","lora","extra","classifier","gpus","split_mode","tensor_split","rpc","loops","loop_kv"];
+const F=["ngl","ctx","batch","threads","experts","served_name","lora","extra","classifier","gpus","split_mode","tensor_split","main_gpu","rpc","loops","loop_kv","truth_probe"];
+const TEXT_FIELDS=["served_name","lora","extra","classifier","truth_probe","gpus","split_mode","tensor_split","rpc","loops","loop_kv"];
 // ---------- engine options (scripts/engine_options.py: one table for the form, the flags and the optimizer)
 let EO=null;
 async function loadEO(engine, values){

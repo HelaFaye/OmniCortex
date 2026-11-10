@@ -615,6 +615,22 @@ SPECS.update({
         "fields": [F("model", req=True), F("prompt", req=True), F("target", help="expected answer, e.g. ' Canberra'"),
                    F("loops", kind="int"), F("h_neurons", help="h_neurons.json for this model"),
                    F("device", default="auto"), F("trust_remote_code", kind="bool"), F("out", req=True)]},
+    "truth_train": {
+        "title": "Truth probe: train", "group": "Interpret", "argv": [S / "truth_probe.py", "train"],
+        "help": "A linear probe on every layer that reads whether the model takes an answer to be true. Give "
+                "Hugging Face weights or a GGUF (with llama-cett-dump). Data: qa/truth, a TestQA bank, or "
+                "question/answer/wrong files. Each layer's cross-validated AUROC is kept (docs/TRUTH_PROBE.md).",
+        "fields": [F("hf", help="Hugging Face model id or folder"), F("gguf", help="or a GGUF file"),
+                   F("data", repeat=True, default="qa/truth"), F("pool", default="last", help="last or mean"),
+                   F("limit", kind="int"), F("trust_remote_code", kind="bool"), F("out", req=True)]},
+    "truth_check": {
+        "title": "Truth probe: does the model believe its answer?", "group": "Interpret",
+        "argv": [S / "truth_probe.py", "check"],
+        "help": "Scores the model's answer, and alternatives, with a truth probe. Flags 'knows but says otherwise' "
+                "when its activations rate another answer true and its own false. A signal, not proof of intent.",
+        "fields": [F("hf"), F("gguf"), F("probe", req=True), F("question", req=True),
+                   F("answer", help="empty: generate one (Hugging Face only)"), F("alt", repeat=True),
+                   F("trust_remote_code", kind="bool"), F("out", req=True)]},
     "gym_export": {
         "title": "NeMo Gym: export TestQA as an RL environment's data", "group": "Retrain",
         "argv": [S / "gym_bridge.py", "export"],
