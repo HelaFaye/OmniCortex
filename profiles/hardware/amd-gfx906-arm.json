@@ -1,0 +1,49 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "amd-gfx906-arm",
+ "title": "AMD Instinct MI50/MI60 and Radeon VII (gfx906) on an ARM host",
+ "era": "legacy",
+ "examples": [
+  "Instinct MI50 32GB on an RK3588 board",
+  "Radeon VII on Ampere Altra"
+ ],
+ "match": {
+  "vendor": "amd",
+  "gfx_prefix": [
+   "gfx906"
+  ],
+  "machine": [
+   "aarch64",
+   "arm64"
+  ]
+ },
+ "purposes": {
+  "inference": {
+   "summary": "llama.cpp with Vulkan (Mesa RADV, arm64 packages, no ROCm needed); HIP only after Vulkan works.",
+   "llama": {
+    "backend": "vulkan",
+    "cmake": ""
+   },
+   "engine": {
+    "flash_attn": "off"
+   },
+   "notes": "Boards with non-coherent PCIe (RK3588) need a host kernel with amdgpu built and the write-combined GTT patch, and a BAR0 small enough for the PCIe window: shrink it to 256 MiB with resizable BAR (scripts/amd_vbios.py says whether this card's VBIOS can). For HIP: ROCm 6.3.3 built from source for gfx906, with HSA_USERPTR_FOR_PAGED_MEM=0 on non-coherent hosts. The mi50-arm guide has the kernel, ROCm and Proxmox steps; docs/PROXMOX.md runs OmniCortex in a container there."
+  },
+  "retraining": {
+   "summary": "PyTorch on the ARM CPU: there are no PyTorch ROCm wheels for aarch64.",
+   "torch": {
+    "spec": "torch",
+    "index": "https://download.pytorch.org/whl/cpu"
+   },
+   "training": {
+    "dtype": "float32",
+    "quantized_base": false,
+    "method": "lora"
+   },
+   "notes": "Train small LoRAs on the CPU or on another computer, and serve the result here through Vulkan."
+  }
+ },
+ "notes": "Untested on real hardware: the steps follow the mi50-arm guide, which is itself untested on an MI50.",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

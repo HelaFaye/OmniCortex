@@ -1,0 +1,51 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "nvidia-maxwell-arm",
+ "title": "NVIDIA Maxwell (Tesla M10, M40) on an ARM host",
+ "era": "legacy",
+ "examples": [
+  "Tesla M10 on an RK3588 board"
+ ],
+ "match": {
+  "vendor": "nvidia",
+  "compute_min": 5.0,
+  "compute_max": 5.3,
+  "machine": [
+   "aarch64",
+   "arm64"
+  ]
+ },
+ "purposes": {
+  "inference": {
+   "summary": "llama.cpp with CUDA 12.9 for the arm64 server (sbsa) toolkit, the last CUDA that builds for Maxwell.",
+   "llama": {
+    "backend": "cuda",
+    "cuda_arch": "50-real;52-real",
+    "cmake": "",
+    "toolkit": "CUDA 12.9 (sbsa)"
+   },
+   "engine": {
+    "flash_attn": "auto",
+    "cache_type_k": "q8_0",
+    "cache_type_v": "q8_0"
+   },
+   "notes": "Maxwell needs NVIDIA's proprietary kernel module, and on non-coherent PCIe (RK3588) that module must be patched (the m10-arm guide: driver 580.95.05 aarch64, uncached system memory). The M10 is four GPUs: llama.cpp splits a model across them with --split-mode layer. vLLM does not support Maxwell."
+  },
+  "retraining": {
+   "summary": "PyTorch on the ARM CPU: PyTorch's aarch64 CUDA wheels target current server GPUs, not Maxwell.",
+   "torch": {
+    "spec": "torch",
+    "index": "https://download.pytorch.org/whl/cpu"
+   },
+   "training": {
+    "dtype": "float32",
+    "quantized_base": false,
+    "method": "lora"
+   },
+   "notes": "Train on another computer and serve the result here."
+  }
+ },
+ "notes": "Untested on real hardware: the steps follow the m10-arm guide, which is itself untested on an M10.",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

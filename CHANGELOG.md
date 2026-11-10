@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Added (Proxmox backend)
+
+- `scripts/proxmox_lxc.py` runs OmniCortex (the remote agent or Studio) in an LXC container on a Proxmox VE host,
+  with the host's AMD or NVIDIA GPUs shared in. This is the only GPU route on boards with non-coherent PCIe such as
+  RK3588, where VFIO is refused.
+  - `host` reads the GPUs, device nodes, coherency and fast cores.
+  - `plan` prints the `pct` commands, the cpuset and the container's environment.
+  - `apply --yes` runs them.
+  - `check` runs inside the container.
+- `scripts/amd_vbios.py` checks MI50/MI60 VBIOS versions against a community VBIOS comparison: the Vulkan 16 GB
+  limit, resizable BAR, mixed versions, and whether BAR0 fits a small PCIe window.
+- Hardware profiles `amd-gfx906-arm` and `nvidia-maxwell-arm`, for those cards on ARM hosts.
+- Jobs: Proxmox: run OmniCortex in a container with the GPU; AMD MI50/MI60: check the VBIOS.
+- See docs/PROXMOX.md.
+
 ### Added (truth probes)
 
 - `scripts/truth_probe.py`: a linear probe on every layer that reads whether the model takes an answer to be true.

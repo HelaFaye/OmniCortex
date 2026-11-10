@@ -631,6 +631,24 @@ SPECS.update({
         "fields": [F("hf"), F("gguf"), F("probe", req=True), F("question", req=True),
                    F("answer", help="empty: generate one (Hugging Face only)"), F("alt", repeat=True),
                    F("trust_remote_code", kind="bool"), F("out", req=True)]},
+    "proxmox_plan": {
+        "title": "Proxmox: run OmniCortex in a container with the GPU", "group": "Setup",
+        "argv": [S / "proxmox_lxc.py", "plan"],
+        "help": "On a Proxmox VE host: the pct commands that give this host's GPUs (AMD or NVIDIA) to an LXC "
+                "container running the remote agent or Studio, pinned to the fastest cores. Prints the plan; "
+                "nothing changes. Boards with non-coherent PCIe (RK3588) can only share a GPU this way "
+                "(docs/PROXMOX.md).",
+        "fields": [F("ctid", kind="int", req=True, help="the container's id, e.g. 101"),
+                   F("role", choices=["agent", "studio"], default="agent"),
+                   F("render_gid", kind="int", help="the render group's id inside the container"),
+                   F("rocm", help="the host's ROCm folder to mount read-only"),
+                   F("models", help="a host folder of models, mounted at /models"),
+                   F("cpus", default="auto")]},
+    "amd_vbios": {
+        "title": "AMD MI50/MI60: check the VBIOS", "group": "Setup", "argv": [S / "amd_vbios.py"],
+        "help": "Which VBIOS each Vega 20 card runs and what it means: whether Vulkan sees all 32 GB, resizable "
+                "BAR, mixed versions, and whether BAR0 fits a small PCIe window (RK3588). Read-only.",
+        "fields": [F("window_mib", kind="int", help="the host's PCIe window if small (RK3588: 1024)")]},
     "gym_export": {
         "title": "NeMo Gym: export TestQA as an RL environment's data", "group": "Retrain",
         "argv": [S / "gym_bridge.py", "export"],
