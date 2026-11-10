@@ -34,7 +34,7 @@ sys.path.insert(0, HERE)
 
 class HScorer:
     def __init__(self, binary: str, gguf: str, classifier: str | None, ngl: int = 99, batch: int = 4096,
-                 device: str = "", timeout: float = 600, tokenizer=None):
+                 device: str = "", timeout: float = 600, tokenizer=None, loops: int | None = None):
         """`classifier` may be None: profile() then works, score() and trace() need one."""
         self.binary, self.gguf, self.ngl, self.batch, self.device = binary, gguf, ngl, batch, device
         self.timeout = timeout
@@ -49,6 +49,8 @@ class HScorer:
             raise ValueError("classifier coefficient size does not match its n_layers x n_neurons "
                              "(MoE classifiers are not supported for live scoring)")
         self._norms = None
+        self.loops = loops           # looped models (Dory): the loop count llama-server runs, if not the GGUF's
+        self._layout = False         # looped layout, read from the GGUF on first use (None: not looped)
         self._tok = tokenizer        # anything with render_chat/decode/has_template
         self.lock = threading.Lock()   # one prefill at a time per model
 
@@ -60,11 +62,17 @@ class HScorer:
                 raise ValueError("this GGUF has no chat template; cannot render the prompt")
         return self._tok
 
+    def layout(self):
+        """(blocks, passes, arch) for a looped GGUF, else None (extract_activations_gguf.looped_layout)."""
+        if self._layout is False:
+            from extract_activations_gguf import looped_layout
+            self._layout = looped_layout(self.gguf, self.loops)
+        return self._layout
+
     def _col_norms(self, n_layers):
         if self._norms is None:
-            from extract_activations_gguf import weight_col_norms
-            norms = weight_col_norms(self.gguf, n_layers)
-            self._norms = np.stack([norms[i] for i in range(n_layers)])
+            from extract_activations_gguf import layer_norms
+            self._norms = layer_norms(self.gguf, n_layers, self.layout())
         return self._norms
 
     def _run(self, args):
@@ -104,9 +112,11 @@ class HScorer:
         m2 = os.path.join(work, "s.jsonl")
         with open(m2, "w", encoding="utf-8") as f:
             f.write(json.dumps({"id": "r", "text": text, "spans": spans}, ensure_ascii=False) + "\n")
+        from extract_activations_gguf import looped_args
         n_layers = self.n_layers or self._layers_from_gguf()
         self._run(["-ngl", str(self.ngl), "-b", str(self.batch), "-c", str(self.batch),
-                   "--n-layers", str(n_layers), "--manifest", m2, "--outdir", work])
+                   "--n-layers", str(n_layers), "--manifest", m2, "--outdir", work,
+                   *looped_args(self.layout(), self.loops is not None)])
         _, agg, _seen, _counts, n_experts = read_aggregate(os.path.join(work, "r.bin"))
         if n_experts > 1:
             raise ValueError("MoE models are not supported for live scoring")
@@ -170,6 +180,8 @@ class HScorer:
         arch = r.fields["general.architecture"].contents()
         arch = arch.decode() if isinstance(arch, bytes) else arch
         self.n_layers = int(r.fields[f"{arch}.block_count"].contents())
+        if self.layout():
+            self.n_layers = self.layout()[0] * self.layout()[1]       # blocks x passes
         return self.n_layers
 
 

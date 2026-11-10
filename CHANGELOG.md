@@ -56,6 +56,11 @@
 - `loop_sweep.py`: TestQA per loop count and KV mode, with confident mistakes, speed and paired changes.
 - `loop_lens.py`: a per-loop logit lens on Hugging Face weights, with the deciding loop and per-loop MLP and H-neuron activity.
 - NeMo Gym: `gym_bridge.py` exports TestQA, fuzzing banks and Fix This Mistake pairs as an environment's data, and `integrations/nemo_gym/omnicortex_testqa` rewards correct answers, pays a little for declining and charges for confident mistakes (optionally shaped by H-neuron risk).
+- `cett-dump --by-weight <blocks>`: finds the down projection by its weight (`blk.N.ffn_down.weight`) instead of the
+  node's name, which Dory's llama.cpp fork never sets. It records pass k of block N as layer k × blocks + N, so a
+  looped model's passes stay apart. Looped GGUFs (`<arch>.num_loops`) use it automatically in extraction and in
+  Studio's live scoring, with the model's loop count. On ordinary models it is identical to name matching
+  (integration test).
 - docs/DORY.md; docs/MOBILE_CLIENTS.md, a plan for phone and cross-platform clients.
 
 ### Changed (the rest of the name)

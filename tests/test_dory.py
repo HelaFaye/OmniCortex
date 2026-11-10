@@ -111,3 +111,50 @@ def test_loop_lens_on_a_tiny_looped_model():
     assert [r["loop"] for r in out["per_loop"]] == [1, 2, 3] and "target_rank" in out["per_loop"][0]
     assert len(out["mlp_activity"]["model.layers.1"]) == 3 and len(out["h_neuron_share"]["model.layers.1"]) == 3
     assert out["decided_at_loop"] is None or 1 <= out["decided_at_loop"] <= 3
+
+
+def _looped_gguf(path, loops=2):
+    """A tiny GGUF with Dory-style metadata: 4 blocks, block 1 attention-only (no ffn_down)."""
+    gguf = pytest.importorskip("gguf")
+    import numpy as np
+    w = gguf.GGUFWriter(str(path), "dory")
+    w.add_block_count(4)
+    w.add_uint32("dory.num_loops", loops)
+    rng = np.random.default_rng(0)
+    for b in (0, 2, 3):
+        w.add_tensor(f"blk.{b}.ffn_down.weight", rng.standard_normal((8, 16)).astype(np.float32))  # [n_embd, n_ff]
+    w.write_header_to_file()
+    w.write_kv_data_to_file()
+    w.write_tensors_to_file()
+    w.close()
+    return path
+
+
+def test_cett_dump_layout_for_looped_ggufs(tmp_path):
+    """Looped GGUFs run cett-dump with --by-weight: pass k of block N is layer k*blocks+N (docs/DORY.md)."""
+    import numpy as np
+    from extract_activations_gguf import layer_norms, looped_args, looped_layout, weight_col_norms
+    g = str(_looped_gguf(tmp_path / "d.gguf"))
+    assert looped_layout(g) == (4, 2, "dory")
+    assert looped_layout(g, loops=3) == (4, 3, "dory")
+    assert looped_args(looped_layout(g)) == ["--by-weight", "4"]
+    assert looped_args(looped_layout(g, 3), True) == ["--by-weight", "4", "--override-kv", "dory.num_loops=int:3"]
+    assert looped_args(None) == []
+    n = layer_norms(g, 8, looped_layout(g))
+    base = weight_col_norms(g, 4, allow_missing=True)
+    assert n.shape == (8, 16) and not n[1].any() and not n[5].any()          # block 1 has no MLP, in both passes
+    assert np.allclose(n[0], base[0]) and np.allclose(n[4], base[0]) and np.allclose(n[7], base[3])
+    import hscore
+    s = hscore.HScorer("cett-dump", g, None, loops=3)
+    assert s.layout() == (4, 3, "dory") and s._layers_from_gguf() == 12 and s._col_norms(12).shape == (12, 16)
+
+
+def test_ordinary_ggufs_are_not_looped(tmp_path):
+    gguf = pytest.importorskip("gguf")
+    import numpy as np
+    from extract_activations_gguf import looped_layout
+    w = gguf.GGUFWriter(str(tmp_path / "l.gguf"), "llama")
+    w.add_block_count(2)
+    w.add_tensor("blk.0.ffn_down.weight", np.ones((4, 8), np.float32))
+    w.write_header_to_file(); w.write_kv_data_to_file(); w.write_tensors_to_file(); w.close()
+    assert looped_layout(str(tmp_path / "l.gguf")) is None

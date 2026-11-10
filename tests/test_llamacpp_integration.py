@@ -78,6 +78,30 @@ def test_cett_dump_matches_pytorch(tiny_gguf, tmp_path):
         assert np.abs(got - want).max() / np.abs(want).max() < 5e-3
 
 
+
+def test_by_weight_matches_named_nodes(tiny_gguf, tmp_path):
+    """--by-weight (finding the down projection by its blk.N.ffn_down.weight, for looped models whose graph does
+    not name it) records exactly what name matching does, across several ubatches; room for a second pass stays
+    unseen on a model that runs each block once."""
+    from extract_activations_gguf import read_aggregate
+    _, gguf = tiny_gguf
+    text = " ".join(["the cat sat on the mat and the dog wrote hamlet"] * 6)
+    (tmp_path / "m.jsonl").write_text(json.dumps({"id": "x", "text": text, "spans": [[0, 10], [5, 50], [30, -1]]}) + "\n")
+
+    def run(name, *extra):
+        (tmp_path / name).mkdir()
+        r = subprocess.run([str(CETT), "-m", str(gguf), "-ngl", "0", "-c", "512", "-b", "512", "-ub", "16",
+                            "--manifest", str(tmp_path / "m.jsonl"), "--outdir", str(tmp_path / name), *extra],
+                           capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr[-800:]
+        return read_aggregate(tmp_path / name / "x.bin")
+    ids, a, sa, _, _ = run("named", "--n-layers", "4")
+    assert len(ids) > 32                                     # several 16-token ubatches
+    _, b, sb, _, _ = run("weight", "--n-layers", "4", "--by-weight", "4")
+    assert np.array_equal(sa, sb) and np.array_equal(a, b)
+    _, c, sc, _, _ = run("weight2", "--n-layers", "8", "--by-weight", "4")
+    assert np.array_equal(c[:, :4], a) and not sc[:, 4:].any()
+
 def test_hscore_end_to_end(tiny_gguf, tmp_path):
     import hscore
     _, gguf = tiny_gguf

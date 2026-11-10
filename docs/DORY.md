@@ -110,11 +110,41 @@ run inside Gym in this repository's CI.
 pre-training. Its papers and the model card's training notes (NVFP4 for most of pre-training, then BF16, and context
 extended to 256K) are background for reading the loop results, not something OmniCortex runs.
 
+## Activations from the GGUF: cett-dump and the loops
+
+Reading the fork's graph (`src/models/dory.cpp` at the pinned commit) answers whether `cett-dump` can tell the loops
+apart:
+
+- **The loops are separable.** The fork unrolls the model into virtual layers: 8 input, 20 × loops recurrent and
+  8 output, so 56 at 2 loops. Every pass gets its own layer index, so a loop's activations never overwrite the
+  previous loop's.
+- **But the MLP output is unnamed.** cett-dump normally finds each layer's down projection by the graph node's name
+  (`ffn_down-<layer>`). Dory's graph calls the matrix multiply directly and names only `l_out`, so name matching
+  finds nothing.
+- **Not every block has an MLP.** Dory alternates attention-only and MLP-only blocks, so only some blocks have an
+  `ffn_down` weight.
+
+So for any GGUF whose metadata has `<arch>.num_loops`, OmniCortex runs cett-dump with **`--by-weight <blocks>`**:
+- the down projection is the matrix multiply whose weight is `blk.N.ffn_down.weight`;
+- the k-th time block N runs within one forward pass is recorded as layer **k × blocks + N**.
+
+Dory has 36 blocks, so at 2 loops there are 72 layer slots. Pass 1 is slots 0–35, and pass 2 of recurrent block N
+is slot 36 + N. Slots that never run (the input and output blocks' second pass, and attention-only blocks) stay
+unseen, with zeros. Weight norms repeat per pass. The neuron index records `looped: {blocks, passes}`.
+
+A classifier or profile made at one loop count therefore has blocks × passes features, and fits only that loop
+count. Studio passes the model's **Loops** setting to cett-dump (`--override-kv`), so live scoring matches what
+llama-server runs.
+
+`--by-weight` records exactly what name matching does on ordinary models: the integration tests compare the two,
+across several micro-batches. It has not yet run on Dory itself. Building and running the fork was not possible in
+the environment where this was written. Run `extract_activations_gguf.py` on the real file and check that pass 2's
+recurrent slots are seen and differ from pass 1's.
+
 ## What is not done yet
 
 - llama-server cannot change the loop count per request. Switching loops reloads the model, which takes a few
   seconds for a 4B model. A per-request loop count would need a llama.cpp change.
 - `loop_lens.py` needs PyTorch and Dory's transformers support.
-- It is untested whether `cett-dump` (the llama.cpp path) tells the loops apart. That depends on how the fork names
-  the tensors of repeated passes; if they share a name, each loop overwrites or adds to the same layer's numbers.
-  Until that is checked on the real file, use the per-loop lens for loop-resolved questions.
+- `cett-dump` on Dory is built for it but not yet run on the real model (see below). Until it is, use the per-loop
+  lens for loop-resolved questions.

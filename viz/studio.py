@@ -2463,10 +2463,12 @@ TRACE_ID = re.compile(r"[A-Za-z0-9_-]{6,64}")
 
 
 def _scorer(model, clf):
-    key = (model["path"], clf)
+    loops = load_settings().get(_key(model["path"]), {}).get("loops")
+    key = (model["path"], clf) if not loops else (model["path"], clf, loops)   # a loop count rebuilds the scorer
     if key not in _SCORERS:
         from hscore import HScorer
-        _SCORERS[key] = HScorer(STATE["cett"], model["path"], clf, ngl=STATE["score_ngl"])
+        _SCORERS[key] = HScorer(STATE["cett"], model["path"], clf, ngl=STATE["score_ngl"],
+                                loops=int(loops) if str(loops or "").isdigit() else None)
     return _SCORERS[key]
 
 
