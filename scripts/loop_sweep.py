@@ -9,7 +9,7 @@ same tasks, and reports accuracy, confident mistakes, declines and speed, plus t
 setting (gained, regressed, McNemar). The question it answers: do more loops mostly fix wrong answers, or do they
 also make the model more confidently wrong somewhere?
 
-    python scripts/loop_sweep.py --gguf ~/models/dory-q5_k_m.gguf --server ~/llama.cpp-dory/build/bin/llama-server \\
+    python scripts/loop_sweep.py --gguf ~/models/NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf --server ~/llama.cpp-dory/build/bin/llama-server \\
         --tasks qa/bank --loops 1 2 3 4 --kv-mode per_loop --out runs/dory-loops.json
 
 --tasks takes a TestQA bank folder or a JSONL of TestQA tasks (qa and reasoning items; graded by TestQA's grader).

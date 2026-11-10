@@ -104,6 +104,28 @@ def messages_for(question: str) -> list[dict]:
     return [{"role": "user", "content": question or "State one fact."}]
 
 
+FRAMINGS = ("judge", "answer")
+JUDGE_PROMPT = "Is this answer correct?\nQuestion: {q}\nAnswer: {a}"
+JUDGE_REPLY = "The answer is"
+
+
+def frame(question: str, answer: str, framing: str, backend: str) -> tuple[list[dict], str]:
+    """(messages, reply text) to read the model at.
+      judge   the model is shown the question and the answer and asked whether it is correct; read at the start
+              of its verdict ("The answer is"), before it says which. Truth is most readable where a model
+              evaluates a claim: on Qwen2.5 0.5B/1.5B this framing beat `answer` (docs/TRUTH_PROBE.md).
+      answer  the answer as the model's own reply, read at its last token (the first version's framing)"""
+    a = answer.strip()
+    if framing == "judge":
+        q = question or "(a statement)"
+        msgs, reply = messages_for(JUDGE_PROMPT.format(q=q, a=a)), JUDGE_REPLY
+    elif framing == "answer":
+        msgs, reply = messages_for(question), a
+    else:
+        raise ValueError(f"framing: one of {', '.join(FRAMINGS)}")
+    return msgs, (" " + reply) if backend == "hf" else reply
+
+
 # ------------------------------------------------------------------ backends
 
 class HFFeatures:
@@ -239,11 +261,10 @@ class Probe:
                    int(z["best"]), meta)
 
 
-def featurize(feat, rows, pool, log=None):
+def featurize(feat, rows, pool, log=None, framing="judge"):
     stages, X, y = None, [], []
     for k, r in enumerate(rows):
-        names, vecs = feat(messages_for(r["question"]), " " + r["answer"].strip() if feat.backend == "hf"
-                           else r["answer"].strip(), pool)
+        names, vecs = feat(*frame(r["question"], r["answer"], framing, feat.backend), pool)
         if stages is None:
             stages = names
         elif names != stages:
@@ -255,31 +276,52 @@ def featurize(feat, rows, pool, log=None):
     return stages, X, np.array(y)
 
 
-def train(feat, rows, pool="last", C=0.1, folds=5, seed=0, log=None) -> Probe:
+METHODS = ("massmean", "logreg")
+
+
+def _fit(method, Z, y, C):
+    """(coef, intercept) on standardised features.
+      massmean  the direction from the false answers' mean to the true answers' mean, with a 1-D logistic fit on
+                the projection for calibration (Marks & Tegmark 2023: generalises better than logistic regression)
+      logreg    L2 logistic regression with inverse strength C"""
     from sklearn.linear_model import LogisticRegression
+    if method == "massmean":
+        d = Z[y == 1].mean(0) - Z[y == 0].mean(0)
+        d = d / (np.linalg.norm(d) + 1e-9)
+        cal = LogisticRegression(C=1e4, max_iter=1000).fit((Z @ d)[:, None], y)
+        return (d * cal.coef_[0, 0]).astype(np.float32), float(cal.intercept_[0])
+    clf = LogisticRegression(C=C, max_iter=3000).fit(Z, y)
+    return clf.coef_[0].astype(np.float32), float(clf.intercept_[0])
+
+
+def train(feat, rows, pool="last", C=0.1, folds=5, seed=0, log=None, framing="judge", method="massmean") -> Probe:
     from sklearn.metrics import roc_auc_score
-    from sklearn.model_selection import StratifiedKFold, cross_val_predict
+    from sklearn.model_selection import StratifiedKFold
+    if method not in METHODS:
+        raise ValueError(f"method: one of {', '.join(METHODS)}")
     if len({r["label"] for r in rows}) < 2:
         raise ValueError("need both true and false answers")
-    stages, X, y = featurize(feat, rows, pool, log)
+    stages, X, y = featurize(feat, rows, pool, log, framing)
     folds = max(2, min(folds, int(min(y.sum(), len(y) - y.sum()))))
     cv = StratifiedKFold(folds, shuffle=True, random_state=seed)
     coef, inter, mean, std, auc = [], [], [], [], []
     for i in range(len(stages)):
         Xi = np.stack([x[i] for x in X]).astype(np.float32)
-        mu, sd = Xi.mean(0), Xi.std(0) + 1e-6
-        Z = (Xi - mu) / sd
-        clf = LogisticRegression(C=C, max_iter=3000)
-        pred = cross_val_predict(clf, Z, y, cv=cv, method="predict_proba")[:, 1]
+        pred = np.zeros(len(y))
+        for tr, te in cv.split(Xi, y):                      # held-out scores: standardise on the training fold only
+            mu, sd = Xi[tr].mean(0), Xi[tr].std(0) + 1e-6
+            w, b = _fit(method, (Xi[tr] - mu) / sd, y[tr], C)
+            pred[te] = ((Xi[te] - mu) / sd) @ w + b
         auc.append(float(roc_auc_score(y, pred)))
-        clf.fit(Z, y)
-        coef.append(clf.coef_[0].astype(np.float32))
-        inter.append(float(clf.intercept_[0]))
+        mu, sd = Xi.mean(0), Xi.std(0) + 1e-6
+        w, b = _fit(method, (Xi - mu) / sd, y, C)
+        coef.append(w)
+        inter.append(b)
         mean.append(mu)
         std.append(sd)
     best = int(np.argmax(auc))
     meta = {"schema": SCHEMA, "backend": feat.backend, "model": feat.model_id, "pool": pool, "C": C,
-            "n": int(len(y)), "n_true": int(y.sum()), "folds": folds}
+            "framing": framing, "method": method, "n": int(len(y)), "n_true": int(y.sum()), "folds": folds}
     return Probe(stages, coef, inter, mean, std, auc, best, meta)
 
 
@@ -297,11 +339,11 @@ def check(feat, probe: Probe, question: str, answer: str, alternatives=(), stage
     if probe.meta.get("backend") != feat.backend:
         raise ValueError(f"this probe was trained on the {probe.meta.get('backend')} backend, not {feat.backend}")
     pool = probe.meta.get("pool", "last")
+    framing = probe.meta.get("framing", "answer")          # probes from before framings existed read the answer
     i = probe.stages.index(stage) if stage else probe.best
-    msgs = messages_for(question)
 
     def score(text):
-        names, vecs = feat(msgs, (" " + text.strip()) if feat.backend == "hf" else text.strip(), pool)
+        names, vecs = feat(*frame(question, text, framing, feat.backend), pool)
         by = dict(zip(names, vecs))
         missing = [s for s in probe.stages if s not in by]
         if missing:
@@ -370,7 +412,12 @@ def main(argv=None) -> int:
     model_args(t)
     t.add_argument("--data", action="append", required=True, help="rows from `data`, or banks (repeatable)")
     t.add_argument("--pool", choices=["last", "mean"], default="last", help="the answer's last token, or its mean")
-    t.add_argument("--C", type=float, default=0.1, help="inverse regularisation strength")
+    t.add_argument("--framing", choices=FRAMINGS, default="judge",
+                   help="judge: ask the model whether the answer is correct and read its verdict (default); "
+                        "answer: read the answer as the model's own reply")
+    t.add_argument("--method", choices=METHODS, default="massmean",
+                   help="massmean: difference of class means, calibrated (default); logreg: logistic regression")
+    t.add_argument("--C", type=float, default=0.1, help="logreg's inverse regularisation strength")
     t.add_argument("--limit", type=int, help="use at most this many rows")
     t.add_argument("--out", required=True)
     c = sub.add_parser("check")
@@ -394,7 +441,8 @@ def main(argv=None) -> int:
         rows = build_rows(a.data)
         random.Random(0).shuffle(rows)
         rows = rows[:a.limit] if a.limit else rows
-        probe = train(feat, rows, a.pool, a.C, log=lambda m: print(m, file=sys.stderr, flush=True))
+        probe = train(feat, rows, a.pool, a.C, log=lambda m: print(m, file=sys.stderr, flush=True),
+                      framing=a.framing, method=a.method)
         probe.save(a.out)
         top = sorted(range(len(probe.stages)), key=lambda k: -probe.auc[k])[:5]
         print(f"{len(rows)} rows, {len(probe.stages)} stages; best {probe.stages[probe.best]} "

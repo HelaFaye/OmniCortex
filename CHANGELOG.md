@@ -27,7 +27,10 @@
   - Training data: `qa/truth` (a starter set), TestQA banks, or question/answer/wrong files.
   - Studio: a per-model Truth probe setting and `POST /api/truth`.
   - Jobs: Truth probe: train and Truth probe: does the model believe its answer?
-  - See docs/TRUTH_PROBE.md.
+  - Default: `--framing judge` (ask the model whether the answer is correct, read its verdict) and
+    `--method massmean`. On Qwen2.5-1.5B: cross-validated AUROC 0.95 against 0.90 for reading the answer itself.
+    On 16 held-out questions, it flagged the model's one mistake and raised no false alarm.
+  - See docs/TRUTH_PROBE.md, which has the results on real models.
 
 ### Added (CI)
 

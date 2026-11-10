@@ -622,6 +622,9 @@ SPECS.update({
                 "question/answer/wrong files. Each layer's cross-validated AUROC is kept (docs/TRUTH_PROBE.md).",
         "fields": [F("hf", help="Hugging Face model id or folder"), F("gguf", help="or a GGUF file"),
                    F("data", repeat=True, default="qa/truth"), F("pool", default="last", help="last or mean"),
+                   F("framing", choices=["judge", "answer"], default="judge",
+                     help="judge: ask the model whether the answer is correct and read its verdict"),
+                   F("method", choices=["massmean", "logreg"], default="massmean"),
                    F("limit", kind="int"), F("trust_remote_code", kind="bool"), F("out", req=True)]},
     "truth_check": {
         "title": "Truth probe: does the model believe its answer?", "group": "Interpret",

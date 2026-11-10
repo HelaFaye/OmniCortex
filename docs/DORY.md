@@ -29,7 +29,7 @@ scripts/build_llama_tools.sh --repo https://github.com/brianchmielNV/llama.cpp.g
 - Point Studio's llama-server at `~/llama.cpp-dory/build/bin/llama-server` (Settings → Workspaces), or keep it
   per workspace.
 
-Download `dory-q5_k_m.gguf` from the
+Download `NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf` from the
 [GGUF repository](https://huggingface.co/nvidia/NVIDIA-Nemotron-Labs-Dory1.0-4B-GGUF). Its SHA-256 is
 `96080be49ffd67b916018b7bdef8c484762576fb52780e10ab98ac4978a660e0`.
 

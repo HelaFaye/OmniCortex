@@ -70,6 +70,17 @@ python scripts/truth_probe.py check --gguf models/my-model.gguf --probe models/m
 
 The same steps are in Jobs as **Truth probe: train** and **Truth probe: does the model believe its answer?**.
 
+### How the answer is read
+
+Two settings decide what the probe reads. Both are saved in the probe file, so `check` reads replies the same way.
+
+- **`--framing judge`** (default): the model is shown the question and the answer and asked "Is this answer
+  correct?", and it is read at the start of its verdict ("The answer is"), before it says which.
+  **`--framing answer`** reads the answer as the model's own reply, at its last token. Probes made before framings
+  existed load as `answer`.
+- **`--method massmean`** (default): the direction from the false answers' average activation to the true answers',
+  calibrated to a probability. **`--method logreg`** is L2 logistic regression (`--C`).
+
 ### Training data
 
 `data` reads any of these formats:
@@ -87,11 +98,41 @@ better probe; use `--no-borrow` to keep only explicit wrong answers.
 `qa/truth/basic.jsonl` is a starter set of 44 questions with 49 wrong answers (93 rows). It is enough to try the probe. For a
 probe you rely on, use a few hundred rows or more, close to the replies you will check.
 
+## Results on real models
+
+These are from the starter set, on a CPU. Qwen2.5-0.5B and 1.5B are small, so treat this as a first measurement.
+
+**Cross-validated AUROC on the starter set (93 rows, best layer):**
+
+| Model | `answer`, last token | `answer`, mean | `judge`, last token | `judge`, mean |
+|---|---|---|---|---|
+| Qwen2.5-0.5B-Instruct | 0.56–0.61 | 0.52–0.56 | 0.69–0.72 | 0.65–0.69 |
+| Qwen2.5-1.5B-Instruct | 0.90 | 0.80–0.86 | **0.95** | 0.95 |
+
+Each range spans mass-mean and logistic regression. Ending the answer with a full stop made `answer` at the last
+token worse on both models, and made no clear difference to the mean. Two things stand out:
+- **Model size matters most.** The 0.5B model barely holds a readable truth signal.
+- **`judge` beats `answer`**, on both models. Truth is easiest to read where the model evaluates a claim, as the
+  literature reports.
+
+The best-of-layers figures are optimistic. So, separately, a probe with the defaults on Qwen2.5-1.5B (best layer:
+`model.layers.25`, cross-validated 0.93) was run on 16 questions outside the training set:
+
+| Test | Result |
+|---|---|
+| correct answer rated above a wrong one | 16 of 16 pairs |
+| correct answers flagged (false alarms) | 0 of 16 (2 `unsure`: "54" for 9 × 6, "8" spider legs) |
+| wrong answers flagged | 14 of 16 (missed "Buzz Aldrin", "Lead") |
+| the model's own answers | 15 of 16 right, 0 flagged. The one mistake ("12 months" for the days in a leap year) was flagged `knows_but_says_otherwise`: own answer p = 0.01, the correct "366" p = 0.70 |
+
+Sixteen questions are too few for a reliable error rate. They do show the intended behaviour on a real model: the
+probe flagged a confident mistake whose correct answer the model rated true, and raised no alarm on correct answers.
+
 ### Reading the training output
 
 `train` prints the best layers and their AUROC, measured by cross-validation on held-out rows. In published results,
 truth is usually most readable in the middle layers, and above 0.8 is common for factual questions on capable
-models. Near 0.5 means the probe found nothing: more or better data, `--pool mean`, or a larger model. The check
+models. Near 0.5 means the probe found nothing: try a larger model first (see Results), then more or better data. The check
 only reports layers at 0.7 or above in the trajectory.
 
 ## In Studio

@@ -66,7 +66,8 @@ def feat(tmp_path_factory):
 
 @torch_needed
 def test_train_check_and_reload(feat, tmp_path):
-    probe = TP.train(feat, synthetic(), pool="last", C=1.0)
+    probe = TP.train(feat, synthetic(), pool="last", C=1.0, framing="answer", method="logreg")
+    assert probe.meta["framing"] == "answer" and probe.meta["method"] == "logreg"
     assert probe.stages == ["model.layers.0", "model.layers.1", "model.layers.2"]
     assert probe.auc[probe.best] > 0.9
     probe.save(tmp_path / "p.npz")
@@ -80,6 +81,35 @@ def test_train_check_and_reload(feat, tmp_path):
 
 
 @torch_needed
+def test_massmean_and_judge_framing(feat, tmp_path):
+    mm = TP.train(feat, synthetic(), framing="answer", method="massmean")
+    assert mm.auc[mm.best] > 0.9 and mm.meta["method"] == "massmean"
+    assert TP.check(feat, mm, "what is the capital", "two", ["blue"])["verdict"] == "knows_but_says_otherwise"
+    j = TP.train(feat, synthetic(), framing="judge")            # the default framing: the answer sits in the prompt
+    assert j.meta["framing"] == "judge" and j.auc[j.best] > 0.6
+    j.save(tmp_path / "j.npz")
+    assert TP.Probe.load(tmp_path / "j.npz").meta["framing"] == "judge"
+
+
+def test_frames():
+    msgs, reply = TP.frame("Capital of France?", " Paris ", "judge", "hf")
+    assert "Question: Capital of France?" in msgs[0]["content"] and "Answer: Paris" in msgs[0]["content"]
+    assert reply == " The answer is"
+    assert TP.frame("Capital of France?", "Paris", "answer", "gguf") == (TP.messages_for("Capital of France?"), "Paris")
+    with pytest.raises(ValueError):
+        TP.frame("q", "a", "vibes", "hf")
+
+
+@torch_needed
+def test_old_probes_read_the_answer(feat, tmp_path):
+    p = TP.train(feat, synthetic(16), C=1.0, framing="answer", method="logreg")
+    del p.meta["framing"]                                        # a probe saved before framings existed
+    p.save(tmp_path / "old.npz")
+    r = TP.check(feat, TP.Probe.load(tmp_path / "old.npz"), "what is the capital", "blue")
+    assert r["verdict"] in TP_VERDICTS
+
+
+@torch_needed
 def test_one_sided_data_rejected(feat):
     with pytest.raises(ValueError):
         TP.train(feat, [r for r in synthetic() if r["label"]])
@@ -87,7 +117,7 @@ def test_one_sided_data_rejected(feat):
 
 @torch_needed
 def test_backend_mismatch_rejected(feat):
-    probe = TP.train(feat, synthetic(16), C=1.0)
+    probe = TP.train(feat, synthetic(16), C=1.0, framing="answer")
     probe.meta["backend"] = "gguf"
     with pytest.raises(ValueError):
         TP.check(feat, probe, "q", "a")
