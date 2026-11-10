@@ -36,9 +36,9 @@ jobs:
         include:
           - {target: linux-x64,   os: ubuntu-24.04,     backend: cpu}
           - {target: linux-arm64, os: ubuntu-24.04-arm, backend: cpu}
-          - {target: macos-arm64, os: macos-14,         backend: metal, python_arch: arm64}
+          - {target: macos-arm64, os: macos-15,         backend: metal, python_arch: arm64}
           # Intel Macs: cross-compiled on Apple silicon; the agent is built with x64 Python (Rosetta)
-          - {target: macos-x64,   os: macos-14,         backend: metal, python_arch: x64,
+          - {target: macos-x64,   os: macos-15,         backend: metal, python_arch: x64,
              cmake: "-DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_SYSTEM_PROCESSOR=x86_64"}
     steps:
       - uses: actions/checkout@v4
@@ -96,12 +96,15 @@ jobs:
   windows:
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    # 32-bit Windows, like the 32-bit Linux targets above, is best-effort in llama.cpp: a failure there
+    # does not fail the run
+    continue-on-error: ${{ matrix.best_effort == true }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - {target: windows-x64,   os: windows-2022,   arch: x64,   python_arch: x64}
-          - {target: windows-x86,   os: windows-2022,   arch: Win32, python_arch: x86,
+          - {target: windows-x86,   os: windows-2022,   arch: Win32, python_arch: x86, best_effort: true,
              cmake: "-DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF"}
           - {target: windows-arm64, os: windows-11-arm, arch: ARM64, python_arch: arm64}
     steps:

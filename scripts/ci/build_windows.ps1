@@ -20,7 +20,26 @@ Copy-Item -Recurse "$root\llama-tools\cett-dump" "$llama\tools\"
 $cm = Get-Content "$llama\tools\CMakeLists.txt" -Raw
 if ($cm -notmatch 'add_subdirectory\(cett-dump\)') { Add-Content "$llama\tools\CMakeLists.txt" "`nadd_subdirectory(cett-dump)" }
 
-$flags = @("-S", $llama, "-B", "$llama\build", "-A", $Arch, "-DLLAMA_CURL=OFF", "-DGGML_NATIVE=OFF", "-DBUILD_SHARED_LIBS=OFF", "-DLLAMA_OPENSSL=OFF")
+$flags = @("-S", $llama, "-B", "$llama\build", "-DLLAMA_CURL=OFF", "-DGGML_NATIVE=OFF", "-DBUILD_SHARED_LIBS=OFF", "-DLLAMA_OPENSSL=OFF")
+if ($Arch -eq "ARM64") {
+  # MSVC can't target a portable ARM CPU in llama.cpp (it only probes the build machine, whose SVE a Snapdragon
+  # laptop lacks). Build with clang through llama.cpp's own toolchain file, as llama.cpp's CI does.
+  if (-not (Get-Command clang -ErrorAction SilentlyContinue)) {
+    $llvm = "C:\Program Files\LLVM\bin"
+    if (-not (Test-Path "$llvm\clang.exe")) { choco install llvm -y --no-progress; if ($LASTEXITCODE) { throw "LLVM install failed" } }
+    $env:PATH = "$llvm;$env:PATH"
+  }
+  if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+    python -m pip install --quiet ninja          # native ARM64 wheel; its ninja.exe lands in Python's Scripts
+    if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+      $env:PATH = "$(Split-Path (Get-Command python).Source)\Scripts;$env:PATH"
+    }
+  }
+  clang --version
+  $flags += @("-G", "Ninja Multi-Config", "-DCMAKE_TOOLCHAIN_FILE=$llama\cmake\arm64-windows-llvm.cmake", "-DGGML_OPENMP=OFF")
+} else {
+  $flags += @("-A", $Arch)
+}
 if ($CMakeExtra) { $flags += $CMakeExtra.Split(" ") }
 cmake @flags
 if ($LASTEXITCODE) { throw "cmake configure failed" }

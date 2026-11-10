@@ -42,7 +42,7 @@ jobs:
       - name: install
         run: |
           python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
-          python -m pip install -r requirements.txt pytest sentencepiece peft trl mcp cryptography uvicorn
+          python -m pip install -r requirements.txt -r requirements-transfer-full.txt pytest sentencepiece peft trl uvicorn
           python -m pip freeze | grep -iE "^(torch|transformers|tokenizers|sentencepiece)==" | tee .test-cache-key
       - uses: actions/cache@v4
         with:
