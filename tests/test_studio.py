@@ -87,6 +87,13 @@ def test_studio_http_server_rejects_connections_above_worker_limit():
         assert b"503 Service Unavailable" in response
     finally:
         release.set()
+        # Allow the active handler to finish before closing its client socket.
+        try:
+            first.settimeout(3)
+            while first.recv(4096):
+                pass
+        except (OSError, socket.timeout):
+            pass
         first.close()
         if second is not None:
             second.close()

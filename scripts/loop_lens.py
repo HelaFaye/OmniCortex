@@ -137,7 +137,7 @@ def lens(model, tok, prompt: str, target: str | None = None, top_k: int = 5, h_n
     final_top = int(final.argmax())
     loops = []
     for k, h in enumerate(calls[last]):
-        lp = rd(h).log_softmax(-1)
+        lp = rd(h).log_softmax(-1).detach()
         p = lp.exp()
         v, i = p.topk(top_k)
         row = {"loop": k + 1, "top": [{"token": tok.decode([int(t)]), "p": round(float(x), 4)} for x, t in zip(v, i)],

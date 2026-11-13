@@ -32,13 +32,13 @@ def test_edit_never_moves_the_protected_component():
     assert torch.allclose(z2 @ R, z @ R, atol=1e-5)          # along R: identical
     assert not torch.allclose(z2, z)                          # elsewhere: edited
     e.project_()
-    assert float((e.a[0] @ R).abs().max()) < 1e-5 and float((e.m[0] @ R).abs().max()) < 1e-5
+    assert float((e.a[0] @ R).abs().max().detach()) < 1e-5 and float((e.m[0] @ R).abs().max().detach()) < 1e-5
     # closed gates: no edit at all
     with torch.no_grad():
         e.la.fill_(-20)
         e.lm.fill_(-20)
     assert torch.allclose(e.edit(0, z), z, atol=1e-6)
-    assert float(e.l0()) < 1e-3
+    assert float(e.l0().detach()) < 1e-3
 
 
 def test_train_chat_export(tmp_path):

@@ -535,7 +535,7 @@ def output_attribution(model, tok, sae, info: dict, prompt: str, token: str, bas
     n = attr.shape[1]
     rows = [{"pos": int(i) // n, "feature": int(i) % n, "token": tok.decode([ids[int(i) // n]]),
              "act": round(float(a.flatten()[i]), 4), "attribution": round(float(flat[i]), 5)} for i in idx]
-    base_metric = float(metric)
+    base_metric = float(metric.detach())
     if ablate:
         with torch.no_grad():
             for r in rows[:ablate]:
