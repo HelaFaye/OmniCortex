@@ -185,9 +185,9 @@ def main(argv=None) -> int:
     a = p.parse_args(argv)
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    tok = AutoTokenizer.from_pretrained(a.model)
+    tok = AutoTokenizer.from_pretrained(a.model, trust_remote_code=False)
     dtype = "auto" if a.dtype == "auto" else getattr(torch, a.dtype)
-    model = AutoModelForCausalLM.from_pretrained(a.model, dtype=dtype)
+    model = AutoModelForCausalLM.from_pretrained(a.model, dtype=dtype, trust_remote_code=False)
     model.to("cuda" if torch.cuda.is_available() else "cpu").eval()
     messages = json.loads(Path(a.messages).read_text()) if a.messages else None
     reply = Path(a.reply_file).read_text() if a.reply_file else a.reply

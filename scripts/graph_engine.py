@@ -44,6 +44,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import time
 import uuid
 from collections import Counter, deque
@@ -93,7 +94,7 @@ class Env:
     they go to --studio over HTTP."""
 
     def __init__(self, studio=None, policy=None, model: str = "", profile: str = "", workdir: str | None = None,
-                 mcp_call=None, graph_loader=None, log=None):
+                 mcp_call=None, graph_loader=None, log=None, scratch_dir: str | None = None):
         self.studio, self.model, self.profile, self.workdir = studio, model, profile, workdir
         self.mcp_call, self.graph_loader = mcp_call, graph_loader
         self.log = log or (lambda *_: None)
@@ -102,6 +103,27 @@ class Env:
             policy = P.Policy()
         self.policy = policy
         self.memory: dict[str, list] = {}
+        self.scratch_dir = str(Path(scratch_dir).expanduser().resolve(strict=False)) if scratch_dir else None
+        self._scratch = None
+
+    def open_scratch(self) -> str:
+        """Create and own a private scratch directory unless one was supplied."""
+        if self.scratch_dir:
+            return self.scratch_dir
+        self._scratch = tempfile.TemporaryDirectory(prefix="omnicortex-job-", ignore_cleanup_errors=True)
+        self.scratch_dir = self._scratch.name
+        return self.scratch_dir
+
+    def close_scratch(self) -> None:
+        """Remove only a scratch directory owned by this Env."""
+        scratch, self._scratch = self._scratch, None
+        if scratch is not None:
+            self.scratch_dir = None
+            scratch.cleanup()
+
+    def permission_context(self) -> dict:
+        import permissions as P
+        return P.context(workdir=self.workdir, repo=self.workdir, tmp=self.scratch_dir)
 
     def need_studio(self):
         if self.studio is None:
@@ -131,7 +153,7 @@ class Env:
 
     def permit(self, action: str, target: str, node_profile: str = "") -> None:
         import permissions as P
-        ctx = P.context(workdir=self.workdir, repo=self.workdir)
+        ctx = self.permission_context()
         effects = [self.policy.check(action, target, self.model, "graph", self.profile, ctx)]
         if node_profile:
             effects.append(self.policy.check(action, target, self.model, "graph", node_profile, ctx))
@@ -393,7 +415,7 @@ def _n_perm(n, i, env, run):
     import permissions as P
     t = _text(i["target"])
     d = env.policy.check(n["params"].get("action") or "run", t, env.model, "graph",
-                         n["params"].get("profile") or env.profile, P.context(workdir=env.workdir, repo=env.workdir))
+                         n["params"].get("profile") or env.profile, env.permission_context())
     return {e: (t if e == d["effect"] else SKIP) for e in P.EFFECTS} | {"why": d["why"]}
 
 
@@ -703,7 +725,7 @@ def _n_mcp(n, i, env, run):
     server, _, tool = (p.get("tool") or "").partition("/")
     args = {**(p.get("args") or {}), **(_json(i["args"]) if i.get("args") is not None else {})}
     d = P.check_call(env.policy, env.model, server, tool, args, job="graph", profile=p.get("profile") or env.profile,
-                     ctx=P.context(workdir=env.workdir))
+                     ctx=env.permission_context())
     if d["effect"] != "allow":
         raise GraphError(f"not permitted: {d['why']}")
     if env.mcp_call is None:
@@ -737,7 +759,7 @@ def _n_http(n, i, env, run):
       acts=["read"], help="Read a text file (the read permission applies).")
 def _n_fread(n, i, env, run):
     import permissions as P
-    path = P.normalise("read", _text(i.get("path")) or n["params"].get("path") or "", P.context(workdir=env.workdir))
+    path = P.normalise("read", _text(i.get("path")) or n["params"].get("path") or "", env.permission_context())
     env.permit("read", path, n["params"].get("profile", ""))
     return {"text": Path(path).read_text(encoding="utf-8", errors="replace")[:MAX_TEXT]}
 
@@ -747,7 +769,7 @@ def _n_fread(n, i, env, run):
       acts=["write"], help="Write text to a file (the write permission applies).")
 def _n_fwrite(n, i, env, run):
     import permissions as P
-    path = P.normalise("write", _text(i.get("path")) or n["params"].get("path") or "", P.context(workdir=env.workdir))
+    path = P.normalise("write", _text(i.get("path")) or n["params"].get("path") or "", env.permission_context())
     env.permit("write", path, n["params"].get("profile", ""))
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     Path(path).write_text(_text(i["text"]), encoding="utf-8")
@@ -785,7 +807,7 @@ def _n_worker(n, i, env, run):
         lines += ["", "Input from earlier steps:", _text(i["inputs"])]
     if i.get("feedback") is not None:
         lines += ["", "Your last attempt was sent back. Feedback:", _text(i["feedback"])]
-    lines += ["", P.prompt_text(env.policy, env.model, "project_task", p.get("profile") or "", P.context(workdir=env.workdir))]
+    lines += ["", P.prompt_text(env.policy, env.model, "project_task", p.get("profile") or "", env.permission_context())]
     out = env.chat([{"role": "system", "content": director.WORKER_SYSTEM}, {"role": "user", "content": "\n".join(lines)}],
                    p.get("model") or "auto", "", 0.4, 4096)
     rep = {}
@@ -1067,14 +1089,18 @@ def main(argv=None) -> int:
     tok = Path(a.token_file).read_text().strip() if a.token_file else os.environ.get("OC_STUDIO_TOKEN")
     env = Env(oc_mcp.Studio(a.studio, tok), model=a.model, profile=a.profile, workdir=a.workdir)
     g = json.loads(Path(a.graph).read_text())
-    if a.cmd == "run":
-        run = Runner(g, env).start(dict(x.split("=", 1) for x in a.input))
-        print(json.dumps(public_run(run), indent=1, ensure_ascii=False))
-        return 0 if run["status"] == "done" else 1
-    cases = [json.loads(line) for line in Path(a.cases).read_text().splitlines() if line.strip()]
-    res = run_eval(g, cases, env, a.expect, a.output, a.grade)
-    print(json.dumps(res, indent=1, ensure_ascii=False))
-    return 0
+    env.open_scratch()
+    try:
+        if a.cmd == "run":
+            run = Runner(g, env).start(dict(x.split("=", 1) for x in a.input))
+            print(json.dumps(public_run(run), indent=1, ensure_ascii=False))
+            return 0 if run["status"] == "done" else 1
+        cases = [json.loads(line) for line in Path(a.cases).read_text().splitlines() if line.strip()]
+        res = run_eval(g, cases, env, a.expect, a.output, a.grade)
+        print(json.dumps(res, indent=1, ensure_ascii=False))
+        return 0
+    finally:
+        env.close_scratch()
 
 
 if __name__ == "__main__":

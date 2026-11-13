@@ -121,10 +121,10 @@ def load(model_path: str, device: str = "cpu", dtype: str = "float32"):
     from transformers import AutoModel, AutoProcessor
     import transformers
     key = "dtype" if int(transformers.__version__.split(".")[0]) >= 5 else "torch_dtype"
-    model = AutoModel.from_pretrained(model_path, **{key: getattr(torch, dtype)}).to(device).eval()
+    model = AutoModel.from_pretrained(model_path, **{key: getattr(torch, dtype)}, trust_remote_code=False).to(device).eval()
     if not (hasattr(model, "vision_model") and hasattr(model, "text_model")):
         raise SystemExit(f"{model_path} is not a dual-encoder (CLIP/SigLIP-style) model")
-    proc = AutoProcessor.from_pretrained(model_path)
+    proc = AutoProcessor.from_pretrained(model_path, trust_remote_code=False)
     return model, proc
 
 

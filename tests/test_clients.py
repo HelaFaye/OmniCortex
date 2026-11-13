@@ -48,10 +48,25 @@ def _godot():
     return g if g and os.path.exists(g) else None
 
 
+@pytest.fixture(scope="module")
+def godot_project_imported():
+    """Build Godot's global script-class cache before checking scripts individually."""
+    godot = _godot()
+    if godot is None:
+        pytest.skip("no Godot 4 binary ($OC_GODOT, godot4 or godot)")
+    project = ROOT / "plugins" / "godot-client" / "client"
+    result = subprocess.run(
+        [godot, "--headless", "--editor", "--path", str(project), "--quit"],
+        capture_output=True, text=True, timeout=120,
+    )
+    output = (result.stdout or "") + (result.stderr or "")
+    assert result.returncode == 0, f"Godot project import failed:\n{output[-3000:]}"
+
+
 @pytest.mark.skipif(_godot() is None, reason="no Godot 4 binary ($OC_GODOT, godot4 or godot)")
 @pytest.mark.parametrize("script", ["studio.gd", "main.gd", "app.gd", "widgets/widget.gd", "widgets/jewel.gd",
                                     "widgets/emotion_graph.gd", "widgets/nav_gizmo.gd", "widgets/chat_box.gd"])
-def test_godot_scripts_parse(script):
+def test_godot_scripts_parse(script, godot_project_imported):
     r = subprocess.run([_godot(), "--headless", "--path", str(ROOT / "plugins" / "godot-client" / "client"), "--check-only",
                         "--script", f"res://{script}"], capture_output=True, text=True, timeout=120)
     assert "SCRIPT ERROR" not in r.stdout + r.stderr and "Parse Error" not in r.stdout + r.stderr, r.stderr[-800:]

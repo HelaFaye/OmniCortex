@@ -23,7 +23,7 @@ def text_config(cfg):
     return getattr(cfg, "text_config", cfg)
 
 
-def load_model(model_path, gpu_mem=None, cpu_mem="40GiB", trust_remote_code=True):
+def load_model(model_path, gpu_mem=None, cpu_mem="40GiB", trust_remote_code=False):
     """Load in bf16, optionally split across GPU and CPU.
 
     Never quantize here. CETT measures activation magnitude, which is exactly

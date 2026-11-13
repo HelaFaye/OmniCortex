@@ -289,8 +289,8 @@ def cmd_fit(a) -> int:
     print(f"{len(pairs)} answers: {int((y == 0).sum())} right, {int(y.sum())} wrong")
     if int(y.sum()) < 4 or int((y == 0).sum()) < 4:
         raise SystemExit("need at least four right and four wrong answers")
-    tok = AutoTokenizer.from_pretrained(a.model)
-    model = AutoModelForCausalLM.from_pretrained(a.model, dtype="auto" if a.dtype == "auto" else getattr(torch, a.dtype))
+    tok = AutoTokenizer.from_pretrained(a.model, trust_remote_code=False)
+    model = AutoModelForCausalLM.from_pretrained(a.model, dtype="auto" if a.dtype == "auto" else getattr(torch, a.dtype), trust_remote_code=False)
     model.to("cuda" if torch.cuda.is_available() else "cpu").eval()
     from concept_edit import decoder_layers
     n_layers = len(decoder_layers(model))

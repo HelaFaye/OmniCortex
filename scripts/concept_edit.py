@@ -308,8 +308,8 @@ class Run:
         self.a = a
         dev = "cuda" if torch.cuda.is_available() and not a.cpu else "cpu"
         dtype = torch.float32 if dev == "cpu" else torch.bfloat16
-        self.tok = AutoTokenizer.from_pretrained(a.model)
-        self.model = AutoModelForCausalLM.from_pretrained(a.model, dtype=dtype).to(dev).eval()
+        self.tok = AutoTokenizer.from_pretrained(a.model, trust_remote_code=False)
+        self.model = AutoModelForCausalLM.from_pretrained(a.model, dtype=dtype, trust_remote_code=False).to(dev).eval()
         self.A = load_prompts(a.concept, a.limit)
         self.B = load_prompts(a.baseline, a.limit)
         self.N = load_prompts(a.neutral, a.limit) if a.neutral else self.B[: max(8, len(self.B) // 2)]

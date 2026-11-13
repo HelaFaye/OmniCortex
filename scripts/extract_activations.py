@@ -49,7 +49,11 @@ def parse_args():
     p.add_argument("--keep_think", action="store_true",
                    help="Search for answer tokens from the start of the response "
                         "instead of after </think>.")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     return p.parse_args()
 
 
@@ -57,7 +61,7 @@ def main():
     args = parse_args()
     model, tokenizer = load_model(
         args.model_path, args.gpu_mem, args.cpu_mem,
-        trust_remote_code=not args.no_trust_remote_code,
+        trust_remote_code=args.trust_remote_code,
     )
     mgr = CETTManager(model, capture=args.capture)
     entry_device = next(model.parameters()).device

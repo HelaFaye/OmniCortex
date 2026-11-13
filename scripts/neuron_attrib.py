@@ -265,9 +265,9 @@ def run_saliency(a) -> dict:
     from oc_common import build_sequence, find_regions
     dtype = {"float32": torch.float32, "float16": torch.float16, "bfloat16": torch.bfloat16}[a.dtype]
     device = a.device if a.device != "auto" else ("cuda" if torch.cuda.is_available() else "cpu")
-    tok = AutoTokenizer.from_pretrained(a.model_path, trust_remote_code=not a.no_trust_remote_code)
+    tok = AutoTokenizer.from_pretrained(a.model_path, trust_remote_code=a.trust_remote_code)
     model = AutoModelForCausalLM.from_pretrained(a.model_path, torch_dtype=dtype, device_map={"": device},
-                                                 trust_remote_code=not a.no_trust_remote_code)
+                                                 trust_remote_code=a.trust_remote_code)
     model.eval()
     for p in model.parameters():
         p.requires_grad_(False)
@@ -331,7 +331,11 @@ def main(argv=None) -> int:
     s.add_argument("--device", default="auto", help="cpu, cuda, cuda:1, mps… (auto: a GPU when PyTorch sees one)")
     s.add_argument("--max_tokens", type=int, default=1024)
     s.add_argument("--keep_think", action="store_true")
-    s.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(s)
     w = sub.add_parser("weights", help="direct logit attribution from a GGUF's weights (numpy, no forward pass)")
     w.add_argument("--gguf", required=True)
     w.add_argument("--input_path", required=True, help="answer_tokens.jsonl")

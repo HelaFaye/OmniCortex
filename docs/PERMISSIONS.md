@@ -24,8 +24,13 @@ policy is used everywhere a model acts:
 | `system` | a component: `gpu`, `docker`, `packages`, `services`, `power`, `drivers`, `users`, `registry`, `firewall`, `clipboard`, `screen`, `camera`, `microphone` |
 | `tool` | an MCP tool, as `server/tool` |
 
-Paths are made absolute and `..` is resolved before matching, so
-`../../etc` cannot walk around a pattern.
+Paths are made absolute, `..` is normalized, and existing symlinks (including
+symlinked parent directories of a not-yet-created output file) are resolved
+before matching. This prevents a path inside an allowed checkout from
+silently resolving outside it. The policy is still an authorization check, not
+a filesystem sandbox: callers must use the same validated destination for the
+actual operation and guard against symlink replacement between checking and
+opening a file.
 
 ## Rules, profiles and layers
 

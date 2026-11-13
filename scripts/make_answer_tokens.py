@@ -23,11 +23,15 @@ def main():
     p.add_argument("--input_path", required=True)
     p.add_argument("--output_path", required=True)
     p.add_argument("--model_path", required=True)
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     a = p.parse_args()
 
     tok = AutoTokenizer.from_pretrained(
-        a.model_path, trust_remote_code=not a.no_trust_remote_code)
+        a.model_path, trust_remote_code=a.trust_remote_code)
 
     tagged = untagged = 0
     with open(a.input_path, encoding="utf-8") as fin, \

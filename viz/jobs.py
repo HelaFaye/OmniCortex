@@ -448,7 +448,8 @@ def U(name, **kw):
     return F(name, flag="--" + name, **kw)
 
 
-TRUST = U("no_trust_remote_code", kind="bool", help="refuse custom model code from the Hub")
+TRUST = U("trust_remote_code", kind="bool", default=False,
+           help="allow custom Python code from the model repository (executes downloaded code)")
 LOCS = ["input", "output", "answer_tokens", "all_except_answer_tokens"]
 
 SPECS.update({

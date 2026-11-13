@@ -153,13 +153,13 @@ def load_model(a, rep):
     from transformers import AutoModelForCausalLM, AutoTokenizer
     if a.vision:
         from transformers import AutoModelForImageTextToText, AutoProcessor
-        tok = AutoProcessor.from_pretrained(a.model)
+        tok = AutoProcessor.from_pretrained(a.model, trust_remote_code=False)
         inner = tok.tokenizer
         if inner.pad_token is None:
             inner.pad_token = inner.eos_token
         auto = AutoModelForImageTextToText
     else:
-        tok = AutoTokenizer.from_pretrained(a.model)
+        tok = AutoTokenizer.from_pretrained(a.model, trust_remote_code=False)
         if tok.pad_token is None:
             tok.pad_token = tok.eos_token
         auto = AutoModelForCausalLM
@@ -178,6 +178,7 @@ def load_model(a, rep):
         kw["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
                                                        bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=dtype)
         kw["device_map"] = {"": local_rank if local_rank >= 0 else 0}
+    kw.setdefault("trust_remote_code", False)
     model = auto.from_pretrained(a.model, **kw)
     if a.method == "qlora":
         from peft import prepare_model_for_kbit_training

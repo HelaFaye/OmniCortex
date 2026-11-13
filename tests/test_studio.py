@@ -52,11 +52,59 @@ def studio_srv(tmp_path):
         "review_dir": str(tmp_path / "review"), "review": None,
         "tool_rules_path": str(tmp_path / "tool-rules.json"), "subject_models": {},
         "config_path": str(tmp_path / "config.json"), "workspace_name": "default", "work_log": None})
-    srv = ThreadingHTTPServer(("127.0.0.1", 0), studio.Handler)
+    srv = studio.BoundedThreadingHTTPServer(("127.0.0.1", 0), studio.Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{srv.server_port}"
     srv.shutdown()
     studio.stop_server()
+
+
+def test_studio_http_server_rejects_connections_above_worker_limit():
+    entered = threading.Event()
+    release = threading.Event()
+
+    class SlowHandler(studio.Handler):
+        def do_GET(self):
+            entered.set()
+            release.wait(5)
+            body = b"ok"
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    srv = studio.BoundedThreadingHTTPServer(("127.0.0.1", 0), SlowHandler, max_workers=1)
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    first = socket.create_connection(("127.0.0.1", srv.server_port), timeout=3)
+    second = None
+    try:
+        first.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        assert entered.wait(3)
+        second = socket.create_connection(("127.0.0.1", srv.server_port), timeout=3)
+        second.sendall(b"GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+        response = second.recv(1024)
+        assert b"503 Service Unavailable" in response
+    finally:
+        release.set()
+        first.close()
+        if second is not None:
+            second.close()
+        srv.shutdown()
+        srv.server_close()
+        thread.join(timeout=3)
+
+
+def test_studio_body_reader_rejects_chunked_encoding():
+    class Headers(dict):
+        def get_all(self, key, default=None):
+            value = self.get(key)
+            return default if value is None else [value]
+
+    class Dummy:
+        headers = Headers({"Transfer-Encoding": "chunked"})
+    with pytest.raises(ValueError, match="Transfer-Encoding"):
+        studio.Handler._read(Dummy())
 
 
 def call(base, path, body=None):

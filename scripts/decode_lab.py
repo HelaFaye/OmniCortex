@@ -149,11 +149,11 @@ class Lab:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
         from logit_lens import final_norm
-        self.tok = AutoTokenizer.from_pretrained(model_id)
+        self.tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False)
         kw = {"dtype": "auto" if dtype == "auto" else getattr(torch, dtype)}
         if attn_eager or any((v.get("steer") or {}).get("adapt") == "attention" for v in variants.values()):
             kw["attn_implementation"] = "eager"
-        self.model = AutoModelForCausalLM.from_pretrained(model_id, **kw)
+        self.model = AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=False, **kw)
         self.model.to("cuda" if torch.cuda.is_available() else "cpu").eval()
         self.dev = next(self.model.parameters()).device
         self.norm, self.head = final_norm(self.model), self.model.get_output_embeddings()

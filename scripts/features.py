@@ -72,11 +72,12 @@ def pick_device(pref: str = "auto") -> str:
 def load_model(model_id: str, dtype: str = "auto", device: str = "auto"):
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    tok = AutoTokenizer.from_pretrained(model_id)
+    tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False)
     dev = pick_device(device)
     if dtype == "auto" and dev == "cpu":
         dtype = "float32"                    # bfloat16 matmuls are slow on most CPUs
     kw = {"dtype": "auto" if dtype == "auto" else getattr(torch, dtype)}
+    kw.setdefault("trust_remote_code", False)
     model = AutoModelForCausalLM.from_pretrained(model_id, **kw)
     model.to(dev).eval()
     return model, tok, dev
@@ -775,7 +776,7 @@ def cmd_interpret(a) -> int:
             print(f"skipping logit effects and token text from the model: {type(e).__name__}: {e}", flush=True)
     if tok is None:
         from transformers import AutoTokenizer
-        tok = AutoTokenizer.from_pretrained(meta["model"])
+        tok = AutoTokenizer.from_pretrained(meta["model"], trust_remote_code=False)
     nb_v, nb_i = neighbours(sae, a.neighbours, dev)
     xy = pca2(sae.directions().to(dev).float())
     vocab: dict[int, str] = {}

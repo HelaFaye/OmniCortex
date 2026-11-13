@@ -46,7 +46,6 @@ import fnmatch
 import json
 import os
 import re
-import tempfile
 import threading
 from pathlib import Path
 
@@ -112,7 +111,7 @@ def presets() -> dict:
             "rules": []},
         "code_sandboxed": {
             "description": "Run candidate code in a container: Python, Docker or Podman, writing only in the job's "
-                           "folder, no network.",
+                           "folder and explicitly assigned scratch directory, no network.",
             "defaults": {"read": "allow", "write": "deny", "run": "deny", "exec": "deny", "net": "deny",
                          "system": "deny", "tool": "deny"},
             "rules": [_r("exec", "allow", "regex", r"^(.*[/\\])?(python[\d.]*|docker|podman)(\.exe)?$", "the sandbox"),
@@ -122,7 +121,7 @@ def presets() -> dict:
                       _r("system", "allow", "exact", "docker", "containers")]},
         "swe_bench": {
             "description": "Fix a repository and run its tests: git, Python, pytest, pip and Docker inside the "
-                           "checkout; packages from PyPI; nothing outside the checkout.",
+                           "checkout and explicitly assigned scratch directory; packages from PyPI; nothing else.",
             "defaults": {"read": "deny", "write": "deny", "run": "deny", "exec": "deny", "net": "deny",
                          "system": "deny", "tool": "deny"},
             "rules": [_r("read", "allow", "glob", "{repo}/**", "the checkout"),
@@ -215,18 +214,24 @@ def normalise(action: str, target: str, ctx: dict) -> str:
         p = os.path.expanduser(target)
         if not os.path.isabs(p) and ctx.get("workdir"):
             p = os.path.join(ctx["workdir"], p)
-        return os.path.normpath(os.path.abspath(p))
+        # Resolve existing symlinks before policy matching. Lexical normalization alone
+        # lets an allowed workspace path point outside the workspace through a symlink.
+        # strict=False also handles not-yet-created output files while resolving their
+        # existing parent directories.
+        return str(Path(p).resolve(strict=False))
     if action == "system":
         return target.lower()
     return target
 
 
 def context(**kw) -> dict:
-    ctx = {"home": str(Path.home()), "tmp": tempfile.gettempdir(),
+    # Scratch access is deliberately absent unless the caller supplies a
+    # job-owned directory. tempfile.gettempdir() is shared by unrelated jobs.
+    ctx = {"home": str(Path.home().resolve(strict=False)),
            "omnicortex": str(Path(__file__).resolve().parent.parent)}
     for k, v in kw.items():
         if v:
-            ctx[k] = os.path.normpath(os.path.abspath(os.path.expanduser(str(v))))
+            ctx[k] = str(Path(os.path.expanduser(str(v))).resolve(strict=False))
     return ctx
 
 

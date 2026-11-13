@@ -65,7 +65,11 @@ def parse_args():
                         "correspond. Required for different models.")
     p.add_argument("--output_path")
     p.add_argument("--dry-run", action="store_true")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     return p.parse_args()
 
 
@@ -114,7 +118,7 @@ def check_lineage(base, donor, asserted):
 
 def main():
     args = parse_args()
-    trc = not args.no_trust_remote_code
+    trc = args.trust_remote_code
 
     from hostcheck import guard
     try:

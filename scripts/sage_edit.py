@@ -244,10 +244,10 @@ def load(model_id: str, cpu: bool):
     torch = _torch()
     from transformers import AutoModelForCausalLM, AutoTokenizer
     dev = "cuda" if torch.cuda.is_available() and not cpu else "cpu"
-    tok = AutoTokenizer.from_pretrained(model_id)
+    tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
-    model = AutoModelForCausalLM.from_pretrained(model_id, dtype=torch.float32 if dev == "cpu" else torch.bfloat16)
+    model = AutoModelForCausalLM.from_pretrained(model_id, dtype=torch.float32 if dev == "cpu" else torch.bfloat16, trust_remote_code=False)
     model.to(dev).eval()
     for p in model.parameters():
         p.requires_grad_(False)

@@ -85,6 +85,9 @@ ACTIVITY = {"last": time.time(), "active": 0}
 ACTIVITY_LOCK = threading.Lock()
 MAX_BODY = 64 * 1024 * 1024        # chat bodies may carry base64 images
 MAX_SMALL_BODY = 256 * 1024
+REQUEST_IDLE_TIMEOUT = 30.0        # idle socket timeout for headers and response writes
+REQUEST_BODY_TIMEOUT = 120.0       # total deadline, including slow-drip request bodies
+MAX_HTTP_WORKERS = 64
 THROTTLE = sec.FailureThrottle()
 JOBS = {}          # download id -> progress record
 JOBS_LOCK = threading.Lock()
@@ -3942,7 +3945,11 @@ def screen_result(graph_name: str, t: dict, text: str, model: str | None) -> dic
         base = f"{'https' if STATE['tls'] else 'http'}://127.0.0.1:{STATE.get('port') or 7870}"
         env = G.Env(studio_client.Studio(base, STATE.get("token"), insecure_loopback=True), P.Policy(STATE.get("permissions_path")),
                     model=model or "", graph_loader=store.get)
-        run = G.Runner(g, env).start({"task": f"{t['title']}\n\n{t.get('detail') or ''}".strip(), "result": text})
+        env.open_scratch()
+        try:
+            run = G.Runner(g, env).start({"task": f"{t['title']}\n\n{t.get('detail') or ''}".strip(), "result": text})
+        finally:
+            env.close_scratch()
         store.save_run(G.public_run(run) | {"kind": "screen"})
         out = run.get("outputs") or {}
         if run["status"] == "done" and "feedback" in out:
@@ -4210,8 +4217,50 @@ def save_chat(chat):
 
 # ---------------------------------------------------------------------- HTTP
 
+class BoundedThreadingHTTPServer(ThreadingHTTPServer):
+    """Thread-per-connection server with a hard cap on active handlers.
+
+    A full server rejects new connections rather than creating unbounded
+    threads. Existing SSE and long-running inference requests occupy a slot
+    until their connection closes, by design.
+    """
+    daemon_threads = True
+    request_queue_size = MAX_HTTP_WORKERS
+
+    def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True, max_workers=MAX_HTTP_WORKERS):
+        self.max_workers = max(1, int(max_workers))
+        self._worker_slots = threading.BoundedSemaphore(self.max_workers)
+        super().__init__(server_address, RequestHandlerClass, bind_and_activate)
+
+    def process_request(self, request, client_address):
+        if not self._worker_slots.acquire(blocking=False):
+            try:
+                request.sendall(
+                    b"HTTP/1.1 503 Service Unavailable\r\n"
+                    b"Connection: close\r\n"
+                    b"Content-Length: 0\r\n\r\n"
+                )
+            except OSError:
+                pass
+            finally:
+                self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._worker_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._worker_slots.release()
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    timeout = REQUEST_IDLE_TIMEOUT
 
     def log_message(self, *a):
         pass
@@ -4343,10 +4392,42 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _read(self, limit=MAX_SMALL_BODY):
-        n = int(self.headers.get("Content-Length", 0))
+        # This API accepts Content-Length bodies only. Reject chunked bodies
+        # explicitly instead of accidentally treating them as empty JSON.
+        if self.headers.get("Transfer-Encoding"):
+            raise ValueError("Transfer-Encoding is not supported; send Content-Length")
+        lengths = self.headers.get_all("Content-Length", [])
+        if len(lengths) > 1:
+            raise ValueError("multiple Content-Length headers are not supported")
+        try:
+            n = int(lengths[0] if lengths else "0")
+        except (TypeError, ValueError):
+            raise ValueError("invalid Content-Length") from None
         if n < 0 or n > limit:
             raise ValueError(f"request body too large (limit {limit} bytes)")
-        return json.loads(self.rfile.read(n) or b"{}")
+
+        # BufferedReader.read(n) can wait indefinitely while a peer trickles
+        # bytes. Read in bounded chunks under one total deadline, with a shorter
+        # idle timeout for each socket operation.
+        deadline = time.monotonic() + REQUEST_BODY_TIMEOUT
+        chunks, remaining = [], n
+        try:
+            while remaining:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    raise ValueError("request body deadline exceeded")
+                self.connection.settimeout(min(REQUEST_IDLE_TIMEOUT, left))
+                try:
+                    chunk = self.rfile.read1(min(64 * 1024, remaining))
+                except socket.timeout:
+                    raise ValueError("request body timed out") from None
+                if not chunk:
+                    raise ValueError("incomplete request body")
+                chunks.append(chunk)
+                remaining -= len(chunk)
+        finally:
+            self.connection.settimeout(REQUEST_IDLE_TIMEOUT)
+        return json.loads(b"".join(chunks) or b"{}")
 
     _route = None
 
@@ -6984,7 +7065,7 @@ def main(argv=None):
     if STATE["token"]:
         print("authentication enabled")
 
-    srv = ThreadingHTTPServer((a.host, a.port), Handler)
+    srv = BoundedThreadingHTTPServer((a.host, a.port), Handler)
     STATE["port"] = srv.server_address[1]
     if tls:
         srv.socket = sec.server_ssl_context(a.tls_cert, a.tls_key).wrap_socket(

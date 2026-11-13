@@ -2,6 +2,7 @@
 evals and running one node to debug it. Owner only; routes in studio.py, page in graphs_page.py."""
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -86,8 +87,8 @@ class Store:
             raise ValueError("bad run id")
         with LOCK:
             live = RUNS.get(rid)
-        if live:
-            return _public(live)
+            if live:
+                return _public(live)
         return json.loads((self.root / "runs" / f"{rid}.json").read_text())
 
 
@@ -96,54 +97,95 @@ def _public(live: dict) -> dict:
         return {"id": live["id"], "kind": "eval", "graph": live["graph"], "status": live["status"],
                 "started": live["started"], **(live.get("result") or {}), "error": live.get("error")}
     r = G.public_run(live["run"]) if live.get("run") else {"id": live["id"], "status": live["status"]}
-    return {**r, "kind": "run", "id": live["id"], "status": live["status"] if live["status"] in ("queued", "running")
-            and not live.get("run") else r.get("status", live["status"]), "error": live.get("error") or r.get("error")}
+    # live.status is the synchronized lifecycle state. The run object is a
+    # completed snapshot; during approval resume it must not dictate status.
+    r["status"] = live.get("status") or r.get("status", "running")
+    return {**r, "kind": "run", "id": live["id"], "error": live.get("error") or r.get("error")}
 
 
 def _finish(store: Store, live: dict) -> None:
-    rec = _public(live)
-    store.save_run(rec)
-    if rec.get("status") != "waiting":
-        with LOCK:
-            RUNS.pop(live["id"], None)
+    # Keep the run registered until its owned scratch directory is removed.
+    # A poller observing absence from RUNS can then rely on cleanup having ended.
+    with LOCK:
+        if RUNS.get(live["id"]) is not live:
+            return
+        rec = _public(live)
+        terminal = rec.get("status") not in ("waiting", "queued", "running")
+        try:
+            store.save_run(rec)
+        finally:
+            if terminal:
+                try:
+                    env = live.get("env")
+                    if env is not None:
+                        env.close_scratch()
+                finally:
+                    RUNS.pop(live["id"], None)
 
 
 def start(store: Store, graph: dict, inputs: dict, env: G.Env) -> str:
     """Run a graph in a thread; poll with Store.run(id)."""
     G.validate(json.loads(json.dumps(graph)))
+    env.open_scratch()
     rid = uuid.uuid4().hex[:12]
-    live = {"id": rid, "kind": "run", "graph": graph.get("name", ""), "status": "running", "started": time.time()}
+    live = {"id": rid, "kind": "run", "graph": graph.get("name", ""), "status": "running",
+            "started": time.time(), "env": env}
     with LOCK:
         RUNS[rid] = live
 
     def go():
         try:
             live["runner"] = G.Runner(graph, env)
-            live["run"] = live["runner"].start(inputs)
-            live["run"]["id"] = rid
-            live["status"] = live["run"]["status"]
+            run = live["runner"].start(inputs)
+            run["id"] = rid
+            with LOCK:
+                live["run"] = run
+                live["status"] = run["status"]
         except Exception as e:                                             # noqa: BLE001
-            live["status"], live["error"] = "failed", f"{type(e).__name__}: {e}"
-        _finish(store, live)
-    threading.Thread(target=go, daemon=True).start()
+            with LOCK:
+                live["status"], live["error"] = "failed", f"{type(e).__name__}: {e}"
+        finally:
+            _finish(store, live)
+
+    try:
+        threading.Thread(target=go, daemon=True).start()
+    except Exception:
+        with LOCK:
+            RUNS.pop(rid, None)
+        env.close_scratch()
+        raise
     return rid
 
 
 def decide(store: Store, rid: str, node: str, approve: bool, value=None, note: str = "") -> dict:
     with LOCK:
         live = RUNS.get(rid)
-    if not live or live.get("status") != "waiting":
-        raise ValueError("that run is not waiting (a run waiting on a person does not survive a Studio restart)")
-    live["status"] = "running"
+        if not live or live.get("status") != "waiting":
+            raise ValueError("that run is not waiting (a run waiting on a person does not survive a Studio restart)")
+        live["status"] = "running"
 
     def go():
         try:
-            live["run"] = live["runner"].resume(live["run"], node, approve, value, note)
-            live["status"] = live["run"]["status"]
+            # Runner.resume mutates its run argument in place. Resume a copy so
+            # concurrent polling/finalization never observes a half-mutated snapshot.
+            resume_state = copy.deepcopy(live["run"], {id(G.SKIP): G.SKIP})
+            run = live["runner"].resume(resume_state, node, approve, value, note)
+            with LOCK:
+                live["run"] = run
+                live["status"] = run["status"]
         except Exception as e:                                             # noqa: BLE001
-            live["status"], live["error"] = "failed", f"{type(e).__name__}: {e}"
-        _finish(store, live)
-    threading.Thread(target=go, daemon=True).start()
+            with LOCK:
+                live["status"], live["error"] = "failed", f"{type(e).__name__}: {e}"
+        finally:
+            _finish(store, live)
+
+    try:
+        threading.Thread(target=go, daemon=True).start()
+    except Exception:
+        with LOCK:
+            if RUNS.get(rid) is live:
+                live["status"] = "waiting"
+        raise
     return {"id": rid, "status": "running"}
 
 
@@ -151,19 +193,34 @@ def start_eval(store: Store, graph: dict, cases: list, env: G.Env, expect="", ou
     G.validate(json.loads(json.dumps(graph)))
     if not cases or len(cases) > 2000:
         raise ValueError("1 to 2000 cases")
+    env.open_scratch()
     rid = uuid.uuid4().hex[:12]
-    live = {"id": rid, "kind": "eval", "graph": graph.get("name", ""), "status": "running", "started": time.time()}
+    live = {"id": rid, "kind": "eval", "graph": graph.get("name", ""), "status": "running",
+            "started": time.time(), "env": env}
     with LOCK:
         RUNS[rid] = live
 
     def go():
         try:
-            live["result"] = G.run_eval(graph, cases, env, expect, output, grade)
-            live["status"] = "done"
+            result = G.run_eval(graph, cases, env, expect, output, grade)
+            with LOCK:
+                if RUNS.get(rid) is live:
+                    live["result"] = result
+                    live["status"] = "done"
         except Exception as e:                                             # noqa: BLE001
-            live["status"], live["error"] = "failed", f"{type(e).__name__}: {e}"
-        _finish(store, live)
-    threading.Thread(target=go, daemon=True).start()
+            with LOCK:
+                if RUNS.get(rid) is live:
+                    live["status"], live["error"] = "failed", f"{type(e).__name__}: {e}"
+        finally:
+            _finish(store, live)
+
+    try:
+        threading.Thread(target=go, daemon=True).start()
+    except Exception:
+        with LOCK:
+            RUNS.pop(rid, None)
+        env.close_scratch()
+        raise
     return rid
 
 
@@ -181,15 +238,19 @@ def run_node(graph: dict, node_id: str, inputs: dict, env: G.Env) -> dict:
     ins = {x["name"]: inputs.get(x["name"]) for x in spec["inputs"]}
     G.validate(g)
     t0 = time.time()
+    env.open_scratch()
     try:
-        out = spec["run"](nd, ins, env, run) or {}
-        return {"ok": True, "ms": int((time.time() - t0) * 1000),
-                "outputs": {k: ("(skipped)" if v is G.SKIP else G._preview(v, 20000)) for k, v in out.items()
-                            if k in {o["name"] for o in spec["outputs"]}}}
-    except G.Pause:
-        return {"ok": True, "outputs": {}, "note": "an approval node waits for a person in a real run"}
-    except Exception as e:                                                 # noqa: BLE001
-        return {"ok": False, "ms": int((time.time() - t0) * 1000), "error": f"{type(e).__name__}: {e}"}
+        try:
+            out = spec["run"](nd, ins, env, run) or {}
+            return {"ok": True, "ms": int((time.time() - t0) * 1000),
+                    "outputs": {k: ("(skipped)" if v is G.SKIP else G._preview(v, 20000)) for k, v in out.items()
+                                if k in {o["name"] for o in spec["outputs"]}}}
+        except G.Pause:
+            return {"ok": True, "outputs": {}, "note": "an approval node waits for a person in a real run"}
+        except Exception as e:                                             # noqa: BLE001
+            return {"ok": False, "ms": int((time.time() - t0) * 1000), "error": f"{type(e).__name__}: {e}"}
+    finally:
+        env.close_scratch()
 
 
 def catalog(store: Store) -> dict:

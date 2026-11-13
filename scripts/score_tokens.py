@@ -51,7 +51,11 @@ def parse_args():
     p.add_argument("--gpu_mem", default=None)
     p.add_argument("--cpu_mem", default="40GiB")
     p.add_argument("--out", default="report.html")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     p.add_argument("--capture", choices=CETTManager.MODES, default="auto",
                    help="how activations leave the GPU (oc_common.CETTManager): auto, stream, device or sync")
     return p.parse_args()
@@ -139,7 +143,7 @@ def main():
 
     model, tokenizer = load_model(
         args.model_path, args.gpu_mem, args.cpu_mem,
-        trust_remote_code=not args.no_trust_remote_code,
+        trust_remote_code=args.trust_remote_code,
     )
     mgr = CETTManager(model, capture=args.capture)
     entry_device = next(model.parameters()).device

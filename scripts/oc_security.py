@@ -235,27 +235,59 @@ class FailureThrottle:
     Used for bad bearer tokens and for WebRTC room joins with a wrong
     invitation secret, so neither can be brute-forced at line rate."""
 
-    def __init__(self, max_failures: int = 10, window: float = 60.0, lockout: float = 300.0):
-        self.max_failures = max_failures
-        self.window = window
-        self.lockout = lockout
+    def __init__(self, max_failures: int = 10, window: float = 60.0, lockout: float = 300.0,
+                 max_addresses: int = 4096, gc_interval: float = 30.0):
+        self.max_failures = max(1, int(max_failures))
+        self.window = max(0.0, float(window))
+        self.lockout = max(0.0, float(lockout))
+        self.max_addresses = max(1, int(max_addresses))
+        self.gc_interval = max(1.0, float(gc_interval))
         self._fails: dict[str, list[float]] = {}
         self._locked: dict[str, float] = {}
         self._lock = threading.Lock()
+        self._last_gc = 0.0
+
+    def _prune(self, now: float) -> None:
+        """Expire old entries at a bounded cadence so one-off addresses cannot accumulate forever."""
+        if now - self._last_gc < self.gc_interval:
+            return
+        for addr, times in list(self._fails.items()):
+            fresh = [t for t in times if now - t < self.window]
+            if fresh:
+                self._fails[addr] = fresh
+            else:
+                self._fails.pop(addr, None)
+        for addr, until in list(self._locked.items()):
+            if until <= now:
+                self._locked.pop(addr, None)
+        self._last_gc = now
+
+    def _make_room(self, addr: str) -> None:
+        peers = set(self._fails) | set(self._locked)
+        if addr in peers or len(peers) < self.max_addresses:
+            return
+        # Evict the least-recently-active peer. Lockout start time is recoverable
+        # from its expiry; an active failure entry stores its last attempt.
+        last_seen = {peer: (times[-1] if times else 0.0)
+                     for peer, times in self._fails.items()}
+        last_seen.update({peer: max(last_seen.get(peer, 0.0), until - self.lockout)
+                          for peer, until in self._locked.items()})
+        oldest = min(last_seen, key=last_seen.get)
+        self._fails.pop(oldest, None)
+        self._locked.pop(oldest, None)
 
     def blocked(self, addr: str) -> bool:
         now = time.monotonic()
         with self._lock:
+            self._prune(now)
             until = self._locked.get(addr)
-            if until and until > now:
-                return True
-            if until:
-                self._locked.pop(addr, None)
-            return False
+            return bool(until and until > now)
 
     def fail(self, addr: str) -> None:
         now = time.monotonic()
         with self._lock:
+            self._prune(now)
+            self._make_room(addr)
             xs = [t for t in self._fails.get(addr, []) if now - t < self.window]
             xs.append(now)
             self._fails[addr] = xs

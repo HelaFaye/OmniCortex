@@ -32,6 +32,69 @@ def E(a, ap, b, bp):
     return {"from": [a, ap], "to": [b, bp]}
 
 
+def test_env_scratch_is_private_and_cleaned(tmp_path):
+    env = G.Env(policy=P.Policy(tmp_path / "permissions.json"), workdir=str(tmp_path))
+    scratch = Path(env.open_scratch())
+    try:
+        ctx = env.permission_context()
+        assert Path(ctx["tmp"]) == scratch.resolve()
+        assert P.Policy(tmp_path / "permissions.json").check(
+            "read", str(scratch / "inside.txt"), job="swe_evaluate", ctx=ctx
+        )["effect"] == "allow"
+        # A sibling of the checkout, not a child of workdir (which is allowed).
+        outside = tmp_path.parent / f"{tmp_path.name}-outside.txt"
+        assert P.Policy(tmp_path / "permissions.json").check(
+            "read", str(outside), job="swe_evaluate", ctx=ctx
+        )["effect"] == "deny"
+    finally:
+        env.close_scratch()
+    assert not scratch.exists()
+
+
+def test_graph_api_scratch_survives_approval_then_cleans(tmp_path):
+    import sys
+    import time
+
+    sys.path.insert(0, str(ROOT / "viz"))
+    import graphs_api as GA
+
+    graph = {
+        "nodes": [N("in", "input"), N("okq", "approval"), N("o", "output"), N("no", "output", name="no")],
+        "edges": [E("in", "value", "okq", "value"), E("okq", "approved", "o", "value"),
+                  E("okq", "rejected", "no", "value")],
+    }
+    env = G.Env(policy=P.Policy(tmp_path / "permissions.json"))
+    store = GA.Store(tmp_path / "graphs")
+    rid = GA.start(store, graph, {"input": "review"}, env)
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        current = store.run(rid)
+        if current.get("status") == "waiting":
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("graph did not reach its approval pause")
+
+    scratch = Path(env.scratch_dir)
+    assert scratch.is_dir()
+    GA.decide(store, rid, "okq", True, value="approved")
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        with GA.LOCK:
+            active = GA.RUNS.get(rid)
+        if active is None:
+            current = store.run(rid)
+            if current.get("status") == "done":
+                break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("graph did not finish and clean up after approval")
+    current = store.run(rid)
+
+    assert current["status"] == "done"
+    assert not scratch.exists()
+
+
 def test_screen_routes_pass_and_fail(tmp_path):
     g = {"nodes": [N("in", "input", name="q"), N("ask", "llm"), N("sec", "secrets_screen", kinds="API key"),
                    N("ok", "output", name="result"), N("bad", "output", name="blocked")],
@@ -233,3 +296,113 @@ def test_plugin_nodes(tmp_path):
     assert r["outputs"]["long"] == "one two three four five"
     G.sync_plugins(None)
     assert not any(k.startswith("plugin:") for k in G.TYPES)
+
+
+def test_graph_api_resume_keeps_published_state_stable(tmp_path, monkeypatch):
+    import sys
+    import threading
+    import time
+
+    sys.path.insert(0, str(ROOT / "viz"))
+    import graphs_api as GA
+
+    graph = {
+        "nodes": [N("in", "input"), N("okq", "approval"), N("o", "output")],
+        "edges": [E("in", "value", "okq", "value"), E("okq", "approved", "o", "value")],
+    }
+    env = G.Env(policy=P.Policy(tmp_path / "permissions.json"))
+    store = GA.Store(tmp_path / "graphs")
+    entered, release = threading.Event(), threading.Event()
+    original_resume = G.Runner.resume
+
+    def held_resume(self, run, *args, **kwargs):
+        entered.set()
+        if not release.wait(10):
+            raise RuntimeError("test resume gate timed out")
+        return original_resume(self, run, *args, **kwargs)
+
+    monkeypatch.setattr(G.Runner, "resume", held_resume)
+    rid = GA.start(store, graph, {"input": "review"}, env)
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        current = store.run(rid)
+        if current.get("status") == "waiting":
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("graph did not reach its approval pause")
+
+    scratch = Path(env.scratch_dir)
+    assert scratch.is_dir()
+    GA.decide(store, rid, "okq", True, value="approved")
+    assert entered.wait(10), "resume thread did not enter Runner.resume"
+
+    with GA.LOCK:
+        live = GA.RUNS.get(rid)
+        assert live is not None
+        assert live["status"] == "running"
+        assert live["run"]["status"] == "waiting"  # published state was not mutated in place
+    assert store.run(rid)["status"] == "running"
+    assert scratch.is_dir()
+
+    release.set()
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        with GA.LOCK:
+            active = GA.RUNS.get(rid)
+        if active is None:
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("graph did not finish after releasing the resume gate")
+
+    assert store.run(rid)["status"] == "done"
+    assert not scratch.exists()
+
+
+def test_graph_api_scratch_cleans_after_resume_error(tmp_path, monkeypatch):
+    import sys
+    import time
+
+    sys.path.insert(0, str(ROOT / "viz"))
+    import graphs_api as GA
+
+    graph = {
+        "nodes": [N("in", "input"), N("okq", "approval"), N("o", "output")],
+        "edges": [E("in", "value", "okq", "value"), E("okq", "approved", "o", "value")],
+    }
+    env = G.Env(policy=P.Policy(tmp_path / "permissions.json"))
+    store = GA.Store(tmp_path / "graphs")
+
+    def fail_resume(*args, **kwargs):
+        raise RuntimeError("intentional resume failure")
+
+    monkeypatch.setattr(G.Runner, "resume", fail_resume)
+    rid = GA.start(store, graph, {"input": "review"}, env)
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        current = store.run(rid)
+        if current.get("status") == "waiting":
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("graph did not reach its approval pause")
+
+    scratch = Path(env.scratch_dir)
+    assert scratch.is_dir()
+    GA.decide(store, rid, "okq", True, value="approved")
+
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        with GA.LOCK:
+            active = GA.RUNS.get(rid)
+        if active is None:
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("failed resume was not finalized")
+
+    final = store.run(rid)
+    assert final["status"] == "failed"
+    assert "intentional resume failure" in final["error"]
+    assert not scratch.exists()

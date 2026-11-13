@@ -583,8 +583,8 @@ def _labels_for(paths: dict) -> dict:
 
 def load_for_attribution(model_id: str, device: str = "auto", dtype: str = "float32"):
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    tok = AutoTokenizer.from_pretrained(model_id)
-    model = AutoModelForCausalLM.from_pretrained(model_id, dtype=getattr(torch, dtype), attn_implementation="eager")
+    tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False)
+    model = AutoModelForCausalLM.from_pretrained(model_id, dtype=getattr(torch, dtype), attn_implementation="eager", trust_remote_code=False)
     dev = FX.pick_device(device)
     model.to(dev).eval()
     for p in model.parameters():

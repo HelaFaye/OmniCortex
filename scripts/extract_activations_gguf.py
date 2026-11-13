@@ -73,7 +73,11 @@ def parse_args():
     p.add_argument("--device", help="passed through, e.g. Vulkan0")
     p.add_argument("--keep_think", action="store_true")
     p.add_argument("--loops", type=int, help="looped models (Dory): the loop count, if not the GGUF's own")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     return p.parse_args()
 
 
@@ -349,7 +353,7 @@ def main():
     if args.tokenizer:
         from transformers import AutoTokenizer
         tok = AutoTokenizer.from_pretrained(
-            args.tokenizer, trust_remote_code=not args.no_trust_remote_code)
+            args.tokenizer, trust_remote_code=args.trust_remote_code)
         use_gguf_tok = False
     else:
         # The GGUF carries the vocab and the chat template, so nothing here
@@ -467,7 +471,7 @@ def main():
     if args.tokenizer:
         from transformers import AutoConfig
         cfg = AutoConfig.from_pretrained(
-            args.tokenizer, trust_remote_code=not args.no_trust_remote_code)
+            args.tokenizer, trust_remote_code=args.trust_remote_code)
         n_layers = getattr(cfg, "text_config", cfg).num_hidden_layers
     else:
         # Layer count from the GGUF itself: no transformers, no torch.

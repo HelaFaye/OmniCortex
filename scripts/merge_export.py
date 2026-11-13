@@ -42,12 +42,12 @@ def merge(base: str, adapter: str, out: Path, dtype: str, vision: bool = False) 
         from transformers import AutoModelForImageTextToText as Auto, AutoProcessor as Tok
     else:
         from transformers import AutoModelForCausalLM as Auto, AutoTokenizer as Tok
-    model = Auto.from_pretrained(base, dtype=getattr(torch, dtype))
+    model = Auto.from_pretrained(base, dtype=getattr(torch, dtype), trust_remote_code=False)
     model = PeftModel.from_pretrained(model, adapter).merge_and_unload()
     out.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(out, safe_serialization=True)
     tok_src = adapter if (Path(adapter) / "tokenizer_config.json").exists() else base
-    Tok.from_pretrained(tok_src).save_pretrained(out)
+    Tok.from_pretrained(tok_src, trust_remote_code=False).save_pretrained(out)
     # SentencePiece models: llama.cpp's converter prefers the original file.
     for name in ("tokenizer.model",):
         for src in (Path(base), Path(adapter)):

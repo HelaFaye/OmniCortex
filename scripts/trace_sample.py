@@ -60,7 +60,11 @@ def parse_args():
     p.add_argument("--ngl", type=int, default=99)
     p.add_argument("--batch", type=int, default=4096)
     p.add_argument("--classifier", help="models/classifier.npz, to score tokens")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     return p.parse_args()
 
 
@@ -115,7 +119,7 @@ def main():
     _require_paths(args)
     if args.tokenizer:
         from transformers import AutoConfig, AutoTokenizer
-        trc = not args.no_trust_remote_code
+        trc = args.trust_remote_code
         tok = AutoTokenizer.from_pretrained(args.tokenizer, trust_remote_code=trc)
         cfg = AutoConfig.from_pretrained(args.tokenizer, trust_remote_code=trc)
         tcfg = getattr(cfg, "text_config", cfg)

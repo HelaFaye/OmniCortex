@@ -99,10 +99,12 @@ code.
 - [x] built-in TLS server and verifying client (`--cafile`)
 - [x] token mandatory off loopback; 256-bit generator; ≥ 32-char minimum
 - [x] constant-time comparison (`secrets.compare_digest`)
+- [x] authentication-throttle state is periodically pruned and bounded to 4,096 tracked peer addresses per process
 - [x] tokens from file or environment; argv use warns
 - [x] resumable chunks; final SHA-256 before atomic publish
 - [x] bounded bodies: JSON 64 KiB, chunk 8 MiB; socket idle timeout 120 s
-- [x] failed-auth throttling; cap on concurrent in-progress transfers (`--max-active`)
+- [x] failed-auth throttling with periodic expiry and a fixed per-process peer-state cap; cap on concurrent in-progress transfers (`--max-active`)
+- [x] Studio uses a bounded HTTP worker pool, idle socket timeouts, and a total request-body deadline (including slow-drip clients)
 - [x] 128-bit hex transfer ids; generic 500 responses (no exception text)
 
 **MCP**
@@ -158,3 +160,9 @@ on every transfer that matters.
 
 Please report vulnerabilities privately to the maintainers rather than in a
 public issue.
+
+## Hugging Face custom model code
+
+OmniCortex does not execute custom Python code from a model repository by default. Hugging Face loaders are configured with `trust_remote_code=False`, and the CLI tools that support custom architectures require the explicit `--trust-remote-code` option. Studio exposes the same choice as an unchecked opt-in. The legacy `--no_trust_remote_code` flag remains accepted as an explicit deny for existing command lines.
+
+Enabling this option executes code supplied by the model repository in the OmniCortex process. Use it only for a repository you have reviewed and trust.
