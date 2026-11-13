@@ -11,7 +11,7 @@ Three kinds of observation are recorded per model file:
                  how strongly the hallucination-associated neurons fired.
     live         an ungraded reply from real traffic: whether it declined.
 
-Everything is append-only JSONL under ~/.neuronscope/stats, one file per model
+Everything is append-only JSONL under ~/.omnicortex/stats, one file per model
 id. Summaries are *rolling*: only the most recent --window observations of each
 kind count (and nothing older than --max-age-days), so a model that was edited,
 re-quantized or simply re-evaluated is judged on recent evidence.
@@ -40,7 +40,7 @@ import time
 from collections import Counter, defaultdict
 from pathlib import Path
 
-DEFAULT_DIR = Path(os.environ.get("NS_STATS_DIR", Path.home() / ".neuronscope" / "stats"))
+DEFAULT_DIR = Path(os.environ.get("OC_STATS_DIR", Path.home() / ".omnicortex" / "stats"))
 GRADED = {"correct", "wrong", "abstained"}
 # testqa verdicts that map onto the three graded outcomes
 VERDICT_MAP = {"correct": "correct", "answered": None, "refused": None, "wrong": "wrong",

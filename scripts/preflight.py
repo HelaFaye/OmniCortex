@@ -19,11 +19,6 @@ import json
 import os
 import sys
 
-import torch
-from transformers import AutoConfig, AutoModelForCausalLM
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import TEXT_LAYER_RE, text_config  # noqa: E402
 
 
 def parse_args():
@@ -33,7 +28,9 @@ def parse_args():
                    help="Balanced pairs per class you intend to train on")
     p.add_argument("--locations", type=int, default=4,
                    help="Number of activation locations you will extract")
-    p.add_argument("--trust_remote_code", action="store_true", default=True)
+    p.add_argument("--trust-remote-code", "--trust_remote_code", dest="trust_remote_code",
+                   action="store_true", default=False,
+                   help="allow execution of repository-supplied Python code when loading the model config")
     return p.parse_args()
 
 
@@ -43,6 +40,13 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    # Load model dependencies only when actually running preflight.
+    import torch
+    from transformers import AutoConfig, AutoModelForCausalLM
+
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from oc_common import TEXT_LAYER_RE, text_config  # noqa: E402
 
     cfg = AutoConfig.from_pretrained(
         args.model_path, trust_remote_code=args.trust_remote_code

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NeuronScope Quantization Lab - local browser GUI.
+"""OmniCortex Quantization Lab - local browser GUI.
 
 Stdlib-only web server; quantization work is delegated to
 scripts/quantization_lab.py. Default bind is loopback.
@@ -40,7 +40,7 @@ STATE = {
 
 HTML = r'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope Quantization Lab</title>
+<title>OmniCortex Quantization Lab</title>
 <style>
 :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color-scheme:dark}
 body{margin:0;background:#111;color:#eee}main{max-width:1280px;margin:auto;padding:22px}
@@ -55,7 +55,7 @@ table{width:100%;border-collapse:collapse;font-size:.92rem}th,td{text-align:left
 @media(max-width:900px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}}
 </style></head>
 <body><main>
-<h1>NeuronScope Quantization Lab</h1>
+<h1>OmniCortex Quantization Lab</h1>
 <p>Capability-aware GGUF quantization using weighted calibration + H-Neuron layer protection. Builds in RAM scratch when it fits, then copies atomically to the destination.</p>
 <div id="global" class="status">Loading…</div>
 <div class="grid">
@@ -247,12 +247,12 @@ def main():
     ap.add_argument("--profiles-dir", default=str(ROOT / "profiles"))
     ap.add_argument("--allow-unauthenticated", action="store_true", help="permit a non-loopback bind (no auth)")
     a = ap.parse_args()
-    import ns_security as sec
+    import oc_security as sec
     sec.loopback_only(a.host, "the Quantization Lab", a.allow_unauthenticated)
     STATE["models_dir"] = os.path.expanduser(a.models_dir[0]) if a.models_dir else os.path.expanduser("~/.models")
     STATE["profiles_dir"] = os.path.expanduser(a.profiles_dir)
     server = ThreadingHTTPServer((a.host, a.port), Handler)
-    print(f"NeuronScope Quantization Lab: http://{a.host}:{a.port}")
+    print(f"OmniCortex Quantization Lab: http://{a.host}:{a.port}")
     print(f"models: {STATE['models_dir']}")
     print(f"profiles: {STATE['profiles_dir']}")
     try:

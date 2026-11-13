@@ -62,7 +62,7 @@ import testqa as tq  # noqa: E402
 LIVEBENCH_SUBJECT = {"coding": "code", "agentic_coding": "code", "agentic_coding_v2": "code", "math": "math",
                      "data_analysis": "math", "reasoning": "logic", "language": "writing",
                      "instruction_following": "writing"}
-# Common leaderboard benchmark names -> NeuronScope subjects (case-insensitive substring match).
+# Common leaderboard benchmark names -> OmniCortex subjects (case-insensitive substring match).
 BENCHMARK_SUBJECT = [
     ("swe-bench", "code"), ("swebench", "code"), ("humaneval", "code"), ("mbpp", "code"), ("livecodebench", "code"),
     ("terminal-bench", "code"), ("aider", "code"), ("codeforces", "code"),
@@ -187,17 +187,9 @@ def extract_patch(text: str) -> str:
 
 
 def load_rows(spec: str, split: str) -> list[dict]:
-    p = Path(spec)
-    if p.exists():
-        if p.suffix == ".jsonl":
-            return [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
-        if p.suffix == ".json":
-            return json.loads(p.read_text())
-        if p.suffix == ".parquet":
-            import pandas as pd
-            return pd.read_parquet(p).to_dict("records")
-    from datasets import load_dataset
-    return list(load_dataset(spec, split=split))
+    """A local file or a Hub dataset; works without the `datasets` package (hf_rows.py)."""
+    import hf_rows
+    return hf_rows.load(spec, split)
 
 
 def swebench_predict(a) -> int:
@@ -216,9 +208,11 @@ def swebench_predict(a) -> int:
                                request_timeout=a.request_timeout)
     name = a.model_name or model or label
     n_patch = 0
-    for r in rows:
-        if r["instance_id"] in done:
-            continue
+    todo = [r for r in rows if r["instance_id"] not in done]
+    print(f"{len(rows)} instances, {len(rows) - len(todo)} already answered in {out}; asking {name} for {len(todo)}",
+          flush=True)
+    for i, r in enumerate(todo):
+        print(f"PROGRESS {i}/{len(todo)} {r['instance_id']}", flush=True)
         # *_bm25_* and *_oracle variants carry a ready prompt with retrieved code in "text";
         # the plain datasets only have the issue, which rarely suffices.
         prompt = r.get("text") or (SWE_INSTRUCTIONS + "Repository: " + r["repo"] + "\n\nIssue:\n" + r["problem_statement"])
@@ -232,7 +226,8 @@ def swebench_predict(a) -> int:
         with out.open("a") as f:
             f.write(json.dumps({"instance_id": r["instance_id"], "model_name_or_path": name,
                                 "model_patch": patch}) + "\n")
-        print(f"{r['instance_id']}: {'patch' if patch else 'no patch'}")
+        print(f"{r['instance_id']}: {'patch' if patch else 'no patch'} ({len(reply)} characters of reply)", flush=True)
+    print(f"PROGRESS {len(todo)}/{len(todo)} done", flush=True)
     print(f"wrote {out}; {n_patch} patches this run")
     return 0
 

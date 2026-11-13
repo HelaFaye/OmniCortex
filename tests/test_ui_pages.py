@@ -27,6 +27,8 @@ PAGES = [
     ("viz/adaptive_tuning_lab.py", "HTML"), ("viz/jobs.py", "PAGE"), ("viz/studio.py", "PAIR_PAGE"), ("viz/studio.py", "LINK_PAGE"),
     ("viz/projects_page.py", "PAGE"), ("viz/connect_page.py", "PAGE"), ("viz/setup_page.py", "PAGE"),
     ("viz/lab_page.py", "PAGE"), ("viz/review_page.py", "PAGE"), ("viz/settings_page.py", "PAGE"),
+    ("viz/system_page.py", "PAGE"),
+    ("viz/features_page.py", "PAGE"), ("viz/graphs_page.py", "PAGE"), ("viz/work_page.py", "PAGE"),
 ]
 PLACEHOLDERS = {"__MODELS__": '""', "__PROFILES__": '""'}
 
@@ -41,6 +43,11 @@ def scripts_of(html: str) -> list[tuple[str, str]]:
 
 
 def load_const(path, name):
+    # A module that is already imported is used as it is: a second copy of studio.py would point
+    # shared hooks (the jobs list's plugin jobs) at its own state, and later tests would see that.
+    loaded = sys.modules.get(Path(path).stem)
+    if loaded is not None and Path(getattr(loaded, "__file__", "") or "").resolve() == (ROOT / path).resolve():
+        return getattr(loaded, name)
     spec = importlib.util.spec_from_file_location(f"page_{Path(path).stem}", ROOT / path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

@@ -48,6 +48,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -312,6 +313,16 @@ def run_code(code: str, tests: list[str], timeout: float = 10.0, mem_mb: int = 1
         return "wrong", (err[-1] if err else f"exit {p.returncode}")[:200]
 
 
+def exec_permitted(model: str, a) -> tuple[bool, str]:
+    """May this model's code run here? The permission policy for job testqa (scripts/permissions.py),
+    for the program that runs it: the sandbox engine, or Python. A batch run has no one to ask, so
+    only allow runs it."""
+    import permissions as P
+    prog = SANDBOX["engine"] or sys.executable
+    d = P.Policy().check("exec", prog, model=model, job="testqa", profile=getattr(a, "permissions", "") or "")
+    return d["effect"] == "allow", f"exec {prog}: {d['effect']} ({d['why']})"
+
+
 def grade_code_exec(text: str, task: dict, allow_exec: bool, timeout: float) -> tuple[str, str]:
     code = _code_blocks(strip_think(text))
     if not code.strip():
@@ -428,6 +439,18 @@ def parse_endpoint(spec: str) -> tuple[str, str, str | None]:
     return label, url, model
 
 
+def parse_concurrency(v) -> int | str:
+    if str(v).strip().lower() == "auto":
+        return "auto"
+    try:
+        n = int(v)
+    except ValueError:
+        raise SystemExit(f"concurrency: a number or auto, got {v!r}")
+    if n < 1:
+        raise SystemExit("concurrency: at least 1")
+    return n
+
+
 def message_for(task: dict) -> dict:
     text = prompt_for(task)
     if not task.get("image"):
@@ -438,7 +461,7 @@ def message_for(task: dict) -> dict:
                                         {"type": "image_url", "image_url": {"url": url}}]}
 
 
-def ask(url: str, model: str | None, message, a) -> str:
+def ask(url: str, model: str | None, message, a, usage: dict | None = None) -> str:
     import requests
     if isinstance(message, str):
         message = {"role": "user", "content": message}
@@ -449,7 +472,10 @@ def ask(url: str, model: str | None, message, a) -> str:
     headers = {"Authorization": f"Bearer {a.api_key}"} if a.api_key else {}
     r = requests.post(f"{url}/chat/completions", json=body, headers=headers, timeout=a.request_timeout)
     r.raise_for_status()
-    msg = r.json()["choices"][0]["message"]
+    d = r.json()
+    if usage is not None:
+        usage.update(d.get("usage") or {})
+    msg = d["choices"][0]["message"]
     txt = msg.get("content") or ""
     rc = msg.get("reasoning_content") or msg.get("reasoning")
     if rc and "</think>" not in txt:
@@ -472,32 +498,52 @@ def grade(task: dict, text: str, a) -> tuple[str, str]:
     return grade_canary(text, task), ""
 
 
-def run_endpoint(label: str, url: str, model: str | None, tasks: list[dict], a, cache_dir: Path | None) -> list[dict]:
+def run_endpoint(label: str, members: list[dict], tasks: list[dict], a, cache_dir: Path | None,
+                 progress=None) -> list[dict]:
+    """Every task through this label's pool of servers (usually one): each server takes the next task
+    whenever it has a free slot (scripts/endpoint_pool.py)."""
+    import endpoint_pool
     cache: dict = {}
     cpath = cache_dir / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', label)}.jsonl" if cache_dir else None
     if cpath and cpath.exists():
         for line in cpath.read_text(encoding="utf-8").splitlines():
             r = json.loads(line)
             cache[r["id"]] = r["text"]
+    clock = threading.Lock()
+    pooled = len(members) > 1
 
-    def one(t):
+    def one(m, t):
         t0 = time.time()
-        text = cache.get(t["id"])
+        text, usage = cache.get(t["id"]), {}
         if text is None:
             try:
-                text = ask(url, model, message_for(t), a)
+                text = ask(m["url"], m["model"], message_for(t), m["args"], usage)
             except Exception as e:
-                return {"id": t["id"], "kind": t["kind"], "subject": t["subject"], "verdict": "error",
-                        "note": str(e)[:160]}
+                r = {"id": t["id"], "kind": t["kind"], "subject": t["subject"], "verdict": "error",
+                     "note": str(e)[:160]}
+                if pooled:
+                    r["served_by"] = m["name"]
+                return r, False, None
             if cpath:
-                with open(cpath, "a", encoding="utf-8") as f:
+                with clock, open(cpath, "a", encoding="utf-8") as f:
                     f.write(json.dumps({"id": t["id"], "text": text}) + "\n")
-        verdict, note = grade(t, text, a)
-        return {"id": t["id"], "kind": t["kind"], "subject": t["subject"], "verdict": verdict, "note": note,
-                "seconds": round(time.time() - t0, 2), "text": strip_think(text).strip()[:600]}
+        verdict, note = grade(t, text, m["args"])
+        r = {"id": t["id"], "kind": t["kind"], "subject": t["subject"], "verdict": verdict, "note": note,
+             "seconds": round(time.time() - t0, 2), "text": strip_think(text).strip()[:600]}
+        if pooled:
+            r["served_by"] = m["name"]
+        return r, True, usage.get("completion_tokens")
 
-    with ThreadPoolExecutor(max_workers=max(1, a.concurrency)) as pool:
-        return list(pool.map(one, tasks))
+    lock, n = threading.Lock(), [0]
+
+    def done(t, r, m):
+        with lock:
+            n[0] += 1
+            if progress:
+                progress(label, t, r)
+            else:
+                print(f"PROGRESS {n[0]}/{len(tasks)} {label}: {t['id']} {r['verdict']}", flush=True)
+    return endpoint_pool.run_pool(members, tasks, one, done)
 
 
 # ---------------------------------------------------------------- report
@@ -627,11 +673,24 @@ def main(argv=None) -> int:
     p.add_argument("--list", action="store_true", help="show bank coverage by subject and kind, then exit")
     p.add_argument("--reference", help="label compared against (default: first endpoint)")
     p.add_argument("--allow-exec", action="store_true", help="run code_exec tasks (executes model-written code)")
+    p.add_argument("--permissions", default="", help="permission profile for running code (default: the policy for job testqa; docs/PERMISSIONS.md)")
     p.add_argument("--exec-timeout", type=float, default=10.0)
     p.add_argument("--sandbox", choices=["none", "docker", "podman"], default="none",
                    help="run --allow-exec code in a locked-down container (no network, read-only, unprivileged)")
     p.add_argument("--sandbox-image", default="python:3.12-slim", help="container image with python")
-    p.add_argument("--concurrency", type=int, default=2)
+    p.add_argument("--concurrency", default="auto",
+                   help="requests in flight per server: a number, or auto (start at one and add while "
+                        "throughput rises, up to --max-concurrency and the server's slots)")
+    p.add_argument("--max-concurrency", type=int, default=8, help="the most auto goes to")
+    p.add_argument("--parallel", action="append", default=[], metavar="LABEL=N|auto",
+                   help="this endpoint's own concurrency, e.g. a slow one at 1")
+    p.add_argument("--pool", action="append", default=[], metavar="LABEL=URL[@model]",
+                   help="another server for an endpoint's tasks (same model): the servers share them, "
+                        "each taking the next whenever it has a free slot")
+    p.add_argument("--slow", type=float, default=120.0,
+                   help="auto keeps a server at one request when a single request takes longer (seconds)")
+    p.add_argument("--sequential", action="store_true",
+                   help="one endpoint after another (default: every endpoint at once)")
     p.add_argument("--max_tokens", type=int, default=2048)
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--request-timeout", type=float, default=900)
@@ -640,7 +699,7 @@ def main(argv=None) -> int:
     p.add_argument("--show", type=int, default=8, help="regressions to print")
     p.add_argument("--out")
     p.add_argument("--record-stats", nargs="?", const="", metavar="DIR",
-                   help="append graded results to the rolling model stats (default ~/.neuronscope/stats) "
+                   help="append graded results to the rolling model stats (default ~/.omnicortex/stats) "
                         "that Studio's model \"auto\" routes on")
     p.add_argument("--publish-stats", metavar="STUDIO_URL",
                    help="send graded results to a running Studio instead (it ties them to the exact model file)")
@@ -679,10 +738,57 @@ def main(argv=None) -> int:
         cache_dir.mkdir(parents=True, exist_ok=True)
 
     eps = [parse_endpoint(s) for s in a.endpoint]
-    raw, summ = {}, {}
+    import endpoint_pool
+    conc = parse_concurrency(a.concurrency)
+    per = {k: parse_concurrency(v) for k, v in (x.split("=", 1) for x in a.parallel)}
+    servers = endpoint_pool.Servers(conc, a.max_concurrency, a.slow)
+    extra: dict = {}
+    for spec in a.pool:
+        lab, u, m = parse_endpoint(spec)
+        extra.setdefault(lab, []).append((u, m))
+    unknown = (set(extra) | set(per)) - {e[0] for e in eps}
+    if unknown:
+        raise SystemExit(f"--pool/--parallel name no --endpoint: {', '.join(sorted(unknown))}")
+    pools = {}
     for label, url, model in eps:
-        print(f"querying {label} ({url}{' @ ' + model if model else ''})")
-        raw[label] = run_endpoint(label, url, model, tasks, a, cache_dir)
+        a_ep = a
+        if kinds.get("code_exec") and a.allow_exec:
+            ok, why = exec_permitted(model or label, a)
+            if not ok:
+                print(f"  not running {label}'s code: {why} (docs/PERMISSIONS.md)")
+                a_ep = argparse.Namespace(**{**vars(a), "allow_exec": False})
+        members = [(url, model)] + extra.get(label, [])
+        pools[label] = [{"name": u + (f" @ {m}" if m else ""), "url": u, "model": m or model, "args": a_ep,
+                         "limiter": servers.get(u, per.get(label))} for u, m in members]
+        print(f"querying {label}: " + ", ".join(f"{x['name']} (" + (f"{x['limiter'].limit} at a time" if
+                                                  not x["limiter"].auto else f"auto, up to {x['limiter'].cap}") + ")"
+                                                  for x in pools[label]))
+    total, n = len(tasks) * len(eps), [0]
+    plock = threading.Lock()
+
+    def progress(label, t, r):
+        with plock:
+            n[0] += 1
+            # Studio's Jobs page reads this as a progress bar
+            print(f"PROGRESS {n[0]}/{total} {label}: {t['id']} {r['verdict']}", flush=True)
+
+    raw, summ = {}, {}
+    if a.sequential or len(eps) == 1:
+        for label, _, _ in eps:
+            raw[label] = run_endpoint(label, pools[label], tasks, a, cache_dir, progress)
+    else:
+        with ThreadPoolExecutor(max_workers=len(eps)) as ex:
+            futs = {label: ex.submit(run_endpoint, label, pools[label], tasks, a, cache_dir, progress)
+                    for label, _, _ in eps}
+            raw = {label: f.result() for label, f in futs.items()}
+    sched = servers.summary()
+    print("\nscheduling: " + "; ".join(f"{x['server']}: {x['limit']} at a time ({x['why']}), {x['done']} done"
+                                       + (f", {x['avg_s']} s each" if x["avg_s"] else "")
+                                       + (f", {x['gen_tok_s']} tok/s" if x["gen_tok_s"] else "") for x in sched))
+    for label, _, model in eps:
+        if len(pools[label]) > 1:
+            share = Counter(r.get("served_by") for r in raw[label])
+            print(f"  {label}: " + ", ".join(f"{k} took {v}" for k, v in share.most_common()))
         summ[label] = summarise(raw[label])
         if a.record_stats is not None or a.publish_stats:
             mid = dict(x.split("=", 1) for x in a.stats_model).get(label) or model or label
@@ -716,7 +822,9 @@ def main(argv=None) -> int:
         Path(a.out).parent.mkdir(parents=True, exist_ok=True)
         Path(a.out).write_text(json.dumps({
             "tasks": len(tasks), "reference": ref,
-            "endpoints": {l: {"url": u, "model": m} for l, u, m in eps},
+            "endpoints": {l: {"url": u, "model": m, **({"pool": [x["name"] for x in pools[l]]} if len(pools[l]) > 1 else {})}
+                          for l, u, m in eps},
+            "scheduling": sched,
             "summary": summ, "skills": {l: skills_from(s) for l, s in summ.items()},
             "comparisons": comparisons, "raw": raw}, indent=2))
         print(f"\nwrote {a.out} (\"skills\" can seed a routing table for subject_classifier.py route)")

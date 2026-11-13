@@ -12,7 +12,17 @@
       0.15,
       1.0
     ],
-    "note": "default. Dark field, blue activations, red-orange for flagged H-neurons; the pair stays distinct for every common colour-vision type"
+    "note": "default. Dark field, blue activations, red-orange for flagged H-neurons; the pair stays distinct for every common colour-vision type",
+    "subjects": [
+      "#E7B65C",
+      "#5FCF8F",
+      "#B48EAD",
+      "#9AD0F5",
+      "#F28FAD",
+      "#C3E88D",
+      "#FFCB6B",
+      "#7FDBCA"
+    ]
   },
   "clinical": {
     "cmap": "gray",
@@ -27,37 +37,17 @@
       0.25,
       1.0
     ],
-    "note": "high contrast, print-safe, no colour used decoratively"
-  },
-  "ember": {
-    "cmap": "magma",
-    "bg": "black",
-    "active": "#EF9F27",
-    "halluc": "#36D6FF",
-    "size": [
-      2.5,
-      7.0
-    ],
-    "alpha": [
-      0.15,
-      1.0
-    ],
-    "note": "dark field, warm ramp; flagged H-neurons in cyan, which stays distinct from amber for every common colour-vision type"
-  },
-  "cool": {
-    "cmap": "viridis",
-    "bg": "#0b1015",
-    "active": "#5DCAA5",
-    "halluc": "#FF8A3D",
-    "size": [
-      2.0,
-      6.0
-    ],
-    "alpha": [
-      0.2,
-      0.95
-    ],
-    "note": "cool ramp; flagged H-neurons in orange against teal (colour-blind safe)"
+    "note": "high contrast, print-safe, no colour used decoratively",
+    "subjects": [
+      "#8A5A00",
+      "#1D6B3A",
+      "#5B3C88",
+      "#0F6B6B",
+      "#7A2E5C",
+      "#3C5A14",
+      "#6B4A1F",
+      "#2F4F8F"
+    ]
   },
   "mono": {
     "cmap": "gray",
@@ -72,11 +62,21 @@
       0.3,
       1.0
     ],
-    "note": "only the hallucinating population carries colour"
+    "note": "only the hallucinating population carries colour",
+    "subjects": [
+      "#FFFF00",
+      "#00E5FF",
+      "#FF9CFF",
+      "#00FF7F",
+      "#FFB74D",
+      "#B3E5FC",
+      "#E6EE9C",
+      "#F8BBD0"
+    ]
   },
   "_ui": {
-    "neuronscope-dark": {
-      "label": "NeuronScope Dark",
+    "omnicortex-dark": {
+      "label": "OmniCortex Dark",
       "bg": "#07070b",
       "panel": "#101018",
       "panel_2": "#16161f",
@@ -96,6 +96,92 @@
       "warn": "#8A4A1E",
       "warn_fg": "#D99A55",
       "note": "purple for interactive state, teal for data, emerald for success. Blood red and burnt umber are reserved for errors and warnings and appear nowhere else -- a colour that shows up decoratively stops carrying information."
+    }
+  },
+  "_studio": {
+    "midnight": {
+      "label": "Midnight",
+      "base": "dark",
+      "viz": "dark",
+      "ui": {},
+      "chart": [
+        "#6ea8e0",
+        "#ff8b7e",
+        "#5fcf8f",
+        "#e7b65c",
+        "#b48ead",
+        "#5dcaa5"
+      ],
+      "note": "Studio's dark look"
+    },
+    "daylight": {
+      "label": "Daylight",
+      "base": "light",
+      "viz": "clinical",
+      "ui": {},
+      "chart": [
+        "#2c5f8a",
+        "#b23c2e",
+        "#2f7d4f",
+        "#a8701c",
+        "#7a4e9c",
+        "#1f8a8a"
+      ]
+    },
+    "contrast": {
+      "label": "High contrast",
+      "base": "dark",
+      "viz": "mono",
+      "ui": {
+        "bg": "#000000",
+        "panel": "#000000",
+        "fg": "#ffffff",
+        "mut": "#d0d0d0",
+        "line": "#8a8a8a",
+        "acc": "#ffff00",
+        "accfg": "#000000",
+        "ok": "#00ff7f",
+        "no": "#ff6060",
+        "warn": "#ffbf00",
+        "soft": "#1a1a1a",
+        "code": "#141414"
+      },
+      "chart": [
+        "#ffff00",
+        "#00e5ff",
+        "#ff6060",
+        "#00ff7f",
+        "#ff9cff",
+        "#ffffff"
+      ],
+      "note": "maximum contrast for low vision and bright rooms"
+    },
+    "clinical": {
+      "label": "Clinical (print)",
+      "base": "light",
+      "viz": "clinical",
+      "ui": {
+        "bg": "#ffffff",
+        "panel": "#ffffff",
+        "fg": "#111111",
+        "mut": "#555555",
+        "line": "#cccccc",
+        "acc": "#185fa5",
+        "accfg": "#ffffff",
+        "ok": "#1d6b3a",
+        "no": "#a32d2d",
+        "warn": "#8a5a00",
+        "soft": "#eef3f9",
+        "code": "#f4f4f4"
+      },
+      "chart": [
+        "#185fa5",
+        "#a32d2d",
+        "#1d6b3a",
+        "#8a5a00",
+        "#5b3c88",
+        "#0f6b6b"
+      ]
     }
   }
 }

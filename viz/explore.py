@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuronScope explorer: 2D and 3D activation maps over a recorded session.
+OmniCortex explorer: 2D and 3D activation maps over a recorded session.
 
     python viz/explore.py runs/model-q6
     python viz/explore.py runs/model-q6 --h-neurons models/h_neurons.json

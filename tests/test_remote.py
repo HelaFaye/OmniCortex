@@ -1,4 +1,4 @@
-"""NeuronScope Remote: the host agent on its own, and Studio as its controller."""
+"""OmniCortex Remote: the host agent on its own, and Studio as its controller."""
 import hashlib
 import io
 import json
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "remote"))
 sys.path.insert(0, str(ROOT / "viz"))
 sys.path.insert(0, str(ROOT / "scripts"))
-from neuronscope_remote import agent as nsr  # noqa: E402
+from omnicortex_remote import agent as nsr  # noqa: E402
 from test_studio import call, free_port, studio_srv  # noqa: E402,F401
 
 
@@ -163,19 +163,19 @@ def test_permissions_uploads_and_install(tmp_path, backend):
         st, out = put(f"/upload/m-q4.gguf?offset=1000&final=1&sha256={sha}", data[1000:])
         assert st == 200 and out["complete"]
         st, out = put("/upload/..%2F..%2Fevil.gguf?offset=0&final=1", b"x")
-        assert st == 200 and out["file"] == "evil.gguf"             # names cannot leave the incoming folder
-        assert (ag.incoming() / "evil.gguf").exists()
+        assert st == 400, out  # encoded path traversal must be rejected
+        assert not (ag.incoming() / "evil.gguf").exists()
         files = tool("list_files")["structuredContent"]["files"]
         assert {"file": "m-q4.gguf", "size": len(data), "partial": False} in files
         r = tool("install_model", {"file": "m-q4.gguf"})["structuredContent"]
         dest = Path(r["installed"])
-        assert dest == tmp_path / "lmstudio-models" / "neuronscope" / "m-q4" / "m-q4.gguf"
+        assert dest == tmp_path / "lmstudio-models" / "omnicortex" / "m-q4" / "m-q4.gguf"
         assert dest.read_bytes() == data
         assert tool("list_files", {"where": "models"})["structuredContent"]["files"][0]["file"] == \
-            "neuronscope/m-q4/m-q4.gguf"
+            "omnicortex/m-q4/m-q4.gguf"
         ag.cfg["allow"]["delete"] = True
         assert tool("delete_file", {"file": "../outside", "where": "models"})["isError"]
-        assert not tool("delete_file", {"file": "evil.gguf"})["isError"]
+        assert tool("delete_file", {"file": "evil.gguf"})["isError"]
         # OpenAI pass-through: models and chat
         st, out, _ = nsr.http_json(url, "GET", "/v1/models", token=tok)
         assert [m["id"] for m in out["data"]] == ["tiny-chat"]
@@ -264,19 +264,19 @@ def test_stdio_and_bridge(tmp_path, backend):
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
             {"jsonrpc": "2.0", "method": "notifications/initialized"},
             {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "list_models"}})) + "\n"
-        env = {**os.environ, "NSR_HOME": str(home), "PYTHONPATH": str(ROOT / "remote")}
-        out = subprocess.run([sys.executable, "-m", "neuronscope_remote", "stdio"], input=msgs, capture_output=True,
+        env = {**os.environ, "OCR_HOME": str(home), "PYTHONPATH": str(ROOT / "remote")}
+        out = subprocess.run([sys.executable, "-m", "omnicortex_remote", "stdio"], input=msgs, capture_output=True,
                              text=True, env=env, timeout=30).stdout.splitlines()
         assert [json.loads(x)["id"] for x in out] == [1, 2]
         assert json.loads(out[1])["result"]["structuredContent"]["models"][0]["id"] == "tiny-chat"
         # the controller side of the package: pair from the command line, then bridge an MCP client
         code = ag.pairing.open()["code"]
-        ctl = {**env, "NSR_HOME": str(tmp_path / "controller")}
-        r = subprocess.run([sys.executable, "-m", "neuronscope_remote", "add-host", url, "--code", code],
+        ctl = {**env, "OCR_HOME": str(tmp_path / "controller")}
+        r = subprocess.run([sys.executable, "-m", "omnicortex_remote", "add-host", url, "--code", code],
                            capture_output=True, text=True, env=ctl, timeout=30)
         assert r.returncode == 0, r.stderr
         assert "CONTROLLER" in r.stdout and '"bridge"' in r.stdout and "gpu-box" in r.stdout
-        out = subprocess.run([sys.executable, "-m", "neuronscope_remote", "bridge", "gpu-box"], input=msgs,
+        out = subprocess.run([sys.executable, "-m", "omnicortex_remote", "bridge", "gpu-box"], input=msgs,
                              capture_output=True, text=True, env=ctl, timeout=30).stdout.splitlines()
         got = {json.loads(x)["id"]: json.loads(x) for x in out}
         assert set(got) == {1, 2} and "HOST" in got[1]["result"]["instructions"]
@@ -306,7 +306,7 @@ def test_official_mcp_client(tmp_path, backend):
                 return init, tools, res
         init, tools, res = asyncio.run(go())
         g = lambda o, *names: next(getattr(o, n) for n in names if hasattr(o, n))  # noqa: E731  SDK 1.x and 2.x
-        assert g(init, "server_info", "serverInfo").name == "neuronscope-remote" and "HOST" in init.instructions
+        assert g(init, "server_info", "serverInfo").name == "omnicortex-remote" and "HOST" in init.instructions
         ann = {t.name: t.annotations for t in tools.tools}
         assert g(ann["delete_file"], "destructive_hint", "destructiveHint")
         assert g(ann["list_models"], "read_only_hint", "readOnlyHint")
@@ -329,7 +329,7 @@ def test_studio_pairs_lists_and_chats_through_a_host(studio_srv, tmp_path, backe
         st, out = call(studio_srv, "/api/remote/pair", {"method": "lan", "address": url, "code": code})
         assert st == 200, out
         assert out["name"] == "gpu-box" and out["models"] == ["tiny-chat"] and out["short_fingerprint"]
-        assert ag.controllers.list()[0]["name"].startswith("NeuronScope Studio")
+        assert ag.controllers.list()[0]["name"].startswith("OmniCortex Studio")
         st, s = call(studio_srv, "/api/remote")
         h = s["hosts"][0]
         assert s["role"] == "controller" and h["pinned"] and h["method"] == "lan" and h["models"] == ["tiny-chat"]
@@ -355,7 +355,7 @@ def test_studio_pairs_lists_and_chats_through_a_host(studio_srv, tmp_path, backe
                 break
             time.sleep(0.05)
         assert s["sends"][0]["status"] == "done", s["sends"]
-        assert list((tmp_path / "lmstudio-models" / "neuronscope").rglob("*.gguf"))
+        assert list((tmp_path / "lmstudio-models" / "omnicortex").rglob("*.gguf"))
         st, r = call(studio_srv, "/api/remote/send", {"host": "gpu-box", "path": "/etc/passwd"})
         assert st == 400
         call(studio_srv, "/api/remote/remove", {"host": "gpu-box"})
@@ -374,7 +374,7 @@ def test_host_that_calls_in(studio_srv, tmp_path, backend):
     with pytest.raises(RuntimeError):
         nsr.claim_invite(ag, bad)
     entry = nsr.claim_invite(ag, inv["invite"])
-    assert entry["controller"].startswith("NeuronScope Studio")
+    assert entry["controller"].startswith("OmniCortex Studio")
     with pytest.raises(RuntimeError):                        # single use
         nsr.claim_invite(nsr.Agent(tmp_path / "other"), inv["invite"])
     rt = nsr.Runtime(ag)
@@ -394,6 +394,19 @@ def test_host_that_calls_in(studio_srv, tmp_path, backend):
         st, r = call(studio_srv, "/v1/chat/completions", {"model": "behind-nat:tiny-chat",
                                                          "messages": [{"role": "user", "content": "hi"}]})
         assert st == 200 and r["choices"][0]["message"]["content"]
+        # streamed: the reply comes through as the host's backend writes it
+        req = urllib.request.Request(studio_srv + "/v1/chat/completions", method="POST",
+                                     data=json.dumps({"model": "behind-nat:tiny-chat", "stream": True,
+                                                      "messages": [{"role": "user", "content": "hi"}]}).encode(),
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            lines = [ln.decode().strip() for ln in resp if ln.strip()]
+        assert lines[-1] == "data: [DONE]"
+        chunks = [json.loads(ln[5:]) for ln in lines[:-1]]
+        text = "".join((c["choices"][0]["delta"].get("content") or "") for c in chunks if c.get("choices"))
+        assert text == "model=tiny-chat mmproj=no image=no"
+        assert chunks[0]["choices"][0]["delta"]["role"] == "assistant"
+        assert chunks[-1]["choices"][0]["finish_reason"] == "stop"
         # Studio serves a model file to it by a one-time ticket; the host fetches it
         _, s = call(studio_srv, "/api/remote")
         st, r = call(studio_srv, "/api/remote/send", {"host": "behind-nat", "path": s["local_models"][0]["path"]})
@@ -413,8 +426,59 @@ def test_host_that_calls_in(studio_srv, tmp_path, backend):
             t.stop.set()
 
 
+def test_callhome_hub_streams_cancels_and_checks_hosts():
+    import threading
+    import remote_hosts
+    hub = remote_hosts.CallHomeHub()
+    hub.seen["a"] = hub.seen["b"] = time.time()
+    got, out = [], {}
+
+    def ask(on_progress):
+        try:
+            out["resp"] = hub.request("a", {"method": "tools/call", "params": {}}, timeout=5, on_progress=on_progress)
+        except Exception as e:
+            out["err"] = e
+
+    t = threading.Thread(target=ask, args=(got.append,))
+    t.start()
+    msg = hub.next("a", wait=2)[0]
+    mid = msg["id"]
+    assert msg["message"]["params"]["_meta"]["progressToken"] == mid
+    assert hub.progress(mid, ["x"], host="b") == {"ok": False, "cancel": True}   # not b's message
+    assert not hub.reply(mid, {"r": 1}, host="b")
+    assert hub.progress(mid, ["Hel", "lo"], host="a") == {"ok": True, "cancel": False}
+    time.sleep(0.2)
+    assert hub.reply(mid, {"r": 1}, host="a") and not hub.reply(mid, {"r": 2}, host="a")
+    t.join(5)
+    assert got == ["Hel", "lo"] and out["resp"] == {"r": 1}
+
+    # the reader goes away: the host learns to stop at its next progress post
+    def gone(_):
+        raise BrokenPipeError
+
+    out.clear()
+    t = threading.Thread(target=ask, args=(gone,))
+    t.start()
+    mid = hub.next("a", wait=2)[0]["id"]
+    hub.progress(mid, ["x"], host="a")
+    t.join(5)
+    assert isinstance(out["err"], BrokenPipeError)
+    assert hub.progress(mid, ["y"], host="a")["cancel"]
+
+
+def test_agent_stream_posts_pieces_and_stops_when_cancelled(backend):
+    b = nsr.Backend("llama-server", backend)
+    seen = []
+    r = b.chat_stream({"model": "tiny-chat", "messages": [{"role": "user", "content": "hi"}]}, seen.append)
+    assert "".join(seen) == r["choices"][0]["message"]["content"] == "model=tiny-chat mmproj=no image=no"
+    seen.clear()
+    r = b.chat_stream({"model": "tiny-chat", "messages": [{"role": "user", "content": "hi"}]}, seen.append,
+                      cancelled=lambda: bool(seen))
+    assert len(seen) == 1 and r["choices"][0]["finish_reason"] == "cancelled"
+
+
 def test_package_is_standalone_and_downloadable(studio_srv):
-    src = (ROOT / "remote" / "neuronscope_remote" / "agent.py").read_text()
+    src = (ROOT / "remote" / "omnicortex_remote" / "agent.py").read_text()
     for line in src.splitlines():
         if line.startswith(("import ", "from ")) and "__future__" not in line:
             mod = line.split()[1].split(".")[0]
@@ -423,6 +487,465 @@ def test_package_is_standalone_and_downloadable(studio_srv):
     with urllib.request.urlopen(studio_srv + "/remote/download") as r:
         z = zipfile.ZipFile(io.BytesIO(r.read()))
     names = set(z.namelist())
-    assert {"neuronscope-remote/neuronscope_remote/agent.py", "neuronscope-remote/pyproject.toml",
-            "neuronscope-remote/README.md", "neuronscope-remote/NeuronScope Remote.bat"} <= names
+    assert {"omnicortex-remote/omnicortex_remote/agent.py", "omnicortex-remote/pyproject.toml",
+            "omnicortex-remote/README.md", "omnicortex-remote/OmniCortex Remote.bat"} <= names
     assert not any("__pycache__" in n for n in names)
+
+
+FAKE_TRACER = '''
+import argparse, sys
+import numpy as np
+sys.path.insert(0, {scripts!r})
+import hscore
+p = argparse.ArgumentParser()
+for f in ("--binary", "--gguf", "--classifier", "--messages", "--response-file", "--trace-out", "--ngl"):
+    p.add_argument(f)
+a = p.parse_args()
+text = open(a.response_file, encoding="utf-8").read()
+n = len(text)
+hscore.save_trace(a.trace_out, {{"frames": np.ones((n, 3, 4), np.float32), "scores": np.linspace(-3, 3, n),
+                  "prob": 1 / (1 + np.exp(-np.linspace(-3, 3, n))), "tokens": [ord(c) for c in text],
+                  "col_weight": np.ones(4), "pieces": list(text), "stride": 1, "h_cells": [[1, 1]], "n_layers": 3}})
+'''
+
+
+def test_check_a_hosts_reply_here_or_on_the_host(studio_srv, tmp_path, backend):
+    import shutil
+    import studio
+    from test_studio import CODER, _fake_scorer
+    st, inv = call(studio_srv, "/api/remote/invite", {"name": "rig"})
+    ag = nsr.Agent(tmp_path / "host")
+    ag.cfg.update(detect=False, backends=[{"kind": "llama-server", "url": backend}], name="rig")
+    rt = nsr.Runtime(ag)
+    rt.start_callhome(nsr.claim_invite(ag, inv["invite"]))
+    sc = _fake_scorer(tmp_path)
+    m = studio.find_model(CODER)
+    studio.STATE.update(cett=sc.binary, traces_dir=str(tmp_path / "traces"))
+    studio._SCORERS[(m["path"], str(tmp_path / "clf.npz"))] = sc
+    try:
+        for _ in range(100):
+            if call(studio_srv, "/api/remote")[1]["hosts"][0].get("online"):
+                break
+            time.sleep(0.05)
+        ask = {"model": "rig:tiny-chat", "text": "abcdef", "messages": [{"role": "user", "content": "hi"}]}
+        # 1. the host has the very file Studio has: Studio traces it itself, with that model's classifier
+        same = tmp_path / "host-models" / "tiny-chat.gguf"
+        same.parent.mkdir()
+        shutil.copy(m["path"], same)
+        ag.cfg["model_files"] = {"tiny-chat": str(same)}
+        st, r = call(studio_srv, "/api/trace", ask)
+        assert st == 400 and "classifier" in r["error"]
+        cfg = studio.load_settings()
+        cfg.setdefault(studio._key(m["path"]), {})["classifier"] = str(tmp_path / "clf.npz")
+        studio.save_settings(cfg)
+        st, r = call(studio_srv, "/api/trace", ask)
+        assert st == 200, r
+        assert r["traced_on"] == "this computer (same file)" and r["host"] == "rig" and r["pieces"] == list("abcdef")
+        # 2. a different file: the host runs its tracer, with the classifier Studio sends
+        other = same.with_name("tiny-chat-other.gguf")
+        other.write_bytes(b"GGUF" + b"\1" * 64)
+        ag.cfg["model_files"] = {"tiny-chat": str(other)}
+        st, r = call(studio_srv, "/api/trace", ask)
+        assert st == 400 and "classifier" in r["error"]           # no twin and none set for the host model
+        st, r = call(studio_srv, "/api/remote/classifier", {"host": "rig", "model": "tiny-chat",
+                                                             "classifier": str(tmp_path / "clf.npz")})
+        assert st == 200
+        ag.cfg["tracer"] = {"omnicortex": str(tmp_path / "no-omnicortex-here")}     # whatever this machine has
+        st, r = call(studio_srv, "/api/trace", ask)
+        assert st == 502 and "no OmniCortex tracer" in r["error"]
+        fake = tmp_path / "ns" / "scripts" / "hscore.py"
+        fake.parent.mkdir(parents=True)
+        fake.write_text(FAKE_TRACER.format(scripts=str(ROOT / "scripts")))
+        ag.cfg["tracer"] = {"omnicortex": str(tmp_path / "ns"), "cett": sc.binary}
+        st, r = call(studio_srv, "/api/trace", ask)
+        assert st == 200, r
+        assert r["traced_on"] == "rig" and r["pieces"] == list("abcdef") and len(r["prob"]) == 6
+        code, meta = call(studio_srv, f"/viz/{r['id']}/api/meta")
+        assert code == 200 and meta["labels"] == list("abcdef")
+        # the host owner can switch it off
+        ag.cfg["allow"]["trace"] = False
+        st, r = call(studio_srv, "/api/trace", ask)
+        assert st == 502 and "does not allow" in r["error"]
+    finally:
+        studio._SCORERS.clear()
+        studio.STATE.update(cett=None)
+        for t in ag.callhome.values():
+            t.stop.set()
+
+
+def test_jobs_run_on_a_host_when_its_owner_allows(studio_srv, tmp_path, backend):
+    ag, rt, url = make_agent(tmp_path, backend, mode="lan", bind="127.0.0.1")
+    try:
+        code = ag.pairing.open()["code"]
+        st, out = call(studio_srv, "/api/remote/pair", {"method": "lan", "address": url, "code": code})
+        assert st == 200, out
+        _, targets = call(studio_srv, "/api/jobs/targets")
+        host = next(t for t in targets if t["id"] == "host:gpu-box")
+        assert targets[0]["id"] == "local" and not host["ok"] and "not allowed" in host["why"]
+        st, r = call(studio_srv, "/api/jobs", {"kind": "split", "values": {}, "target": "host:gpu-box"})
+        assert st == 502 and "does not run jobs" in r["error"]
+        # the host's owner allows jobs; the agent finds the OmniCortex folder it runs from
+        ag.cfg["allow"]["jobs"] = True
+        ag.cfg["jobs_cwd"] = str(tmp_path)
+        import studio
+        studio._RCACHE.clear()
+        _, targets = call(studio_srv, "/api/jobs/targets")
+        host = next(t for t in targets if t["id"] == "host:gpu-box")
+        assert host["ok"] and "split" in host["kinds"]
+        st, j = call(studio_srv, "/api/jobs", {"kind": "split", "target": "host:gpu-box",
+                                               "values": {"input_path": str(tmp_path / "missing.jsonl"),
+                                                          "output_path": str(tmp_path / "ids.json")}})
+        assert st == 200 and j["host"] == "gpu-box" and j["status"] == "running"
+        for _ in range(100):
+            studio._RCACHE.pop("jobs:gpu-box", None)
+            _, js = call(studio_srv, "/api/jobs")
+            mine = [x for x in js if x.get("host") == "gpu-box" and x["id"] == j["id"]]
+            if mine and mine[0]["status"] != "running":
+                break
+            time.sleep(0.1)
+        assert mine[0]["status"] == "failed" and mine[0]["hint"]          # a reason, from the host's own runner
+        st, log = call(studio_srv, f"/api/jobs/host/gpu-box/{j['id']}/log")
+        assert st == 200 and "missing.jsonl" in log["log"]
+        # bad job kinds are refused by the host's own checks
+        st, r = call(studio_srv, "/api/jobs", {"kind": "rm -rf", "values": {}, "target": "host:gpu-box"})
+        assert st == 502 and "unknown job kind" in r["error"]
+        # the System page lists the host's agent; restarting is up to the host's owner
+        _, sv = call(studio_srv, "/api/services")
+        assert any(s["id"] == "host:gpu-box" and "restart" in s["actions"] for s in sv["services"])
+        ag.cfg["allow"]["restart"] = False
+        st, r = call(studio_srv, "/api/services", {"id": "host:gpu-box", "action": "restart"})
+        assert st == 400 and "does not allow" in r["error"]
+    finally:
+        rt.close_api()
+
+
+def test_host_gives_the_computer_back_to_its_owner(tmp_path, backend):
+    ag, rt, url = make_agent(tmp_path, backend)
+    try:
+        snap = {"idle_s": 999, "gamepad": False, "vr": False}
+        g = nsr.PresenceGuard(ag, read=lambda: dict(snap))
+        ag.presence = g
+        g.check()
+        assert ag.busy is None                                         # off unless the owner turns it on
+        ag.cfg["yield"] = {"enabled": True, "idle_under": 60, "cooldown": 300}
+        snap["idle_s"] = 4
+        g.check()
+        assert ag.busy and ag.busy["source"] == "owner" and "keyboard or mouse" in ag.busy["why"]
+        r = ag.call_tool("chat", {"messages": [{"role": "user", "content": "hi"}]}, "t")
+        assert r["isError"] and r["content"][0]["text"].startswith(nsr.BUSY_PREFIX)
+        assert ag.call_tool("set_busy", {"busy": False}, "t")["structuredContent"]["busy"]      # not a controller's to end
+        snap["idle_s"] = 120
+        g.check()
+        assert ag.busy                                                 # quiet, but not for the cooldown yet
+        g.last_seen -= 400
+        g.check()
+        assert ag.busy is None
+        assert not ag.call_tool("chat", {"messages": [{"role": "user", "content": "hi"}]}, "t")["isError"]
+        snap.update(idle_s=None, vr=True)
+        g.check()
+        assert "VR" in ag.busy["why"]
+        # a controller's rule (power) can make it rest, for a while
+        ag.set_busy(None)
+        ag.cfg["yield"]["enabled"] = False
+        r = ag.call_tool("set_busy", {"busy": True, "minutes": 30, "reason": "monthly energy cap"}, "t")
+        assert not r["isError"] and ag.busy["until"] > time.time()
+        assert ag.call_tool("t" and "telemetry", {}, "t")["structuredContent"]["busy"]["why"] == "monthly energy cap"
+        ag.busy["until"] = time.time() - 1                                 # its time is up
+        assert not ag.call_tool("chat", {"messages": [{"role": "user", "content": "hi"}]}, "t")["isError"]
+    finally:
+        rt.close_api()
+
+class _FakeDownloadResponse:
+    def __init__(self, status, headers=None, body=b""):
+        self.status = status
+        self.headers = list((headers or {}).items())
+        self.stream = io.BytesIO(body)
+
+    def getheaders(self):
+        return list(self.headers)
+
+    def read(self, amount=-1):
+        return self.stream.read(amount)
+
+
+class _FakeDownloadConnection:
+    def __init__(self, response):
+        self.response = response
+        self.request_args = None
+        self.closed = False
+
+    def request(self, method, path, headers=None, **kwargs):
+        self.request_args = (method, path, dict(headers or {}))
+
+    def getresponse(self):
+        return self.response
+
+    def close(self):
+        self.closed = True
+
+
+def _run_fake_download(monkeypatch, agent, dest, response, sha=""):
+    tid = "test-download"
+    agent.download_slots.acquire()
+    agent.transfers[tid] = {
+        "id": tid,
+        "file": dest.name,
+        "status": "running",
+        "done": 0,
+        "size": None,
+        "started": time.time(),
+    }
+    agent.active_download_names.add(dest.name)
+
+    conn = _FakeDownloadConnection(response)
+    monkeypatch.setattr(nsr, "open_conn", lambda *args, **kwargs: conn)
+    agent._download(
+        tid,
+        "http://download.test/model.gguf",
+        dest,
+        sha,
+        "",
+        None,
+    )
+    return agent.transfers[tid], conn
+
+
+def test_download_resumed_206_validates_range_and_completes(tmp_path, monkeypatch):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    data = b"already received|" + os.urandom(4096)
+    prefix = data[:17]
+    suffix = data[len(prefix):]
+    part = dest.with_name(dest.name + ".part")
+    part.write_bytes(prefix)
+
+    response = _FakeDownloadResponse(
+        206,
+        {
+            "Content-Range": f"bytes {len(prefix)}-{len(data) - 1}/{len(data)}",
+            "Content-Length": str(len(suffix)),
+        },
+        suffix,
+    )
+    row, conn = _run_fake_download(
+        monkeypatch,
+        ag,
+        dest,
+        response,
+        hashlib.sha256(data).hexdigest(),
+    )
+
+    assert row["status"] == "done", row
+    assert dest.read_bytes() == data
+    assert not part.exists()
+    assert conn.request_args[2]["Range"] == f"bytes={len(prefix)}-"
+    assert conn.request_args[2]["Accept-Encoding"] == "identity"
+    assert conn.closed
+
+
+@pytest.mark.parametrize(
+    ("content_range", "content_length"),
+    [
+        ("bytes 16-99/100", "84"),  # Wrong starting offset.
+        ("bytes 17-99/100", "82"),  # Wrong Content-Length.
+        ("bytes 17-98/100", "82"),  # Does not contain the full requested tail.
+        ("bytes 17-99/*", "83"),    # Unknown total size.
+    ],
+)
+def test_download_rejects_invalid_206_range(
+    tmp_path, monkeypatch, content_range, content_length
+):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    prefix = b"seventeen bytes!!"
+    assert len(prefix) == 17
+    part = dest.with_name(dest.name + ".part")
+    part.write_bytes(prefix)
+
+    response = _FakeDownloadResponse(
+        206,
+        {
+            "Content-Range": content_range,
+            "Content-Length": content_length,
+        },
+        b"x" * 83,
+    )
+    row, _ = _run_fake_download(monkeypatch, ag, dest, response)
+
+    assert row["status"] == "failed", row
+    assert not dest.exists()
+    assert part.read_bytes() == prefix
+
+
+def test_download_rejects_416_without_expected_checksum(tmp_path, monkeypatch):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    data = b"already complete but not independently verified"
+    part = dest.with_name(dest.name + ".part")
+    part.write_bytes(data)
+
+    response = _FakeDownloadResponse(
+        416,
+        {"Content-Range": f"bytes */{len(data)}"},
+    )
+    row, _ = _run_fake_download(monkeypatch, ag, dest, response)
+
+    assert row["status"] == "failed", row
+    assert "without an expected SHA-256" in row["error"]
+    assert not dest.exists()
+    assert part.read_bytes() == data
+
+
+def test_download_accepts_416_only_after_size_and_checksum_match(tmp_path, monkeypatch):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    data = os.urandom(2048)
+    part = dest.with_name(dest.name + ".part")
+    part.write_bytes(data)
+
+    response = _FakeDownloadResponse(
+        416,
+        {"Content-Range": f"bytes */{len(data)}"},
+    )
+    row, _ = _run_fake_download(
+        monkeypatch,
+        ag,
+        dest,
+        response,
+        hashlib.sha256(data).hexdigest(),
+    )
+
+    assert row["status"] == "done", row
+    assert dest.read_bytes() == data
+    assert not part.exists()
+
+
+def test_download_rejects_symlinked_partial_file(tmp_path, monkeypatch):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    part = dest.with_name(dest.name + ".part")
+    sentinel = tmp_path / "do-not-modify.bin"
+    sentinel.write_bytes(b"protected data")
+    part.symlink_to(sentinel)
+
+    response = _FakeDownloadResponse(200, {"Content-Length": "4"}, b"evil")
+    row, _ = _run_fake_download(monkeypatch, ag, dest, response)
+
+    assert row["status"] == "failed", row
+    assert "symlink" in row["error"]
+    assert part.is_symlink()
+    assert sentinel.read_bytes() == b"protected data"
+    assert not dest.exists()
+
+
+def test_download_restarts_when_server_ignores_range(tmp_path, monkeypatch):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    data = b"complete fresh response"
+    part = dest.with_name(dest.name + ".part")
+    part.write_bytes(b"stale partial data")
+
+    response = _FakeDownloadResponse(
+        200,
+        {"Content-Length": str(len(data))},
+        data,
+    )
+    row, conn = _run_fake_download(
+        monkeypatch,
+        ag,
+        dest,
+        response,
+        hashlib.sha256(data).hexdigest(),
+    )
+
+    assert row["status"] == "done", row
+    assert dest.read_bytes() == data
+    assert not part.exists()
+    assert "Range" in conn.request_args[2]
+
+
+def test_put_upload_reservations_prevent_transfer_collisions(tmp_path, backend):
+    ag, rt, url = make_agent(tmp_path, backend)
+    try:
+        code = nsr.norm_code(ag.pairing.open()["code"])
+        first = nsr.pair_direct(url, code, "studio-one")
+        first_token = first["token"]
+
+        def put(token, path, body):
+            conn = nsr.open_conn(url, None, 10)
+            try:
+                conn.request(
+                    "PUT",
+                    path,
+                    body=body,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                response = conn.getresponse()
+                payload = json.loads(response.read())
+                return response.status, payload
+            finally:
+                conn.close()
+
+        # A PUT must not write a filename currently owned by a download.
+        ag.active_download_names.add("collision.gguf")
+        try:
+            status, payload = put(
+                first_token,
+                "/upload/collision.gguf?offset=0",
+                b"blocked",
+            )
+            assert status == 409, payload
+            assert not (ag.incoming() / "collision.gguf.part").exists()
+        finally:
+            ag.active_download_names.discard("collision.gguf")
+
+        # The first controller owns a partial upload until it completes.
+        status, payload = put(
+            first_token,
+            "/upload/owned.gguf?offset=0",
+            b"part",
+        )
+        assert status == 200, payload
+        partial = ag.incoming() / "owned.gguf.part"
+        assert partial.read_bytes() == b"part"
+
+        # A different paired controller cannot append to that partial.
+        code2 = nsr.norm_code(ag.pairing.open()["code"])
+        second = nsr.pair_direct(url, code2, "studio-two")
+        status, payload = put(
+            second["token"],
+            "/upload/owned.gguf?offset=4",
+            b"tamper",
+        )
+        assert status == 409, payload
+        assert partial.read_bytes() == b"part"
+
+        # The owner can resume and complete it with the expected digest.
+        complete = b"part" + b"-complete"
+        digest = hashlib.sha256(complete).hexdigest()
+        status, payload = put(
+            first_token,
+            f"/upload/owned.gguf?offset=4&final=1&sha256={digest}",
+            b"-complete",
+        )
+        assert status == 200 and payload["complete"], payload
+        assert (ag.incoming() / "owned.gguf").read_bytes() == complete
+        assert not partial.exists()
+        assert "owned.gguf" not in ag.upload_owners
+
+        # A symlinked upload partial must not be followed.
+        outside = tmp_path / "outside-upload-target.bin"
+        outside.write_bytes(b"protected")
+        symlink_part = ag.incoming() / "symlink.gguf.part"
+        symlink_part.symlink_to(outside)
+
+        status, payload = put(
+            first_token,
+            "/upload/symlink.gguf?offset=0",
+            b"overwrite",
+        )
+        assert status == 400, payload
+        assert symlink_part.is_symlink()
+        assert outside.read_bytes() == b"protected"
+    finally:
+        rt.close_api()

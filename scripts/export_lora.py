@@ -50,7 +50,7 @@ import torch
 from safetensors.torch import save_file
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import TEXT_LAYER_RE, load_model, text_config  # noqa: E402
+from oc_common import TEXT_LAYER_RE, load_model, text_config  # noqa: E402
 from profiles import Profile  # noqa: E402
 
 
@@ -66,7 +66,11 @@ def parse_args():
                         "ffn_down tensors instead of the bf16 safetensors. Use "
                         "the exact file you will serve: it makes the adapter "
                         "mathematically exact rather than approximate.")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     return p.parse_args()
 
 
@@ -126,7 +130,7 @@ def main():
 
     model, tokenizer = load_model(
         args.model_path, gpu_mem=None,
-        trust_remote_code=not args.no_trust_remote_code,
+        trust_remote_code=args.trust_remote_code,
     )
     profile.check(model)
     by_layer = profile.by_layer

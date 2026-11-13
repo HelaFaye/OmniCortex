@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuronScope recording format.
+OmniCortex recording format.
 
 The interface that makes this a toolkit rather than two disconnected apps. The
 web dashboard and the Fastplotlib explorer both read these; so can anything you
@@ -230,7 +230,7 @@ def merge_check(sessions):
 
 if __name__ == "__main__":
     import argparse
-    p = argparse.ArgumentParser(description="Inspect a NeuronScope session")
+    p = argparse.ArgumentParser(description="Inspect a OmniCortex session")
     p.add_argument("path")
     a = p.parse_args()
     s = Session(a.path)

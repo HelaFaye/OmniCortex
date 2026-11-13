@@ -1,0 +1,43 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "amd-legacy-gcn",
+ "title": "AMD GCN, Polaris and Vega (gfx803, gfx900, gfx906)",
+ "era": "legacy",
+ "examples": [
+  "RX 470/480/580",
+  "Vega 56/64",
+  "Radeon VII",
+  "Instinct MI50/MI60"
+ ],
+ "match": {
+  "vendor": "amd",
+  "gfx_prefix": [
+   "gfx80",
+   "gfx90"
+  ],
+  "gfx_exclude": [
+   "gfx908",
+   "gfx90a"
+  ]
+ },
+ "purposes": {
+  "general": {
+   "summary": "llama.cpp with Vulkan: ROCm has dropped or deprecated these chips, Vulkan still runs them well.",
+   "llama": {
+    "backend": "vulkan",
+    "cmake": ""
+   },
+   "engine": {
+    "flash_attn": "off"
+   },
+   "torch": {
+    "spec": "torch",
+    "index": "https://download.pytorch.org/whl/cpu"
+   },
+   "notes": "Training runs on the CPU (or an older ROCm 5.x stack for gfx906, unsupported). Inference and activation extraction (cett-dump) work through Vulkan."
+  }
+ },
+ "notes": "",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

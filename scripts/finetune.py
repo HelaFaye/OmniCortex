@@ -153,13 +153,13 @@ def load_model(a, rep):
     from transformers import AutoModelForCausalLM, AutoTokenizer
     if a.vision:
         from transformers import AutoModelForImageTextToText, AutoProcessor
-        tok = AutoProcessor.from_pretrained(a.model)
+        tok = AutoProcessor.from_pretrained(a.model, trust_remote_code=False)
         inner = tok.tokenizer
         if inner.pad_token is None:
             inner.pad_token = inner.eos_token
         auto = AutoModelForImageTextToText
     else:
-        tok = AutoTokenizer.from_pretrained(a.model)
+        tok = AutoTokenizer.from_pretrained(a.model, trust_remote_code=False)
         if tok.pad_token is None:
             tok.pad_token = tok.eos_token
         auto = AutoModelForCausalLM
@@ -178,6 +178,7 @@ def load_model(a, rep):
         kw["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4",
                                                        bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=dtype)
         kw["device_map"] = {"": local_rank if local_rank >= 0 else 0}
+    kw.setdefault("trust_remote_code", False)
     model = auto.from_pretrained(a.model, **kw)
     if a.method == "qlora":
         from peft import prepare_model_for_kbit_training
@@ -272,7 +273,7 @@ def lora_config(a, model=None):
 def common_args(a, prec, out: Path, model) -> dict:
     kw = dict(output_dir=str(out), per_device_train_batch_size=a.batch_size,
               gradient_accumulation_steps=a.grad_accum, learning_rate=a.lr, num_train_epochs=a.epochs,
-              max_steps=a.max_steps, logging_steps=a.logging_steps, save_strategy="no", report_to=[],
+              max_steps=a.max_steps, logging_steps=a.logging_steps, save_strategy="no", report_to=[x for x in (a.report_to or "").split(",") if x],
               gradient_checkpointing=a.gradient_checkpointing, seed=a.seed, max_length=a.max_length,
               bf16=prec["bf16"], fp16=prec["fp16"], lr_scheduler_type="cosine", warmup_ratio=0.03,
               warmup_steps=max(1, int(0.03 * a.max_steps)) if a.max_steps > 0 else 10)
@@ -320,6 +321,13 @@ def train(a) -> int:
                 prm.requires_grad_(False)
     trainer = SFTTrainer(model=model, args=sft_args, train_dataset=train_ds,
                          processing_class=tok, peft_config=peft_cfg)
+    kept = len(trainer.train_dataset)
+    if kept == 0:
+        raise SystemExit(f"all {len(train_ds)} SFT examples were dropped: with --max-length {a.max_length} the "
+                         "prompt fills the window and no reply token is left to learn from. Raise --max-length.")
+    if kept < len(train_ds):
+        print(f"note: {len(train_ds) - kept} of {len(train_ds)} examples had no reply left within --max-length "
+              f"{a.max_length} and were dropped")
     trainer.train()
     model = trainer.model
     sft_dir = out if not a.dpo else out / "sft"
@@ -343,8 +351,10 @@ def train(a) -> int:
     meta = {"base": a.model, "method": a.method, "vision": bool(a.vision), "data": str(data), "dpo": bool(a.dpo),
             "lora": None if a.method == "full" else {"r": a.lora_r, "alpha": a.lora_alpha, "targets": a.lora_targets},
             "layers": a.layer_list,
-            "precision": prec, "hardware": rep}
-    (out / "neuronscope-finetune.json").write_text(json.dumps(meta, indent=2))
+            "precision": prec, "hardware": rep,
+            # the training curves, so sweeps can compare runs without TensorBoard
+            "log": {"sft": trainer.state.log_history, "dpo": dtrainer.state.log_history if a.dpo else None}}
+    (out / "omnicortex-finetune.json").write_text(json.dumps(meta, indent=2))
     print(f"wrote {out}")
     return 0
 
@@ -382,6 +392,7 @@ def main(argv=None) -> int:
     p.add_argument("--dpo-epochs", type=float, default=1)
     p.add_argument("--dpo-max-steps", type=int, default=-1)
     p.add_argument("--logging-steps", type=int, default=5)
+    p.add_argument("--report-to", default="", help="comma list for the trainer, e.g. tensorboard (event files in OUT)")
     p.add_argument("--seed", type=int, default=0)
     a = p.parse_args(argv)
     if a.check:

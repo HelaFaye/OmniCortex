@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NeuronScope Scale Sweep Lab browser GUI."""
+"""OmniCortex Scale Sweep Lab browser GUI."""
 from __future__ import annotations
 
 import argparse
@@ -20,7 +20,7 @@ STATE = {"jobs": {}, "lock": threading.Lock()}
 
 HTML = r'''<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope Scale Sweep Lab</title>
+<title>OmniCortex Scale Sweep Lab</title>
 <style>
 body{margin:0;background:#101216;color:#e9ecf1;font:14px system-ui,sans-serif}main{max-width:1400px;margin:auto;padding:20px}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.wide{grid-column:1/-1}.card{background:#181b21;border:1px solid #30343c;border-radius:12px;padding:14px}h1{margin:0 0 6px}h2{margin:0 0 10px;font-size:18px}small,p{color:#aeb5c0}label{display:block;color:#aeb5c0;margin:7px 0 3px}input,select,textarea,button{font:inherit;background:#0e1116;color:#eef;border:1px solid #3a404a;border-radius:7px;padding:8px;box-sizing:border-box}input,select,textarea{width:100%}textarea{min-height:90px;font-family:ui-monospace,monospace}.row{display:flex;gap:8px}.row>*{flex:1}button{cursor:pointer}.primary{background:#2d4770;border-color:#6382b6}.danger{border-color:#724047}.status{padding:9px;background:#12151a;border-radius:8px;margin-top:8px;white-space:pre-wrap}.ok{color:#8bd39b}.warn{color:#e8c476}.err{color:#f17c86}.muted{color:#8e97a5}
@@ -28,7 +28,7 @@ body{margin:0;background:#101216;color:#e9ecf1;font:14px system-ui,sans-serif}ma
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px;border-bottom:1px solid #2c3139}.pill{display:inline-block;padding:2px 7px;border-radius:999px;background:#282e38;font-size:12px}
 @media(max-width:900px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.row{flex-direction:column}}
 </style></head><body><main>
-<h1>NeuronScope Scale Sweep Lab</h1><p>Generate static GGUF suppression/amplification variants from an H-Neuron profile, visualize the activation footprint, batch builds through scratch/RAM disk, and optionally evaluate/prune candidates.</p>
+<h1>OmniCortex Scale Sweep Lab</h1><p>Generate static GGUF suppression/amplification variants from an H-Neuron profile, visualize the activation footprint, batch builds through scratch/RAM disk, and optionally evaluate/prune candidates.</p>
 <div id="top" class="status">Ready.</div>
 <div class="grid">
 <section class="card"><h2>Model + profile</h2>
@@ -42,7 +42,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px;bord
 <section class="card"><h2>Batch + scratch</h2>
 <label>Models per batch</label><input id="batch" type="number" min="1" value="1">
 <label>Scratch strategy</label><select id="scratch"><option value="auto">AUTO — RAM if it fits</option><option value="ram">RAM only</option><option value="disk">Disk temp</option><option value="none">Direct output</option></select>
-<label>Scratch root (optional)</label><input id="scratchRoot" placeholder="/dev/shm/neuronscope">
+<label>Scratch root (optional)</label><input id="scratchRoot" placeholder="/dev/shm/omnicortex">
 <div id="scratchInfo" class="status">Scratch not checked.</div></section>
 <section class="card"><h2>Evaluation + pruning</h2>
 <label>Baseline score (0–1)</label><input id="baseline" type="number" min="0" max="1" step="0.001" placeholder="0.80">
@@ -127,8 +127,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--host',default='127.0.0.1');ap.add_argument('--port',type=int,default=8797);ap.add_argument('--allow-unauthenticated',action='store_true',help='permit a non-loopback bind (no auth)');a=ap.parse_args()
-    import ns_security as sec; sec.loopback_only(a.host,'the Scale Sweep Lab',a.allow_unauthenticated)
-    s=ThreadingHTTPServer((a.host,a.port),Handler);print(f'NeuronScope Scale Sweep Lab: http://{a.host}:{a.port}')
+    import oc_security as sec; sec.loopback_only(a.host,'the Scale Sweep Lab',a.allow_unauthenticated)
+    s=ThreadingHTTPServer((a.host,a.port),Handler);print(f'OmniCortex Scale Sweep Lab: http://{a.host}:{a.port}')
     try:s.serve_forever()
     except KeyboardInterrupt:pass
     finally:s.server_close()

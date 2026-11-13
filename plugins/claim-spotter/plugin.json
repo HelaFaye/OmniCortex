@@ -1,0 +1,20 @@
+{
+  "name": "claim-spotter",
+  "version": "1.0",
+  "author": "OmniCortex",
+  "description": "Marks the checkable claims in a reply (numbers, dates, years, quotations) so you know what to verify, and collects them from saved chats into a CSV.",
+  "checks": [
+    {"name": "claims", "title": "Claims to verify", "script": "check.py", "auto": false,
+     "help": "numbers, dates and quotations: the parts of a reply most often hallucinated with confidence"}
+  ],
+  "jobs": [
+    {"kind": "collect", "title": "Collect claims from saved chats", "script": "collect.py",
+     "help": "Every number, date and quotation in the assistant's replies, with the question, as a CSV to fact-check.",
+     "fields": [
+       {"name": "chats", "required": true, "help": "Studio's chats folder (Settings → Workspaces shows it)"},
+       {"name": "out", "required": true, "help": "CSV file to write"},
+       {"name": "model", "help": "only replies from this model"}
+     ]}
+  ],
+  "page": "page"
+}

@@ -603,7 +603,7 @@ def main(argv=None) -> int:
     p.add_argument("--unknown", choices=["abstain", "skip", "teach"], default="abstain",
                    help="facts the model does not know: train a decline (default), leave out, or teach the answer")
     p.add_argument("--review-model", help="a model in the neuron review: write focus_layers into plan.json")
-    p.add_argument("--review-dir", help="neuron review folder (default $NS_REVIEW_DIR or ~/.neuronscope/review)")
+    p.add_argument("--review-dir", help="neuron review folder (default $OC_REVIEW_DIR or ~/.omnicortex/review)")
     p.add_argument("--focus-top", type=int, default=8, help="how many focus layers (default 8)")
     p.add_argument("--allow-exec", action="store_true", help="run code to verify code targets and variations")
     p.add_argument("--sandbox", choices=["none", "docker", "podman"], default="none",

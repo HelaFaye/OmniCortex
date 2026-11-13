@@ -24,6 +24,7 @@ points those read better than a glow would anyway.
 """
 
 import argparse
+import glob
 import json
 import os
 import sys
@@ -41,6 +42,17 @@ _THEME_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 with open(_THEME_PATH) as _f:
     # Keys starting with "_" (the UI palette) are not viewer themes.
     THEMES = {k: v for k, v in json.load(_f).items() if not k.startswith("_")}
+# Theme add-ons (plugins/*/plugin.json with "themes": a file like this one), bundled or installed, add more.
+for _d in (os.path.join(os.path.dirname(_THEME_PATH), "..", "plugins"), os.path.expanduser("~/.omnicortex/plugins")):
+    for _m in sorted(glob.glob(os.path.join(_d, "*", "plugin.json"))):
+        try:
+            with open(_m) as _f:
+                _rel = json.load(_f).get("themes")
+            if _rel and ".." not in _rel and not os.path.isabs(_rel):
+                with open(os.path.join(os.path.dirname(_m), _rel)) as _f:
+                    THEMES.update({k: v for k, v in json.load(_f).items() if not k.startswith("_") and k not in THEMES})
+        except (OSError, ValueError):
+            pass
 
 
 def add_flag_args(p):

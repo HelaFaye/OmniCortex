@@ -21,3 +21,10 @@ env.local.sh
 *.token
 ns-key.pem
 .vscode/settings.json
+
+# CI build output
+/dist/
+/build/
+.godot/
+.test-cache/
+.test-cache-key

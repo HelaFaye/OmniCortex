@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Godot client</title>
+<style>
+:root{color-scheme:dark light}*{box-sizing:border-box}
+body{margin:0;font:14px/1.55 ui-sans-serif,system-ui;background:var(--bg,#151514);color:var(--fg,#ececea)}
+main{max-width:900px;margin:0 auto;padding:1.2rem 16px 3rem}h1{font-size:20px;margin:.2rem 0}h2{font-size:15px;margin:1.2rem 0 .3rem}
+.card{background:var(--panel,#1d1d1b);border:1px solid var(--line,#33332f);border-radius:12px;padding:1rem;margin:.8rem 0}
+.note{color:var(--mut,#9a9a94);font-size:13px}a{color:var(--acc,#6f93ff)}
+a.btn{display:inline-block;border:1px solid var(--line,#33332f);border-radius:8px;padding:.4rem .8rem;text-decoration:none;color:inherit;margin:.2rem .3rem .2rem 0}
+a.pri{background:var(--acc,#6f93ff);color:#0b0b0a;border-color:var(--acc,#6f93ff)}
+code{background:var(--code,#262624);padding:0 .3rem;border-radius:4px}
+</style>
+<main>
+<h1>Godot client</h1>
+<p class="note">All of Studio as a native app, with its own 3D view of activations: orbit, pan, zoom and preset views from a Blender-style gizmo, the emotion graph and jewel, and a search line, all fixed to the screen however you move. It runs best on a different computer from the one with the models, so drawing never takes GPU memory from them.</p>
+<div class="card"><h2>On this computer</h2>
+  <a class="btn pri" href="/jobs#kind=plugin:godot-client:get_godot" target="_top">1. Get Godot</a>
+  <a class="btn" href="/jobs#kind=plugin:godot-client:open" target="_top">2. Open the client</a>
+  <p class="note">Get Godot downloads Godot 4 from the Godot project's releases and checks it against their SHA-512 list. Or run <code>./omnicortex godot</code>.</p></div>
+<div class="card"><h2>On another computer</h2>
+  <a class="btn pri" href="download/omnicortex-godot.zip">Download the client (.zip)</a>
+  <p class="note">Unzip it, install <a href="https://godotengine.org/download" target="_blank" rel="noopener">Godot 4</a>, and run <code>godot --path omnicortex-godot</code>. Under Connect, enter this Studio's address; on another computer, pair it with a link from Connect → Devices instead of copying the owner token.</p></div>
+</main>
+<script>try{ const v=JSON.parse(localStorage.getItem('ns-theme-vars')||'{}'); for(const k in v) document.documentElement.style.setProperty('--'+k,v[k]); }catch(e){}</script>

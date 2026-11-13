@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-import ns_security as sec  # noqa: E402
-import ns_transfer as nt  # noqa: E402
+import oc_security as sec  # noqa: E402
+import oc_transfer as nt  # noqa: E402
 
 
 def test_generated_token_is_256_bits():
@@ -73,6 +73,24 @@ def test_throttle_locks_out():
     for _ in range(3):
         t.fail("a")
     assert t.blocked("a") and not t.blocked("b")
+
+
+def test_failure_throttle_bounds_peer_state():
+    throttle = sec.FailureThrottle(max_failures=2, max_addresses=3, gc_interval=1)
+    for addr in ("192.0.2.1", "192.0.2.2", "192.0.2.3", "192.0.2.4", "192.0.2.5"):
+        throttle.fail(addr)
+    assert len(set(throttle._fails) | set(throttle._locked)) <= 3
+
+
+def test_failure_throttle_prunes_expired_entries(monkeypatch):
+    now = [100.0]
+    monkeypatch.setattr(sec.time, "monotonic", lambda: now[0])
+    throttle = sec.FailureThrottle(max_failures=2, window=10, lockout=20, gc_interval=1)
+    throttle.fail("192.0.2.10")
+    assert "192.0.2.10" in throttle._fails
+    now[0] = 120.0
+    assert not throttle.blocked("192.0.2.10")
+    assert "192.0.2.10" not in throttle._fails
 
 
 def _server(tmp, token):
@@ -146,10 +164,10 @@ def test_tls_roundtrip(tmp_path):
 
 
 def test_mcp_never_puts_token_in_state_or_argv(tmp_path, monkeypatch):
-    monkeypatch.setenv("NS_CONFIG_DIR", str(tmp_path))
-    monkeypatch.setenv("NS_TRANSFER_MCP_STATE", str(tmp_path / "state.json"))
+    monkeypatch.setenv("OC_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setenv("OC_TRANSFER_MCP_STATE", str(tmp_path / "state.json"))
     import importlib
-    import ns_transfer_mcp as m
+    import oc_transfer_mcp as m
     m = importlib.reload(m)
     monkeypatch.setattr(m, "_keyring", lambda: None)
     # Legacy state with an inline token is migrated out on load.

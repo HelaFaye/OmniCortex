@@ -1,9 +1,9 @@
 """Studio's /remote page: the computers this Studio controls that run models but
-not NeuronScope (LM Studio, Ollama, llama.cpp with the NeuronScope Remote agent).
+not OmniCortex (LM Studio, Ollama, llama.cpp with the OmniCortex Remote agent).
 This Studio is the controller; those computers are hosts."""
 
 PAGE = r"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Studio Remote</title><script>try{document.documentElement.dataset.theme=localStorage.getItem('ns-theme')||'dark'}catch{document.documentElement.dataset.theme='dark'}</script>
+<title>Studio Remote Hosts</title><script>try{const d=document.documentElement,t=localStorage.getItem('ns-theme')||'dark';d.dataset.theme=localStorage.getItem('ns-theme-base')||(t==='light'?'light':'dark');const v=JSON.parse(localStorage.getItem('ns-theme-vars')||'{}');for(const k in v)d.style.setProperty('--'+k,v[k])}catch{document.documentElement.dataset.theme='dark'}</script>
 <style>
 :root{--bg:#fafaf9;--panel:#fff;--fg:#1c1c1a;--mut:#6b6b66;--line:#e4e4df;--acc:#2d5bd7;--accfg:#fff;--ok:#1f8a4c;--no:#c0392b;--warn:#a8701c;--code:#f3f3f0;--soft:#eef2fc}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#151514;--panel:#1d1d1b;--fg:#ececea;--mut:#9a9a94;--line:#33332f;--acc:#6f93ff;--accfg:#0b0b0a;--ok:#4cc27e;--no:#ff7a6b;--warn:#e7b65c;--code:#262624;--soft:#1f2433}}
@@ -40,14 +40,14 @@ code,.code{font:12px ui-monospace,monospace;background:var(--code);padding:.05re
 .os{display:flex;gap:.3rem;margin:.3rem 0}.os button{padding:.2rem .6rem;font-size:12px}.os button.on{border-color:var(--acc);color:var(--acc)}
 pre{font:12px ui-monospace,monospace;background:var(--code);padding:.5rem .6rem;border-radius:6px;white-space:pre-wrap;word-break:break-all;margin:.3rem 0}
 </style>
-<header><h1>Studio · Remote</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/remote">Remote</a><a href="/link">Link (Studio to Studio)</a><a href="/connect">Connect</a><a href="/jobs">Jobs</a></header>
+<header><h1>Studio · Remote hosts</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/remote">Remote</a><a href="/link">Link (Studio to Studio)</a><a href="/connect">Connect</a><a href="/jobs">Jobs</a></header>
 <main>
 <section class="card"><div class="roles">
- <div class="role me"><b>This computer: CONTROLLER</b><div class="note">NeuronScope Studio. It decides what runs where, and sends the instructions.</div><div class="note" id="meAddr"></div></div>
+ <div class="role me"><b>This computer: CONTROLLER</b><div class="note">OmniCortex Studio. It decides what runs where, and sends the instructions.</div><div class="note" id="meAddr"></div></div>
  <div class="arrow">→</div>
- <div class="role"><b>Hosts: <span id="hostCount">0</span></b><div class="note">Computers that run the models (LM Studio, Ollama, llama.cpp) with the small NeuronScope Remote agent. They do what this Studio asks, within what their owner allows, and can revoke it at any time.</div></div>
+ <div class="role"><b>Hosts: <span id="hostCount">0</span></b><div class="note">Computers that run the models (LM Studio, Ollama, llama.cpp) with the small OmniCortex Remote agent. They do what this Studio asks, within what their owner allows, and can revoke it at any time.</div></div>
 </div>
-<div class="note" style="margin-top:.5rem">The other computer runs NeuronScope Studio itself? Use <a href="/link">Link</a> instead. Any MCP client (Claude Desktop, Cline…) can control a host too: see the agent's README.</div></section>
+<div class="note" style="margin-top:.5rem">The other computer runs OmniCortex Studio itself? Use <a href="/link">Link</a> instead. Any MCP client (Claude Desktop, Cline…) can control a host too: see the agent's README.</div></section>
 
 <section class="card" id="hosts"><div class="row"><h2 class="grow">Your hosts</h2><button id="refresh">Refresh</button></div><div id="hostList" class="note">loading…</div><div id="sends"></div></section>
 
@@ -55,7 +55,7 @@ pre{font:12px ui-monospace,monospace;background:var(--code);padding:.5rem .6rem;
 <div class="row" style="margin-bottom:.6rem"><input id="quick" class="grow" placeholder="Shortcut: paste the host's pairing link (nsr://…) here"><button class="pri" id="quickGo">Pair</button></div>
 <div class="steps">
 <div class="step on"><h3>1. Put the agent on the host</h3>
- <div class="row"><a href="/remote/download"><button class="pri">Download NeuronScope Remote (.zip)</button></a><span class="note">Python 3.9 or newer on the host; nothing else to install.</span></div>
+ <div class="row"><a href="/remote/download"><button class="pri">Download OmniCortex Remote (.zip)</button></a><span class="note">Python 3.9 or newer on the host; nothing else to install.</span></div>
  <div class="os" id="os"><button data-os="win" class="on">Windows</button><button data-os="mac">macOS</button><button data-os="linux">Linux</button><button data-os="pip">pip</button></div>
  <pre id="osCmd"></pre>
  <div class="note">It starts with a console in the browser on the host, where its owner chooses how controllers reach it, sees a pairing code, and allows or revokes what controllers may do.</div></div>
@@ -70,10 +70,10 @@ const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=
 const post=async(u,b)=>{ const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})}); const j=await r.json().catch(()=>({error:'HTTP '+r.status})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; };
 const gb=n=>n==null?'':(n/2**30).toFixed(n>2**30*10?0:1)+' GB';
 let S=null, method=null, open=new Set();
-const OS={win:'Unzip neuronscope-remote.zip, then double-click\n  neuronscope-remote\\NeuronScope Remote.bat\n(Python from python.org or the Microsoft Store; tick "Add to PATH")',
- mac:'unzip neuronscope-remote.zip && cd neuronscope-remote\n./neuronscope-remote.sh',
- linux:'unzip neuronscope-remote.zip && cd neuronscope-remote\n./neuronscope-remote.sh',
- pip:'pip install ./neuronscope-remote          # or: pipx install ./neuronscope-remote\nneuronscope-remote                          # add [tls] for certificates without openssl'};
+const OS={win:'Unzip omnicortex-remote.zip, then double-click\n  omnicortex-remote\\OmniCortex Remote.bat\n(Python from python.org or the Microsoft Store; tick "Add to PATH")',
+ mac:'unzip omnicortex-remote.zip && cd omnicortex-remote\n./omnicortex-remote.sh',
+ linux:'unzip omnicortex-remote.zip && cd omnicortex-remote\n./omnicortex-remote.sh',
+ pip:'pip install ./omnicortex-remote          # or: pipx install ./omnicortex-remote\nomnicortex-remote                          # add [tls] for certificates without openssl'};
 document.querySelectorAll('#os button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#os button').forEach(x=>x.classList.toggle('on',x===b)); $('#osCmd').textContent=OS[b.dataset.os]; });
 $('#osCmd').textContent=OS.win;
 const METHODS=[
@@ -124,7 +124,7 @@ async function invite(){ try{ const j=await post('/api/remote/invite',{url:$('#f
  }catch(e){ $('#inv').innerHTML='<span class="err">'+esc(e.message)+'</span>'; } }
 $('#quickGo').onclick=()=>{ const v=$('#quick').value.trim(); if(!v) return; method=v.startsWith('nsr://')&&/s=https/.test(v)?'lan':'vpn'; pair({link:v}); };
 function linkCell(h){ const how={lan:'same network',vpn:'VPN',ssh:'SSH '+(h.ssh||''),tunnel:'public tunnel',callhome:'calls in'}[h.method]||h.method;
-  return `<span class="pill">${esc(how)}</span> ${h.method==='callhome'?(h.online?'<span class="on-line">● connected</span>':'<span class="off-line">● not connected</span>'):'<code>'+esc(h.url)+'</code>'}${h.pinned?` <span class="pill" title="certificate pinned at pairing">🔒 ${esc(h.short_fingerprint)}</span>`:''}`; }
+  return `<span class="pill">${esc(how)}</span> ${h.method==='callhome'?(h.online?'<span class="on-line">● connected</span>':'<span class="off-line">● not connected</span>')+(h.last_seen!=null?` <span style="color:var(--mut)" title="the host checks in at least every 25 s">seen ${h.last_seen<60?h.last_seen+' s':Math.round(h.last_seen/60)+' min'} ago</span>`:'')+(h.agent_version?` <span style="color:var(--mut)">agent ${esc(h.agent_version)}</span>`:''):'<code>'+esc(h.url)+'</code>'}${h.pinned?` <span class="pill" title="certificate pinned at pairing">🔒 ${esc(h.short_fingerprint)}</span>`:''}`; }
 function render(){ $('#hostCount').textContent=S.hosts.length; const st=S.studio;
   $('#meAddr').innerHTML=`${esc(st.url)} · ${st.network?'reachable from the network':'this computer only'}${st.tls?' · TLS':''}`;
   $('#hostList').innerHTML=S.hosts.length?S.hosts.map((h,i)=>`<div class="host ${open.has(h.name)?'open':''}" data-h="${esc(h.name)}">
@@ -143,8 +143,9 @@ async function detail(h,i){ const el=$('#d'+i); if(!el) return;
   const out=$('#o'+i), call=(tool,args)=>post('/api/remote/call',{host:h.name,tool,args});
   el.querySelectorAll('[data-act]').forEach(b=>b.onclick=async()=>{ const a=b.dataset.act; out.textContent='…';
    try{
-    if(a==='info'){ const r=await call('host_info',{}); out.innerHTML=`<table><tr><td>name</td><td>${esc(r.name)} <span class="pill">role: ${esc(r.role)}</span> <span class="pill">this Studio: ${esc(r.you_are)}</span></td></tr><tr><td>system</td><td>${esc(r.os)} · ${esc(r.cpus)} CPUs · ${esc(r.ram_gb)} GB RAM</td></tr><tr><td>GPUs</td><td>${r.gpus.length?r.gpus.map(g=>esc(g.name)+' '+Math.round(g.vram_mb/1024)+' GB').join(', '):'none reported'}</td></tr><tr><td>LLM servers</td><td>${r.backends.map(b=>esc(b.kind)+' <code>'+esc(b.url)+'</code>').join('<br>')||'<span class="err">none running</span>'}</td></tr><tr><td>models folder</td><td><code>${esc(r.models_dir||'-')}</code></td></tr><tr><td>incoming</td><td><code>${esc(r.incoming_dir)}</code> (${esc(r.incoming_free_gb)} GB free)</td></tr><tr><td>allowed</td><td>${Object.entries(r.allowed).map(([k,v])=>`<span class="pill" style="color:var(--${v?'ok':'no'})">${esc(k)}</span>`).join(' ')}</td></tr><tr><td>agent</td><td>${esc(r.agent)} · link ${esc(r.link)}</td></tr></table>`; }
-    if(a==='models'){ const r=await call('list_models',{}); out.innerHTML='<table><tr><th>model</th><th>server</th><th>state</th><th></th></tr>'+r.models.map(m=>m.error?`<tr><td colspan=4 class="err">${esc(m.backend)}: ${esc(m.error)}</td></tr>`:`<tr><td>${esc(m.id)}</td><td>${esc(m.backend)}</td><td>${m.loaded===true?'loaded':m.loaded===false?'not loaded':''}</td><td><button data-l="${esc(m.id)}">Load</button> <button data-u="${esc(m.id)}">Unload</button></td></tr>`).join('')+'</table>';
+    if(a==='info'){ const r=await call('host_info',{}); out.innerHTML=`<table><tr><td>name</td><td>${esc(r.name)} <span class="pill">role: ${esc(r.role)}</span> <span class="pill">this Studio: ${esc(r.you_are)}</span></td></tr><tr><td>system</td><td>${esc(r.os)} · ${esc(r.cpus)} CPUs · ${esc(r.ram_gb)} GB RAM</td></tr><tr><td>GPUs</td><td>${r.gpus.length?r.gpus.map(g=>esc(g.name)+' '+Math.round(g.vram_mb/1024)+' GB').join(', '):'none reported'}</td></tr><tr><td>LLM servers</td><td>${r.backends.map(b=>esc(b.kind)+' <code>'+esc(b.url)+'</code>').join('<br>')||'<span class="err">none running</span>'}</td></tr><tr><td>models folder</td><td><code>${esc(r.models_dir||'-')}</code></td></tr><tr><td>incoming</td><td><code>${esc(r.incoming_dir)}</code> (${esc(r.incoming_free_gb)} GB free)</td></tr><tr><td>allowed</td><td>${Object.entries(r.allowed).map(([k,v])=>`<span class="pill" style="color:var(--${v?'ok':'no'})">${esc(k)}</span>`).join(' ')}</td></tr><tr><td>agent</td><td>${esc(r.agent)} · link ${esc(r.link)}</td></tr><tr><td>tracer</td><td>${r.tracer&&r.tracer.available?'OmniCortex tracer ready: 3D checks of its models can run there':'<span class="note">none: 3D checks need the same model file on this computer, or OmniCortex and llama-cett-dump on the host</span>'}</td></tr></table>`; }
+    if(a==='models'){ const r=await call('list_models',{}); out.innerHTML='<table><tr><th>model</th><th>server</th><th>state</th><th></th></tr>'+r.models.map(m=>m.error?`<tr><td colspan=4 class="err">${esc(m.backend)}: ${esc(m.error)}</td></tr>`:`<tr><td>${esc(m.id)}</td><td>${esc(m.backend)}</td><td>${m.loaded===true?'loaded':m.loaded===false?'not loaded':''}</td><td><button data-l="${esc(m.id)}">Load</button> <button data-u="${esc(m.id)}">Unload</button> <button data-c="${esc(m.id)}" title="the H-Neuron classifier used when you check this model's replies (3D view)">Classifier…</button></td></tr>`).join('')+'</table>';
+      out.querySelectorAll('[data-c]').forEach(x=>x.onclick=async()=>{ const p=prompt('Classifier (.npz) on this computer for '+x.dataset.c+' (empty to clear). Without one, a local copy of the same file lends its classifier.'); if(p===null) return; try{ await post('/api/remote/classifier',{host:h.name,model:x.dataset.c,classifier:p.trim()}); x.textContent=p.trim()?'Classifier set':'Classifier…'; }catch(e){ x.insertAdjacentHTML('afterend',' <span class="err">'+esc(e.message)+'</span>'); } });
       out.querySelectorAll('[data-l],[data-u]').forEach(x=>x.onclick=async()=>{ x.disabled=true; try{ await call(x.dataset.l?'load_model':'unload_model',{model:x.dataset.l||x.dataset.u}); x.textContent='done'; }catch(e){ x.insertAdjacentHTML('afterend',' <span class="err">'+esc(e.message)+'</span>'); } }); }
     if(a==='ask'){ const r=await call('chat',{model:$('#qm'+i).value,messages:[{role:'user',content:$('#q'+i).value}],max_tokens:512}); out.innerHTML=`<pre>${esc(r.reply)}</pre><span class="note">${esc(r.model)} on ${esc(r.backend)}</span>`; }
     if(a==='send'){ const r=await post('/api/remote/send',{host:h.name,path:$('#snd'+i).value,install:$('#ins'+i).checked}); out.textContent='Sending in the background; progress below.'; load(); }

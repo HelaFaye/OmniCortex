@@ -4,17 +4,17 @@ Three GUIs plus CLIs for turning an H-Neuron profile into shipped GGUFs. None of
 
 ## Quantization Lab
 
-A **capability-preserving quantization layer** without changing NeuronScope's H-Neuron intervention semantics and without adding an SFT/training system.
+A **capability-preserving quantization layer** without changing OmniCortex's H-Neuron intervention semantics and without adding an SFT/training system.
 
 ### What it does
 
 1. Builds a deterministic calibration corpus from one or more weighted text sets.
 2. Computes a llama.cpp importance matrix (`llama-imatrix`).
-3. Reads NeuronScope H-Neuron profiles and converts their layer-level concentration into protection scores.
+3. Reads OmniCortex H-Neuron profiles and converts their layer-level concentration into protection scores.
 4. Selects the highest-scoring decoder layers under a protection budget.
 5. Uses `llama-quantize --imatrix` plus `--tensor-type` to quantize normal tensors at the base level and selected FFN down-projection tensors at a higher precision.
 6. Builds in RAM (`/dev/shm`) when enough tmpfs space exists, otherwise falls back to disk scratch unless RAM-only mode was requested.
-7. Copies the completed GGUF to the destination atomically and writes a `.neuronscope.json` build manifest containing source/output hashes, profiles, calibration, plan and commands.
+7. Copies the completed GGUF to the destination atomically and writes a `.omnicortex.json` build manifest containing source/output hashes, profiles, calibration, plan and commands.
 
 The first implementation deliberately protects **whole FFN down tensors per selected layer**, because the normal llama.cpp quantizer exposes tensor-level type overrides rather than arbitrary per-neuron bit allocation. Future work can replace this planner with finer-grained block/channel allocation without changing the GUI or build manifest format.
 
@@ -65,7 +65,7 @@ The GUI exposes source/target quants, weighted capability profiles, weighted cal
 
 ## Scale Sweep Lab
 
-The Scale Sweep Lab builds static GGUF variants from a NeuronScope H-Neuron profile.
+The Scale Sweep Lab builds static GGUF variants from a OmniCortex H-Neuron profile.
 It treats the same scale operation as a symmetric control:
 
 - `0 < scale < 1`: suppression
@@ -88,10 +88,10 @@ The GUI visualizes the H-Neuron activation/selection footprint by layer and the 
 
 The optional evaluator command receives these environment variables and formatting fields:
 
-- `NS_MODEL` / `{model}` — candidate GGUF path
-- `NS_SCALE` / `{scale}` — scale used
-- `NS_BASELINE` / `{baseline}` — baseline score if supplied
-- `NS_PROFILE` / `{profile}` — H-Neuron profile path
+- `OC_MODEL` / `{model}` — candidate GGUF path
+- `OC_SCALE` / `{scale}` — scale used
+- `OC_BASELINE` / `{baseline}` — baseline score if supplied
+- `OC_PROFILE` / `{profile}` — H-Neuron profile path
 
 It must print JSON containing either `score` in `[0,1]` or `correct` + `total`.
 
@@ -174,13 +174,13 @@ Start this on the machine that actually has the LLM/GGUF:
 python scripts/tuning_worker.py \
   --host 0.0.0.0 \
   --port 8799 \
-  --root /models/neuronscope-tuning \
+  --root /models/omnicortex-tuning \
   --source /models/model.Q6_K.gguf \
   --profile /models/h_neurons.json \
-  --suppressor /opt/neuronscope/scripts/suppress_gguf.py \
+  --suppressor /opt/omnicortex/scripts/suppress_gguf.py \
   --evaluator 'python /opt/evaluators/my_eval.py --model "{model}" --scale "{scale}"' \
   --workers 1 \
-  --token-file ~/.config/neuronscope/worker.token \
+  --token-file ~/.config/omnicortex/worker.token \
   --tls-cert ns-cert.pem --tls-key ns-key.pem
 ```
 
@@ -199,7 +199,7 @@ python scripts/adaptive_tuner.py tune \
   --batch-size 3 \
   --margin-of-error 0.02 \
   --baseline-score 0.91 \
-  --token-file ~/.config/neuronscope/worker.token \
+  --token-file ~/.config/omnicortex/worker.token \
   --auto-delete
 ```
 
@@ -249,7 +249,7 @@ over Tailscale), score each candidate there, where it will be used. The
 tuner writes candidates locally, the transfer watcher carries each one
 over as it appears, and `scripts/eval_lmstudio.py` is the evaluator:
 
-1. Start the watcher on the folder the candidates go to: `ns_transfer.py
+1. Start the watcher on the folder the candidates go to: `oc_transfer.py
    watch`, or the transfer MCP's `start_watch`. Point its destination at a
    folder **inside LM Studio's models folder**, two levels deep
    (`<models>/<publisher>/<name>/`), or LM Studio will not list the files.

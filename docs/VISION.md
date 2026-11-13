@@ -93,6 +93,48 @@ or confidence AUROC without a large accuracy loss. As with text models,
 suppression trades confident errors for low-confidence ones; it does not add
 knowledge. Measure on held-out images, never on the training split.
 
+## Pixel art and cartoons
+
+CLIP learned mostly from photos, and its processor treats every image like
+one. Pixel art usually arrives already enlarged into hard square blocks, and
+the processor resizes those blocks, whose sharp edges look nothing like a
+photo. It also centre-crops, which cuts off the edges of wide or tall art.
+`--style` fixes the input side without retraining (`scripts/clip_style.py`):
+
+| style | what happens |
+|---|---|
+| `off` (default) | the processor's own resize and crop |
+| `pixel` | finds the art's own pixel grid (sprites are often shared already scaled by 2, 3 or 4) and shrinks back to it; pads to a square with the background colour; scales up smoothly (bicubic) from that grid to the model's input size |
+| `cartoon` | pads to a square instead of cropping |
+| `auto` | `pixel` for images with few colours and long runs of identical pixels, `cartoon` for flat-colour images, nothing for photos |
+
+The text side gets style prompts as well: "pixel art of a {}", "a 16-bit
+sprite of a {}", "a cartoon of a {}" and similar, averaged with the photo
+templates. `collect` records the style in `run.json`, and `extract` and
+`evaluate` reuse it unless told otherwise. `clip_bench.py eval --style`
+measures whether it helps on your images. Compare `off` and `auto` on the
+same set before you rely on it.
+
+What it did on one test (CLIP ViT-B/32, zero-shot, 1,000 CIFAR-10 test
+images, and the same images as 16-colour pixel art shipped at 4×):
+
+| | photos (32 px) | pixel art (128 px) |
+|---|---|---|
+| off | 0.908 | 0.495 |
+| style prompts only | 0.907 | 0.519 |
+| recovered grid, nearest neighbour | | 0.507 |
+| recovered grid, bicubic | 0.908 | 0.727 |
+| `auto` (grid, bicubic and prompts) | 0.907 | **0.750** |
+
+Recovering the grid matters, and so does enlarging it *smoothly*. Hard
+edges from nearest neighbour gained nothing. These are pixelated photos
+rather than drawn sprites, so check on your own art.
+
+```bash
+python scripts/clip_style.py inspect sprite.png --out sprite-224.png   # what auto sees, and the result
+python scripts/clip_neurons.py collect --model openai/clip-vit-base-patch32 --images data/sprites --style auto --out runs/clip-sprites
+```
+
 ## Benchmark it
 
 For standard numbers (ImageNetV2, ImageNet-Sketch, VTAB and the rest of CLIP_benchmark) at each suppression scale, see [BENCHMARKS.md](BENCHMARKS.md#clip_benchmark-imagenetv2-imagenet-sketch-vtab-).

@@ -1,0 +1,47 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "nvidia-modern-sm75",
+ "title": "NVIDIA Turing and newer (compute 7.5+)",
+ "era": "modern",
+ "examples": [
+  "RTX 2060\u20135090",
+  "T4",
+  "A100",
+  "L40S",
+  "H100"
+ ],
+ "match": {
+  "vendor": "nvidia",
+  "compute_min": 7.5
+ },
+ "purposes": {
+  "inference": {
+   "summary": "llama.cpp with CUDA (12.8 or 13), flash attention on.",
+   "llama": {
+    "backend": "cuda",
+    "cuda_arch": "",
+    "cmake": "",
+    "toolkit": "CUDA 12.8 or newer"
+   },
+   "engine": {
+    "flash_attn": "on"
+   }
+  },
+  "retraining": {
+   "summary": "PyTorch from the CUDA 12.8 wheels; bfloat16 on Ampere and newer, QLoRA with bitsandbytes.",
+   "torch": {
+    "spec": "torch",
+    "index": "https://download.pytorch.org/whl/cu128"
+   },
+   "training": {
+    "dtype": "bfloat16",
+    "quantized_base": true,
+    "method": "qlora"
+   },
+   "notes": "Turing (RTX 20xx, T4) has no bfloat16: use float16 there."
+  }
+ },
+ "notes": "",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

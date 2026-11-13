@@ -2,6 +2,7 @@
 """Stand-in for llama-server in tests: same CLI shape, same HTTP surface."""
 import argparse
 import json
+import math
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 p = argparse.ArgumentParser()
@@ -43,6 +44,8 @@ class H(BaseHTTPRequestHandler):
                     v[int(hashlib.md5(w.encode()).hexdigest(), 16) % 64] += 1.0
                 out.append({"index": i, "embedding": v})
             return self._send({"data": out, "model": a.alias})
+        if self.path == "/tokenize":
+            return self._send({"tokens": list(range(len(body.get("content", "").split())))})   # one per word
         msgs = body.get("messages", [])
         if body.get("tools") and body.get("stream") and (not msgs or msgs[-1].get("role") != "tool"):
             # call the first tool named like *__add, the way llama-server streams tool calls
@@ -65,17 +68,39 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(f"data: {json.dumps({'choices': [{'delta': {'content': text}}]})}\n\ndata: [DONE]\n\n".encode())
             return
+        user_last = next((m.get("content") for m in reversed(msgs) if m.get("role") == "user"), "")
+        if user_last == "loop please" and body.get("stream"):
+            # a reply that loops; resumed (a trailing assistant message), it finishes and shows what it was sent
+            resumed = msgs and msgs[-1].get("role") == "assistant"
+            pieces = ([f" Done. bias={json.dumps(body.get('logit_bias'))} dry={body.get('dry_multiplier')}"] if resumed
+                      else ["Start. "] + ["again and again. "] * 12)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for piece in pieces:
+                self.wfile.write(f"data: {json.dumps({'choices': [{'delta': {'content': piece}}]})}\n\n".encode())
+            self.wfile.write(b"data: [DONE]\n\n")
+            return
         has_img = any(isinstance(m.get("content"), list) for m in msgs)
         ctx = any(m.get("role") == "system" and "[1] (" in str(m.get("content")) for m in body.get("messages", []))
         text = f"model={a.alias} mmproj={'yes' if a.mmproj else 'no'} image={'yes' if has_img else 'no'}"
         if ctx:
             text += " ctx=yes"
+        if any(m.get("role") == "system" and str(m.get("content")).startswith("Summary of the first") for m in msgs):
+            text += f" summary=yes turns={sum(1 for m in msgs if m.get('role') != 'system')}"
         if body.get("stream"):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.end_headers()
-            for piece in [text[:10], text[10:]]:
-                self.wfile.write(f"data: {json.dumps({'choices': [{'delta': {'content': piece}}]})}\n\n".encode())
+            for n, piece in enumerate([text[:10], text[10:]]):
+                ch = {"delta": {"content": piece}}
+                if body.get("logprobs"):
+                    # first piece certain, second spread over five candidates
+                    tops = ([{"token": piece, "logprob": -0.01}] if n == 0 else
+                            [{"token": piece, "logprob": math.log(0.2)}] * 5)
+                    ch["logprobs"] = {"content": [{"token": piece, "logprob": tops[0]["logprob"],
+                                                   "top_logprobs": tops[:body.get("top_logprobs", 5)]}]}
+                self.wfile.write(f"data: {json.dumps({'choices': [ch]})}\n\n".encode())
             final = {"choices": [{"delta": {}, "finish_reason": "stop"}],
                      "timings": {"predicted_n": 7, "predicted_per_second": 42.0}}
             self.wfile.write(f"data: {json.dumps(final)}\n\ndata: [DONE]\n\n".encode())

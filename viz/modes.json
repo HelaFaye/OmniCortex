@@ -1,5 +1,5 @@
 {
-  "_comment": "The mode registry. Every NeuronScope surface renders its tabs from this file, so a new mode is an entry here rather than a code change in four frontends. `surfaces` lists which frontends implement a mode; one that does not yet implement it shows the tab disabled rather than hiding it, so the navigation is the same everywhere and a missing feature is visible instead of silent.",
+  "_comment": "The mode registry. Every OmniCortex surface renders its tabs from this file, so a new mode is an entry here rather than a code change in four frontends. `surfaces` lists which frontends implement a mode; one that does not yet implement it shows the tab disabled rather than hiding it, so the navigation is the same everywhere and a missing feature is visible instead of silent.",
   "version": 1,
   "modes": [
     {

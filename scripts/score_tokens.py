@@ -36,7 +36,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import (CETTManager, build_sequence, find_think_end,  # noqa: E402
+from oc_common import (CETTManager, build_sequence, find_think_end,  # noqa: E402
                        load_model)
 
 
@@ -51,7 +51,13 @@ def parse_args():
     p.add_argument("--gpu_mem", default=None)
     p.add_argument("--cpu_mem", default="40GiB")
     p.add_argument("--out", default="report.html")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
+    p.add_argument("--capture", choices=CETTManager.MODES, default="auto",
+                   help="how activations leave the GPU (oc_common.CETTManager): auto, stream, device or sync")
     return p.parse_args()
 
 
@@ -59,7 +65,8 @@ def score_sequence(model, tokenizer, mgr, coef, intercept, question, response,
                    entry_device):
     full_ids, prompt_len = build_sequence(tokenizer, question, response)
     mgr.clear()
-    with torch.no_grad():
+    mgr.prepare(len(full_ids))
+    with torch.inference_mode():
         model(full_ids.unsqueeze(0).to(entry_device))
 
     cett = mgr.cett()                       # [L, T, N]
@@ -136,9 +143,9 @@ def main():
 
     model, tokenizer = load_model(
         args.model_path, args.gpu_mem, args.cpu_mem,
-        trust_remote_code=not args.no_trust_remote_code,
+        trust_remote_code=args.trust_remote_code,
     )
-    mgr = CETTManager(model)
+    mgr = CETTManager(model, capture=args.capture)
     entry_device = next(model.parameters()).device
     if mgr.n_layers * mgr.n_neurons != coef.shape[0]:
         raise SystemExit(
@@ -152,7 +159,8 @@ def main():
             [{"role": "user", "content": args.question}],
             add_generation_prompt=True, return_tensors="pt",
         ).to(entry_device)
-        with torch.no_grad():
+        mgr.pause()                         # nothing to capture while generating
+        with torch.inference_mode():
             gen = model.generate(ids, max_new_tokens=args.max_new_tokens,
                                  do_sample=True, temperature=0.6, top_p=0.95,
                                  pad_token_id=tokenizer.eos_token_id)

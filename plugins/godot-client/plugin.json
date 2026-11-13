@@ -1,0 +1,58 @@
+{
+  "name": "godot-client",
+  "version": "1.0",
+  "author": "OmniCortex",
+  "homepage": "https://godotengine.org",
+  "description": "The Godot client: all of Studio from another computer, with a native 3D view of activations, the emotion jewel and Blender-style navigation. Gets Godot for you, opens the client here, or gives you a download for another machine.",
+  "tab": {
+    "label": "Godot client",
+    "tip": "Studio and its 3D view as a native app (Godot)"
+  },
+  "page": "page",
+  "downloads": {
+    "omnicortex-godot.zip": "client"
+  },
+  "jobs": [
+    {
+      "kind": "get_godot",
+      "title": "Godot client: get Godot",
+      "script": "get_godot.py",
+      "help": "Download Godot 4 for this computer from the Godot project's GitHub releases, check it against the release's SHA-512 list, and keep it in ~/.omnicortex/godot.",
+      "fields": [
+        {
+          "name": "version",
+          "default": "4.7.2-stable",
+          "help": "a Godot release tag"
+        },
+        {
+          "name": "folder",
+          "default": "~/.omnicortex/godot"
+        }
+      ]
+    },
+    {
+      "kind": "open",
+      "title": "Godot client: open",
+      "script": "open.py",
+      "help": "Open the Godot client on this computer, connected to this Studio. It runs until you close it or cancel this job.",
+      "fields": [
+        {
+          "name": "studio",
+          "default": "http://127.0.0.1:7870",
+          "help": "the Studio to connect to"
+        },
+        {
+          "name": "tab",
+          "default": "",
+          "help": "open on a tab, e.g. 3D or Features"
+        },
+        {
+          "name": "godot",
+          "default": "",
+          "help": "Godot binary (empty: the one from 'get Godot', then godot4/godot on PATH)"
+        }
+      ]
+    }
+  ],
+  "default": true
+}

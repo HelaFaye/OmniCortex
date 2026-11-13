@@ -14,8 +14,8 @@ at runtime.
     python scripts/merge_export.py --base org/base-model --adapter runs/adapter \\
         --out runs/adapter-gguf --lora-gguf
 
-Uses llama.cpp's own converters from $NS_LLAMA (scripts/build_llama_tools.sh)
-and its llama-quantize. Writes a neuronscope-export.json next to the result.
+Uses llama.cpp's own converters from $OC_LLAMA (scripts/build_llama_tools.sh)
+and its llama-quantize. Writes a omnicortex-export.json next to the result.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from pathlib import Path
 
 
 def llama_dir(arg: str | None) -> Path:
-    d = Path(arg or os.environ.get("NS_LLAMA", "~/llama.cpp")).expanduser()
+    d = Path(arg or os.environ.get("OC_LLAMA", "~/llama.cpp")).expanduser()
     if not (d / "convert_hf_to_gguf.py").exists():
         raise SystemExit(f"no llama.cpp checkout at {d}; run scripts/build_llama_tools.sh or pass --llama")
     return d
@@ -42,12 +42,12 @@ def merge(base: str, adapter: str, out: Path, dtype: str, vision: bool = False) 
         from transformers import AutoModelForImageTextToText as Auto, AutoProcessor as Tok
     else:
         from transformers import AutoModelForCausalLM as Auto, AutoTokenizer as Tok
-    model = Auto.from_pretrained(base, dtype=getattr(torch, dtype))
+    model = Auto.from_pretrained(base, dtype=getattr(torch, dtype), trust_remote_code=False)
     model = PeftModel.from_pretrained(model, adapter).merge_and_unload()
     out.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(out, safe_serialization=True)
     tok_src = adapter if (Path(adapter) / "tokenizer_config.json").exists() else base
-    Tok.from_pretrained(tok_src).save_pretrained(out)
+    Tok.from_pretrained(tok_src, trust_remote_code=False).save_pretrained(out)
     # SentencePiece models: llama.cpp's converter prefers the original file.
     for name in ("tokenizer.model",):
         for src in (Path(base), Path(adapter)):
@@ -68,7 +68,7 @@ def main(argv=None) -> int:
     p.add_argument("--base", required=True, help="HF id or path of the base model the adapter was trained on")
     p.add_argument("--adapter", required=True)
     p.add_argument("--out", required=True)
-    p.add_argument("--llama", help="llama.cpp checkout (default $NS_LLAMA)")
+    p.add_argument("--llama", help="llama.cpp checkout (default $OC_LLAMA)")
     p.add_argument("--dtype", default="float16", choices=["float16", "bfloat16", "float32"])
     p.add_argument("--gguf", nargs="?", const="F16", metavar="QUANT",
                    help="also convert to GGUF; optional quant type such as Q4_K_M or Q8_0 (default F16)")
@@ -94,6 +94,7 @@ def main(argv=None) -> int:
             if not (merged / "tokenizer.model").exists() and (Path(a.base) / "tokenizer.model").exists():
                 shutil.copy(Path(a.base) / "tokenizer.model", merged / "tokenizer.model")
         meta["merged"] = str(merged)
+        out.mkdir(parents=True, exist_ok=True)
         if a.gguf:
             ll = llama_dir(a.llama)
             f16 = out / "model-f16.gguf"
@@ -116,7 +117,7 @@ def main(argv=None) -> int:
                     # llama.cpp converts projectors for the VLM families it serves (Gemma 3,
                     # Qwen-VL, SmolVLM, Pixtral, ...), not every HF layout.
                     meta["mmproj_error"] = (r.stderr or r.stdout).strip().splitlines()[-1][:500]
-    (out / "neuronscope-export.json").write_text(json.dumps(meta, indent=2))
+    (out / "omnicortex-export.json").write_text(json.dumps(meta, indent=2))
     print(json.dumps(meta, indent=2))
     if "mmproj_error" in meta:
         print("\nThe language model converted, but llama.cpp could not convert this projector:\n  "

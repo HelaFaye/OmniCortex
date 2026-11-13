@@ -1,0 +1,41 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "cpu-x86",
+ "title": "x86 CPU only",
+ "era": "any",
+ "examples": [
+  "any x86 CPU, with or without AVX2/AVX-512"
+ ],
+ "match": {
+  "backend_only": "cpu",
+  "machine": [
+   "x86_64",
+   "AMD64",
+   "i686",
+   "i386"
+  ]
+ },
+ "purposes": {
+  "general": {
+   "summary": "llama.cpp for the CPU, with the instruction sets this CPU has; PyTorch CPU wheels.",
+   "llama": {
+    "backend": "cpu",
+    "cmake": "",
+    "native": true
+   },
+   "torch": {
+    "spec": "torch",
+    "index": "https://download.pytorch.org/whl/cpu"
+   },
+   "training": {
+    "dtype": "float32",
+    "quantized_base": false,
+    "method": "lora"
+   },
+   "notes": "Small models (up to ~8B at Q4) are usable; activation methods that need no GPU are listed in docs/PIPELINE.md#without-cett-older-gpus-and-cpus."
+  }
+ },
+ "notes": "",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

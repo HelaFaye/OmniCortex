@@ -1,0 +1,143 @@
+{
+  "name": "pose",
+  "version": "0.2",
+  "author": "OmniCortex",
+  "description": "Video-to-pose with a kinematic deficit sieve: flags impossible joints, stages corrected/rejected pairs for review, and refines the pose model with DPO once enough are approved. Streams to engines over VMC or JSON; Godot and Blender clients show joint stress, and Blender bakes it into FBX vertex colours.",
+  "checks": [
+    {
+      "name": "staging",
+      "title": "Pose review backend",
+      "script": "check.py",
+      "auto": false,
+      "help": "used by the add-on's review page"
+    }
+  ],
+  "jobs": [
+    {
+      "kind": "extract",
+      "title": "Video or OpenPose output to pose frames",
+      "script": "extract.py",
+      "fields": [
+        {
+          "name": "video"
+        },
+        {
+          "name": "openpose"
+        },
+        {
+          "name": "frames_jsonl"
+        },
+        {
+          "name": "out",
+          "required": true
+        },
+        {
+          "name": "images"
+        },
+        {
+          "name": "landmarker"
+        },
+        {
+          "name": "people",
+          "kind": "int",
+          "default": 4
+        }
+      ]
+    },
+    {
+      "kind": "sieve",
+      "title": "Find impossible poses and stage pairs",
+      "script": "sieve.py",
+      "fields": [
+        {
+          "name": "frames",
+          "required": true
+        },
+        {
+          "name": "out",
+          "required": true
+        },
+        {
+          "name": "images"
+        },
+        {
+          "name": "model"
+        },
+        {
+          "name": "knee_limit",
+          "kind": "float",
+          "default": 10
+        }
+      ]
+    },
+    {
+      "kind": "stream",
+      "title": "Stream poses to an engine (VMC / JSON over UDP)",
+      "script": "stream.py",
+      "fields": [
+        {
+          "name": "frames",
+          "required": true
+        },
+        {
+          "name": "vmc"
+        },
+        {
+          "name": "json"
+        },
+        {
+          "name": "staging"
+        },
+        {
+          "name": "loop",
+          "kind": "bool"
+        },
+        {
+          "name": "follow",
+          "kind": "bool"
+        }
+      ]
+    },
+    {
+      "kind": "orchestrate",
+      "title": "Refine the pose model from approved pairs",
+      "script": "orchestrate.py",
+      "fields": [
+        {
+          "name": "staging",
+          "required": true
+        },
+        {
+          "name": "work",
+          "required": true
+        },
+        {
+          "name": "threshold",
+          "kind": "int",
+          "default": 50
+        },
+        {
+          "name": "model"
+        },
+        {
+          "name": "watch",
+          "kind": "bool"
+        },
+        {
+          "name": "promote"
+        },
+        {
+          "name": "gguf"
+        },
+        {
+          "name": "install"
+        }
+      ]
+    }
+  ],
+  "page": "page",
+  "downloads": {
+    "omnicortex-pose-godot.zip": "engine/godot",
+    "omnicortex_pose.zip": "engine/blender/omnicortex_pose"
+  }
+}

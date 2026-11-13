@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from adaptive_tuner import AdaptiveTuner, WorkerClient  # noqa: E402
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 
 STATE: dict = {}
 MAX_BODY = 64 * 1024
@@ -216,7 +216,7 @@ def main(argv=None):
     sec.loopback_only(a.host, "the Adaptive Tuning lab", a.allow_unauthenticated)
     threading.Thread(target=live_state, daemon=True).start()
     s = ThreadingHTTPServer((a.host, a.port), H)
-    print(f"NeuronScope Adaptive Tuning: http://{a.host}:{a.port}/")
+    print(f"OmniCortex Adaptive Tuning: http://{a.host}:{a.port}/")
     s.serve_forever()
 
 

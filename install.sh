@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installer for NeuronScope: creates ./venv with a PyTorch build that matches
+# Installer for OmniCortex: creates ./venv with a PyTorch build that matches
 # this machine, installs requirements, and smoke-tests the GPU.
 #
 #   NVIDIA (nvidia-smi present)  -> a CUDA wheel for the GPU's architecture:
@@ -178,16 +178,16 @@ install_launcher() {
   if [[ "$(uname -s)" == "Linux" ]]; then
     local apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
     mkdir -p "$apps"
-    cat > "$apps/neuronscope.desktop" <<DESKTOP
+    cat > "$apps/omnicortex.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
-Name=NeuronScope
+Name=OmniCortex
 Comment=Run, test and look inside local models
-Exec=$here/neuronscope
+Exec=$here/omnicortex
 Terminal=false
 Categories=Development;Science;
 DESKTOP
-    info "added NeuronScope to the app menu ($apps/neuronscope.desktop)"
+    info "added OmniCortex to the app menu ($apps/omnicortex.desktop)"
   fi
 }
 
@@ -205,7 +205,7 @@ if [[ "$MODE" == "none" ]]; then
 
 Done, without PyTorch.
 
-Start it from the app menu (NeuronScope), or:  ./neuronscope
+Start it from the app menu (OmniCortex), or:  ./omnicortex
 It opens Studio in your browser; the Setup page there takes care of the rest.
 Command line: source $VENV/bin/activate
 
@@ -299,7 +299,7 @@ fi
 # ---------------------------------------------------------------- smoke test
 
 info "verifying"
-cat > /tmp/ns_smoke.py <<'PY'
+cat > /tmp/oc_smoke.py <<'PY'
 import torch
 print("torch     :", torch.__version__)
 print("hip       :", getattr(torch.version, "hip", None))
@@ -337,7 +337,7 @@ else:
     print("no GPU visible to torch; extraction will run on CPU")
 PY
 
-if python /tmp/ns_smoke.py; then
+if python /tmp/oc_smoke.py; then
   :
 else
   warn "smoke test failed."
@@ -350,13 +350,13 @@ else
   fi
   exit 1
 fi
-rm -f /tmp/ns_smoke.py
+rm -f /tmp/oc_smoke.py
 
 cat <<EOF
 
 Done.
 
-Start it from the app menu (NeuronScope), or:  ./neuronscope
+Start it from the app menu (OmniCortex), or:  ./omnicortex
 It opens Studio in your browser; the Setup page there takes care of the rest.
 Command line: source $VENV/bin/activate
 

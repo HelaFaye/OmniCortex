@@ -5,7 +5,7 @@ Score one tuning candidate in LM Studio, for the adaptive tuner.
 The adaptive tuner (scripts/adaptive_tuner.py) writes a GGUF per scale,
 calls an evaluator for each, and narrows the scale range around the best
 score. When the model is meant for LM Studio on another machine, the
-candidate goes there with the transfer watcher (ns_transfer.py watch, or the
+candidate goes there with the transfer watcher (oc_transfer.py watch, or the
 transfer MCP's start_watch), and this script is the evaluator:
 
   1. waits until LM Studio on the destination lists the candidate (the transfer
@@ -145,11 +145,11 @@ def run_testqa(base: str, model_id: str, a, out: Path) -> list[dict]:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("--lmstudio", default=os.environ.get("NS_LMSTUDIO_URL", "http://127.0.0.1:1234"),
-                   help="LM Studio's server (default $NS_LMSTUDIO_URL or http://127.0.0.1:1234)")
+    p.add_argument("--lmstudio", default=os.environ.get("OC_LMSTUDIO_URL", "http://127.0.0.1:1234"),
+                   help="LM Studio's server (default $OC_LMSTUDIO_URL or http://127.0.0.1:1234)")
     p.add_argument("--model", required=True, help="the candidate GGUF the tuner wrote (its file name is matched)")
     p.add_argument("--model-id", help="LM Studio's id for it, if the name does not match")
-    p.add_argument("--api-key", default=os.environ.get("NS_LMSTUDIO_KEY"))
+    p.add_argument("--api-key", default=os.environ.get("OC_LMSTUDIO_KEY"))
     p.add_argument("--wait", type=float, default=3600, help="seconds to wait for the transfer (default 1 h)")
     p.add_argument("--poll", type=float, default=15)
     p.add_argument("--per-subject", type=int, default=10, help="TestQA items per subject (default 10)")
@@ -162,7 +162,7 @@ def main(argv=None) -> int:
     p.add_argument("--sandbox", choices=("docker", "podman", "none"), default="docker")
     p.add_argument("--request-timeout", type=float, default=300, help="per request; the first one loads the model")
     p.add_argument("--timeout", type=float, default=7200, help="the whole TestQA run")
-    p.add_argument("--keep", default=os.environ.get("NS_EVAL_DIR", "runs/lmstudio-eval"),
+    p.add_argument("--keep", default=os.environ.get("OC_EVAL_DIR", "runs/lmstudio-eval"),
                    help="folder for each candidate's TestQA results (default runs/lmstudio-eval)")
     a = p.parse_args(argv)
     stem = stem_of(a.model)

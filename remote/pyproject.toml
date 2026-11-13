@@ -3,9 +3,9 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "neuronscope-remote"
+name = "omnicortex-remote"
 version = "0.1.0"
-description = "Let NeuronScope (or any MCP client) control the LLMs on this computer: LM Studio, Ollama, llama.cpp."
+description = "Let OmniCortex (or any MCP client) control the LLMs on this computer: LM Studio, Ollama, llama.cpp."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
@@ -14,7 +14,7 @@ dependencies = []
 tls = ["cryptography>=41"]
 
 [project.scripts]
-neuronscope-remote = "neuronscope_remote.agent:main"
+omnicortex-remote = "omnicortex_remote.agent:main"
 
 [tool.setuptools]
-packages = ["neuronscope_remote"]
+packages = ["omnicortex_remote"]

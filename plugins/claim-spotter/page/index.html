@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claim spotter</title>
+<style>
+:root{--bg:#fafaf9;--fg:#1c1c1a;--mut:#6b6b66;--acc:#2d5bd7;--hl:#fff1b8}
+@media (prefers-color-scheme:dark){:root{--bg:#151514;--fg:#ececea;--mut:#9a9a94;--acc:#6f93ff;--hl:#5a4a12}}
+body{margin:0;padding:1rem 16px;font:14px/1.5 system-ui;background:var(--bg);color:var(--fg);max-width:760px}
+textarea{width:100%;min-height:8rem;font:inherit;background:transparent;color:inherit}
+mark{background:var(--hl);color:inherit;border-radius:3px}small{color:var(--mut)}a{color:var(--acc)}
+</style>
+<h1>Claim spotter</h1>
+<p>Paste a reply to see what in it can be checked. In Studio's chat, <b>Claims to verify</b> under a reply does the same.
+<a href="/">← Studio</a></p>
+<textarea id="t" placeholder="The Eiffel Tower was completed in 1889 and is 330 m tall."></textarea>
+<p id="out"></p>
+<script>
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+let timer;
+document.getElementById('t').oninput=e=>{ clearTimeout(timer); timer=setTimeout(async()=>{
+  const text=e.target.value;
+  const r=await fetch('/api/plugins/check',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({plugin:'claim-spotter',check:'claims',text})});
+  const j=await r.json(); if(!r.ok){ document.getElementById('out').textContent=j.error; return; }
+  let h='',i=0; for(const [a,b,k] of j.spans){ h+=esc(text.slice(i,a))+`<mark title="${k}">${esc(text.slice(a,b))}</mark>`; i=b; }
+  document.getElementById('out').innerHTML=h+esc(text.slice(i))+`<br><small>${esc(j.label)}${j.note?' · '+esc(j.note):''}</small>`;
+ },300); };
+</script>

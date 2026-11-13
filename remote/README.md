@@ -1,6 +1,6 @@
-# NeuronScope Remote
+# OmniCortex Remote
 
-Let another computer use the LLMs on this one. You don't need NeuronScope
+Let another computer use the LLMs on this one. You don't need OmniCortex
 on this computer. The agent works with LM Studio, Ollama, llama.cpp's
 `llama-server`, or any OpenAI-compatible server.
 
@@ -8,7 +8,7 @@ on this computer. The agent works with LM Studio, Ollama, llama.cpp's
 
 | | **Host** | **Controller** |
 |---|---|---|
-| what it is | the computer with the models and this agent | NeuronScope Studio, or any MCP client (Claude Desktop, Cline, Cursor…) |
+| what it is | the computer with the models and this agent | OmniCortex Studio, or any MCP client (Claude Desktop, Cline, Cursor…) |
 | what it does | runs the models and does what paired controllers ask, within what you allow | decides what to run and sends the instructions |
 | what it shows | the console: pairing code, controllers, permissions, activity | its list of hosts and their models |
 
@@ -29,16 +29,16 @@ off at once.
 The host needs Python 3.9 or newer. No other packages are needed.
 
 - **Windows:** unzip the download from Studio (Remote → *Download*) and
-  double-click `NeuronScope Remote.bat`. If you don't have Python, get it
+  double-click `OmniCortex Remote.bat`. If you don't have Python, get it
   from python.org or the Microsoft Store.
-- **macOS, Linux:** run `./neuronscope-remote.sh`.
-- **pip:** run `pip install ./neuronscope-remote` (or `pipx install …`), then
-  `neuronscope-remote`. Add `[tls]` if the computer has no `openssl` command.
+- **macOS, Linux:** run `./omnicortex-remote.sh`.
+- **pip:** run `pip install ./omnicortex-remote` (or `pipx install …`), then
+  `omnicortex-remote`. Add `[tls]` if the computer has no `openssl` command.
   The *Same network* link needs one of the two to make its certificate.
 
 The agent starts and opens its **console** in your browser. Only this
 computer can open the console. If you close the tab, get it back with
-`neuronscope-remote console`.
+`omnicortex-remote console`.
 
 Start the LLM server you use as well. LM Studio: *Developer → Start
 server*. Ollama and llama-server: just run them. The agent finds them on
@@ -57,7 +57,7 @@ their usual ports, or you can add an address in the console.
 | **This computer calls the controller** | behind a router or firewall you cannot change | listens on nothing; connects out to the controller and waits for instructions |
 
 **2. Pair.** Click **Show a pairing code** in the console. On the
-controller, open NeuronScope Studio → **Remote** → **Add a host**, and
+controller, open OmniCortex Studio → **Remote** → **Add a host**, and
 either type the code or paste the pairing link. With *Same network*,
 Studio lists this host on its own. Each code:
 - is valid for 10 minutes;
@@ -71,7 +71,7 @@ machine in the middle presenting another certificate fails the pairing.
 For **This computer calls the controller**, it works the other way round:
 1. Studio makes an invite (`nsr1:…`).
 2. Paste it into the console's **Join** box, or run
-   `neuronscope-remote connect nsr1:…` on this computer.
+   `omnicortex-remote connect nsr1:…` on this computer.
 
 ## Other MCP clients as controllers
 
@@ -79,13 +79,13 @@ On the controller computer, install this same package and pair from the
 command line:
 
 ```bash
-neuronscope-remote add-host 'nsr://192.168.1.20:47871/#c=…'   # the pairing link the host shows
-neuronscope-remote add-host 100.101.102.103 --code ABCDE-FGH23
-neuronscope-remote hosts
+omnicortex-remote add-host 'nsr://192.168.1.20:47871/#c=…'   # the pairing link the host shows
+omnicortex-remote add-host 100.101.102.103 --code ABCDE-FGH23
+omnicortex-remote hosts
 ```
 
 `add-host` prints the entry for the MCP client's configuration. The entry
-starts `neuronscope-remote bridge NAME`, which carries MCP over
+starts `omnicortex-remote bridge NAME`, which carries MCP over
 stdin/stdout to the host and pins its certificate:
 
 ```json
@@ -97,19 +97,19 @@ header `Authorization: Bearer <token>`. This works only if they trust the
 host's certificate: either through a VPN or SSH link with plain HTTP, or
 a tunnel with a public certificate.
 
-An MCP client on the host itself can run `neuronscope-remote stdio`.
+An MCP client on the host itself can run `omnicortex-remote stdio`.
 
 ## Commands
 
 ```
-neuronscope-remote                       start with the saved link and open the console
-neuronscope-remote serve --mode lan|vpn|ssh|tunnel|callhome [--bind ADDR] [--public-url URL]
-neuronscope-remote pair                  a new pairing code
-neuronscope-remote controllers [--revoke ID]
-neuronscope-remote connect nsr1:…        call home to a controller
-neuronscope-remote console               open the console of the running agent
-neuronscope-remote stdio                 MCP over stdin/stdout on this computer
-neuronscope-remote add-host | hosts | remove-host | bridge     (controller side)
+omnicortex-remote                       start with the saved link and open the console
+omnicortex-remote serve --mode lan|vpn|ssh|tunnel|callhome [--bind ADDR] [--public-url URL]
+omnicortex-remote pair                  a new pairing code
+omnicortex-remote controllers [--revoke ID]
+omnicortex-remote connect nsr1:…        call home to a controller
+omnicortex-remote console               open the console of the running agent
+omnicortex-remote stdio                 MCP over stdin/stdout on this computer
+omnicortex-remote add-host | hosts | remove-host | bridge     (controller side)
 ```
 
 The agent's own port is 47871; its console is on 47872, on this computer
@@ -120,10 +120,10 @@ network* and *VPN* links; allow it on private networks.
 ## Files
 
 The agent keeps its settings in one folder:
-- Windows: `%APPDATA%\NeuronScopeRemote`
-- macOS: `~/Library/Application Support/NeuronScopeRemote`
-- elsewhere: `~/.config/neuronscope-remote`
-- or the folder in `$NSR_HOME`, if set.
+- Windows: `%APPDATA%\OmniCortexRemote`
+- macOS: `~/Library/Application Support/OmniCortexRemote`
+- elsewhere: `~/.config/omnicortex-remote`
+- or the folder in `$OCR_HOME`, if set.
 
 What it holds:
 - `config.json`: the link, the LLM servers, and what controllers may do;
@@ -134,5 +134,5 @@ What it holds:
 - `hosts.json`: on a controller, the hosts it paired with.
 
 Received models go into `incoming/`. `install_model` then moves them into
-LM Studio's models folder as `neuronscope/<name>/<file>.gguf`, or creates an
+LM Studio's models folder as `omnicortex/<name>/<file>.gguf`, or creates an
 Ollama model from them.

@@ -51,8 +51,8 @@ _SCALE_FIELDS = {
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--gguf", default=os.environ.get("NS_GGUF"),
-                   help="source model (default $NS_GGUF)")
+    p.add_argument("--gguf", default=os.environ.get("OC_GGUF"),
+                   help="source model (default $OC_GGUF)")
     p.add_argument("--h_neurons", required=True)
     p.add_argument("--scale", type=float, required=True,
                    help="multiplier for H-Neuron activations: 1 = unchanged, "

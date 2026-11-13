@@ -1,0 +1,53 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "nvidia-legacy-sm50-70",
+ "title": "NVIDIA Maxwell, Pascal and Volta (compute 5.0\u20137.0)",
+ "era": "legacy",
+ "examples": [
+  "Tesla M10",
+  "Tesla M40",
+  "GTX 970/980",
+  "GTX 1060/1070/1080",
+  "Tesla P4/P40/P100",
+  "Tesla V100",
+  "Titan V"
+ ],
+ "match": {
+  "vendor": "nvidia",
+  "compute_min": 5.0,
+  "compute_max": 7.2
+ },
+ "purposes": {
+  "inference": {
+   "summary": "llama.cpp with CUDA 12.x for these architectures: CUDA 13 cannot build for them.",
+   "llama": {
+    "backend": "cuda",
+    "cuda_arch": "50-real;52-real;60-real;61-real;70-real",
+    "cmake": "",
+    "toolkit": "CUDA 12.x (12.9 at most)"
+   },
+   "engine": {
+    "flash_attn": "auto",
+    "cache_type_k": "q8_0",
+    "cache_type_v": "q8_0"
+   },
+   "notes": "No tensor cores before Volta: prompt processing is slower than on newer cards, generation is bandwidth-bound and holds up well. Multi-GPU boards (four GPUs on one card) split a model with --split-mode layer."
+  },
+  "retraining": {
+   "summary": "PyTorch from the CUDA 12.6 wheels, the last with kernels for compute 5.0\u20136.1; LoRA in fp32 (no bfloat16).",
+   "torch": {
+    "spec": "torch",
+    "index": "https://download.pytorch.org/whl/cu126"
+   },
+   "training": {
+    "dtype": "float32",
+    "quantized_base": false,
+    "method": "lora"
+   },
+   "notes": "bitsandbytes 4-bit (QLoRA) is not reliable below compute 7.5: train a LoRA on an fp16/fp32 base instead."
+  }
+ },
+ "notes": "",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

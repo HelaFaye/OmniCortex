@@ -127,9 +127,9 @@ python scripts/director.py analyze notes.md --repo ~/src/project   # the split, 
 
 ## Requirements of a project
 
-A project has its own needs, separate from NeuronScope's: the toolchain,
+A project has its own needs, separate from OmniCortex's: the toolchain,
 libraries and Python packages its build files name, the hardware it wants,
-which NeuronScope features it relies on, and anything to check by hand. The
+which OmniCortex features it relies on, and anything to check by hand. The
 project page's **Requirements** card keeps that list:
 
 - **Inferred** when the project is created from a checkout (and on **Scan
@@ -144,7 +144,7 @@ project page's **Requirements** card keeps that list:
   read (not `node_modules`, `build`, vendored or third-party folders), never
   sources.
 - **Edited** by you: add a tool, library (pkg-config name), Python package,
-  hardware (`ram_gib`, `vram_gib`, `disk_gib`, `gpu` vendor), a NeuronScope
+  hardware (`ram_gib`, `vram_gib`, `disk_gib`, `gpu` vendor), a OmniCortex
   feature, or a note; remove what doesn't apply. Your items survive
   re-scans. Every change is in the plan's history.
 - **Checked** on this machine (**Check now**): versions against the
@@ -157,7 +157,7 @@ listing what; you can start anyway. Workers are told what the machine has
 and what it lacks, so their build steps and commands fit it.
 
 ```bash
-python scripts/ns_requirements.py project ~/src/game     # the same, for any checkout
+python scripts/oc_requirements.py project ~/src/game     # the same, for any checkout
 ```
 
 ## API
@@ -181,4 +181,15 @@ Owner only (a paired device gets 403), like Jobs.
 | `POST /api/projects/<id>/policy` | `{policy: {review, max_parallel, max_attempts, default_model, check, devices, device_settings}}` |
 | `GET /api/workers`, `POST /api/workers/stop` | running workers and detected devices |
 
-Plans live in `--projects-dir` (default `~/.neuronscope/projects/<id>/plan.json`).
+Plans live in `--projects-dir` (default `~/.omnicortex/projects/<id>/plan.json`).
+
+## Verification graphs
+
+A project's policy can name a node graph that screens every result before
+review: secrets, length, a judge, a hallucination check, anything a graph can
+do. The graph sees `task` and `result`; an `accepted` output passes the result
+and a `feedback` output fails it. With *send failures back automatically*, a
+failed result returns to the worker with the feedback. The verdict and a link
+to the graph show on each attempt. See [GRAPHS.md](GRAPHS.md#projects-delegation).
+Workers are also told what their task may do ([PERMISSIONS.md](PERMISSIONS.md)).
+

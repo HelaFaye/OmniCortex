@@ -2,7 +2,388 @@
 
 ## Unreleased
 
+### Added (Proxmox backend)
+
+- `scripts/proxmox_lxc.py` runs OmniCortex (the remote agent or Studio) in an LXC container on a Proxmox VE host,
+  with the host's AMD or NVIDIA GPUs shared in. This is the only GPU route on boards with non-coherent PCIe such as
+  RK3588, where VFIO is refused.
+  - `host` reads the GPUs, device nodes, coherency and fast cores.
+  - `plan` prints the `pct` commands, the cpuset and the container's environment.
+  - `apply --yes` runs them.
+  - `check` runs inside the container.
+- `scripts/amd_vbios.py` checks MI50/MI60 VBIOS versions against a community VBIOS comparison: the Vulkan 16 GB
+  limit, resizable BAR, mixed versions, and whether BAR0 fits a small PCIe window.
+- Hardware profiles `amd-gfx906-arm` and `nvidia-maxwell-arm`, for those cards on ARM hosts.
+- Jobs: Proxmox: run OmniCortex in a container with the GPU; AMD MI50/MI60: check the VBIOS.
+- See docs/PROXMOX.md.
+
+### Added (truth probes)
+
+- `scripts/truth_probe.py`: a linear probe on every layer that reads whether the model takes an answer to be true.
+  `check` flags replies where the model's activations rate another answer true and its own false
+  ("knows but says otherwise"), with a per-layer trajectory. It is a signal, not proof of intent.
+  - Backends: Hugging Face weights (each layer, and each pass of a looped model, is a stage) and any GGUF through
+    llama-cett-dump.
+  - Training data: `qa/truth` (a starter set), TestQA banks, or question/answer/wrong files.
+  - Studio: a per-model Truth probe setting and `POST /api/truth`.
+  - Jobs: Truth probe: train and Truth probe: does the model believe its answer?
+  - Default: `--framing judge` (ask the model whether the answer is correct, read its verdict) and
+    `--method massmean`. On Qwen2.5-1.5B: cross-validated AUROC 0.95 against 0.90 for reading the answer itself.
+    On 16 held-out questions, it flagged the model's one mistake and raised no false alarm.
+  - See docs/TRUTH_PROBE.md, which has the results on real models.
+
+### Added (CI)
+
+- `.github/workflows/tests.yml` runs the test suite with caches for pip, the tiny test models and a llama.cpp build
+  with cett-dump, so the llama.cpp integration tests run in CI instead of skipping.
+- `OC_TEST_CACHE`: tests/tiny_models.py builds each test model once into that folder and copies it after that.
+
+### Changed (faster activation capture)
+
+- `CETTManager` (oc_common.py) has capture modes (`--capture` in extract_activations.py and score_tokens.py):
+  - `device` keeps activations on the GPU and copies back only the per-region results;
+  - `stream` copies asynchronously into page-locked buffers, overlapping compute;
+  - `auto` picks between them.
+
+  Layer output norms are reduced on the GPU, extraction computes only the spans it saves, and forward passes run
+  under `torch.inference_mode()`. The numbers are unchanged; tests/test_capture_modes.py checks that.
+- docs/MOBILE_CLIENTS.md: OmniCortex's own client is planned in Python and Kivy (desktop, Android through Buildozer, iOS through kivy-ios).
+
+### Added (looped models: NVIDIA Dory)
+
+- Studio recognises looped models (`<arch>.num_loops`), tags them, and offers Loops and Recurrent KV cache settings (passed as `--override-kv`); Dory also gets `--jinja` and `--reasoning on` as its card recommends.
+- `build_llama_tools.sh --repo` (and the Build llama.cpp job) builds a fork, such as the one Dory's GGUF needs; `--ref` fetches from that repository.
+- `loop_sweep.py`: TestQA per loop count and KV mode, with confident mistakes, speed and paired changes.
+- `loop_lens.py`: a per-loop logit lens on Hugging Face weights, with the deciding loop and per-loop MLP and H-neuron activity.
+- NeMo Gym: `gym_bridge.py` exports TestQA, fuzzing banks and Fix This Mistake pairs as an environment's data, and `integrations/nemo_gym/omnicortex_testqa` rewards correct answers, pays a little for declining and charges for confident mistakes (optionally shaped by H-neuron risk).
+- `cett-dump --by-weight <blocks>`: finds the down projection by its weight (`blk.N.ffn_down.weight`) instead of the
+  node's name, which Dory's llama.cpp fork never sets. It records pass k of block N as layer k × blocks + N, so a
+  looped model's passes stay apart. Looped GGUFs (`<arch>.num_loops`) use it automatically in extraction and in
+  Studio's live scoring, with the model's loop count. On ordinary models it is identical to name matching
+  (integration test).
+- docs/DORY.md; docs/MOBILE_CLIENTS.md, a plan for phone and cross-platform clients.
+
+### Changed (the rest of the name)
+
+- Everything that still said NeuronScope now says OmniCortex: the launcher (`./omnicortex`), the data folders (`~/.omnicortex`, `~/.config/omnicortex`, moved on first start), environment variables (`OC_*`, `OCR_*`), the MCP server name, the route header, ComfyUI node ids, the remote agent and its package, cookies, and the `ns_*` modules (now `oc_*`, the CLI `scripts/oc.py`). No old names are kept as aliases; README.md lists what an existing install needs to change.
+
+### Added (pose add-on)
+
+- `plugins/pose`: video (MediaPipe) or OpenPose to tracked 3D poses; a kinematic sieve (hyperextension, inversion, velocity, bone length, floor clip, foot slip) that stages corrected and rejected pairs; a review page with skeleton overlays; a DPO refinement orchestrator; VMC and JSON-over-UDP streaming; Godot and Blender clients (stress shaders, x-ray pass, vertex-colour baking to FBX). See docs/POSE.md.
+
+### Added (default add-ons)
+
+- `semantic-friction`: DRY sampling within replies and a small bias away from words earlier replies keep reusing.
+- `adversarial-canary`: perturbation stability and planted-instruction probes, an automatic injection screen, and a graph node.
+- `concept-translation`: a ridge bridge between two models' layers, with held-out R², to carry concept directions across.
+- `audio-stem-map`: a tilt-aware frequency map of WAV stems (harshness, sibilance, boom, clipping, phase), a band repair, and MIDI checks.
+- `cluster-offload`: live free GPU memory across hosts, placement plans with RPC servers and a tensor split, and a Proxmox inventory.
+- Plugins can set sampler options for Studio's chat (`"sampling"`), and their scripts can call Studio (`scripts/plugin_api.py`).
+- docs/ADDON_IDEAS.md: every brainstormed idea not built yet, with a realistic path and what stands in the way.
+
+### Added (integrated options, third batch)
+
+- Backend hot-swap: a model that cannot load for lack of memory or a driver fault loads again with fewer GPU layers, on an alternate llama-server, or on the CPU; a server that dies mid-chat is reloaded and the request sent once more.
+- Layer streaming over llama.cpp RPC: a per-model RPC servers setting, `build_llama_tools.sh --rpc`, `layer_stream.py` (serve, check, split) and its job.
+- Chat compression "summarize by topic": older turns grouped by topic into anchor notes.
+- Morphing: simple requests for the full model go to a small one (off by default).
+- `expert_shards.py`: one suppressed variant per subject, routed by subject.
+- Feature packs: share H-neuron sets, vectors and SAE picks with their base model and hashes; board submissions.
+
+### Added (integrated options, second batch)
+
+- `quant_mask.py`: more precision for the layers with the most H-neurons, less for the safest, plus an importance matrix from mistake contexts.
+- `model_lab.py jitter` (brittle layers under noise, DPO pairs from flipped items) and `model_lab.py hijack` (cross-layer back-patching, optionally gated by a feature direction).
+- Neuron aging and decay: a served LoRA correction eases off when unused and returns at full strength when needed (off by default).
+- `neuro_fuzz.py`: new, verified, deduplicated TestQA items aimed at the model's failures and risky replies.
+
+### Added (integrated options, first batch)
+
+- Fix This Mistake: a **fix** button under each reply keeps your correction as a training pair (and the reply's activations as a known mistake); an optional idle-time DPO micro-tune.
+- Neural Reset: a reply caught repeating itself is cut at the loop and resumed with the loop pushed down.
+- Prompt sanitizer for chats sent to linked hosts: secrets and listed names become placeholders and are restored in the reply.
+- Core shunt: jobs run at low priority, on efficiency cores where the CPU has them.
+- Dependency GC and dependency snapshots (diff, pip plan, sandbox venv; `/api/env/snapshot`, `/api/env/compare`).
+- Settings → Integrated options; docs/INTEGRATED_OPTIONS.md says what each does and does not do.
+
+### Added (unified review and browser extension)
+
+- `scripts/unified_review.py` and Studio's `/api/lookup`: everything known about a model in one record, from review boards (verified accuracy, speed per hardware), hardware-profile reports, SAELens's catalogue and this Studio's observations. Re-packagings (GGUF, AWQ, …) are marked related.
+- Cards may carry self-reported emotion and feature summaries (`score_cards.py --extras`); boards average them and every viewer marks them as not re-checked.
+- `extension/`: a browser extension for Chromium browsers (Chrome, Edge, Opera, Brave, Vivaldi) and Firefox (desktop and Android). Its icon glows blue on model pages with data, and it has a filterable popup. CI packages it. Studio's `/#hub=org/name` opens a repo's files.
+
+### Added (hardware support profiles)
+
+- Profiles per hardware family, legacy and modern alike, with setups stored per purpose (inference, retraining, or general): `scripts/hw_profiles.py`, `profiles/hardware/`, Setup → Hardware support profiles, the `hw_apply` job.
+- Share them through the review board: submit a profile for community review, report whether one worked; reports are aggregated in `board.json`. See docs/HARDWARE_PROFILES.md.
+
+### Changed (the name)
+
+- NeuronScope is now **OmniCortex**, because [RudrenduPaul/NeuronScope](https://github.com/RudrenduPaul/NeuronScope)
+  already uses the name. The installers are `Install OmniCortex.bat` / `.command`, the Windows launcher is
+  `OmniCortex.bat`, and `./omnicortex` joins `./neuronscope`. Data folders (`~/.neuronscope`), `NS_*` variables,
+  HTTP headers and ComfyUI node ids are unchanged, so existing installs and saved workflows keep working.
+
+### Added (binaries)
+
+- `.github/workflows/binaries.yml`: llama.cpp tools and the remote agent as one executable for Windows (x64,
+  x86, ARM64), macOS (Apple silicon, Intel) and Linux (x64, ARM64, x86, ARMv7), attached to releases
+  ([docs/BINARIES.md](docs/BINARIES.md)).
+
+### Added (MCP over the network)
+- `ns_transfer_mcp.py --http`: the transfer MCP server over streamable HTTP
+  for controllers on other computers.
+  - A bearer token is always required, compared in constant time, and
+    wrong guesses are throttled. Requests from other sites' web pages are
+    refused.
+  - A network address needs TLS or `--allow-plaintext`; behind `tailscale
+    serve` it stays on 127.0.0.1.
+  - The MCP session manager starts and stops with the server, and the
+    hostname check is replaced by the token check, so a proxy's own
+    hostname works. `GET /health` answers without the token.
+  - Its tools carry read-only and destructive annotations, and its
+    instructions say the tools act on the computer running it.
+- `mcp.json`: an HTTP server's `token_file` or `token_env`, and
+  `${file:…}` / `${env:…}` in header and env values, so tokens need not be
+  copied into the file. They are read at each connect.
+- Studio's Tools tab: **Test** per server. It lists the tools again and
+  calls one read-only tool that needs no arguments.
+
+### Fixed
+- With the MCP library 2.x, Studio read no tool annotations (2.x names
+  them `read_only_hint`…), so tool approval treated every tool as
+  unannotated. Both spellings are read now.
+
+### Added (newcomers)
+- An optional tour of Studio, offered once on the first visit (*Show me
+  around*, *Not now*, *Don't ask again*). It has eleven stops across
+  Studio, Setup, Jobs, Review, Projects, Workers, Connect and Settings,
+  each pointing at the real control.
+  - Back and Next (or the arrow keys), and Esc to end it.
+  - A ? button on every page restarts it, jumps to the current page's stop,
+    or opens the help pages.
+
+### Added (installing)
+- A cross-platform installer wizard (`scripts/installer.py`, standard
+  library only), opened by double-clicking `Install OmniCortex.bat`
+  (Windows), `Install OmniCortex.command` (macOS) or `install-gui.sh`
+  (Linux).
+  - It finds a suitable Python first, and offers or explains how to get
+    one.
+  - It shows what it found and each platform's peculiarities.
+  - It picks the PyTorch build per GPU (CUDA per generation, ROCm per AMD
+    target, Metal, CPU, or none), installs with live output and advice on
+    failure, smoke-tests the GPU, and adds a Start menu, Applications or
+    app-menu shortcut.
+  - `--yes` and `--check` run it in a terminal. `scripts/torch_smoke.py` is
+    the shared GPU check.
+- Batch files are stored with Windows line endings (`.gitattributes`).
+
+### Added (roles and help)
+- docs/ROLES.md: every connection with its controller and the side that
+  does the work, every default port and whether it speaks MCP, and who may
+  do what.
+- The Connect page shows who controls whom.
+- Studio's MCP instructions and `studio_status` name the computer the tools
+  act on.
+- `/help/<page>` renders OmniCortex's docs inside Studio.
+
+### Added (work distribution)
+- Workers page (`/workers`): monitor and control where project tasks run.
+  - Workers are this computer's models, endpoints you run yourself (any
+    OpenAI-compatible server, here or elsewhere), and remote hosts and
+    linked Studios.
+  - Pause, drain, per-worker parallel limits, the subjects each takes, a
+    timed test, and stopping a local model.
+  - Routing by subject: up to three workers in order.
+  - The queue shows why each task waits; a task can be moved to another
+    worker.
+  - GPU temperatures, VRAM, load and power for this computer and each
+    remote host, plus an activity log.
+  - The director dispatches to all three kinds of worker. An endpoint that
+    stops answering is marked down at once, so its tasks wait instead of
+    failing. docs/WORKERS.md.
+- OmniCortex Remote: GPU telemetry (nvidia-smi, rocm-smi, or Linux amdgpu
+  sensors, without guessing) as the `telemetry` tool, and a thermal guard.
+  Off until the host's owner turns it on; above a chosen limit the host
+  takes no new work and unloads what it can, and it resumes once cooler.
+
+### Added (confidence signals)
+- Confidence strip in the chat (*confidence*, on by default). Studio asks
+  llama-server or vLLM for each token's top-5 probabilities and shows where
+  the model was unsure: spread (entropy of the top 5 plus the rest, over
+  log 6) and the chosen token's probability. It is saved with the chat.
+- `scripts/logit_lens.py` (Jobs → *Logit lens over a reply*). For Hugging
+  Face models: each layer's guess for every token of a reply, its spread,
+  the settle layer and the top-k decay layer. Tokens that settle late with
+  a spread-out final layer are marked. Writes JSON and a heatmap page.
+- `scripts/decode_lab.py` (Jobs → *Decoding lab*): one Hugging Face model
+  served as several decoding variants on an OpenAI-compatible port, for
+  TestQA and the gate to compare.
+  - SLED (self logits evolution decoding).
+  - Steering with a concept_edit direction, at a fixed strength or one that
+    follows the model's uncertainty (output spread, or attention entropy).
+  - docs/DECODING.md.
+- docs/CONFIDENCE.md: the three signals side by side (confidence strip,
+  logit lens, H-Neuron check), and what it would take to tell dishonesty
+  from a confident mistake.
+
+### Changed (Setup)
+- Setup → Settings now holds every Studio flag worth a setting, in groups:
+  models and engines (vLLM command, backend port), routing (stats
+  window), activation checks, workers and jobs (hardware file, turning
+  jobs off, jobs on the network), documents and tools (embedding
+  endpoint and GPU layers, mcp.json). Network, security and pairing are
+  under *Advanced*.
+  - A listen address Studio would refuse at startup (no token, or HTTP
+    without TLS and without plaintext allowed) is refused when saving, so
+    the setting cannot lock you out.
+  - Clearing a field returns it to the flag's default.
+  - Folders stay under Settings → Workspaces.
+
+### Added (plugins)
+- A plugin framework (`viz/plugins.py`, docs/PLUGINS.md). A plugin is a
+  folder with a `plugin.json` that adds jobs, checks under chat replies, a
+  page and MCP tools. None runs until the owner turns it on in Settings →
+  Plugins; a SHA-256 of its files is recorded then, and any change turns it
+  off again. Scripts run as separate processes.
+- Example plugin `plugins/claim-spotter`: marks the numbers, dates and
+  quotations in a reply as claims to verify, and collects them from saved
+  chats into a CSV.
+- docs/CONNECT.md: *MCP, step by step*, for the three MCP pieces (Studio as
+  tools for an agent app, another computer's LLMs through the Remote
+  bridge, tools in Studio's chat).
+
+### Added (remote hosts)
+- Streaming chat with hosts that call in to Studio. The agent reads its
+  backend's reply as it is written and posts the new text a few times a
+  second (MCP progress token, `POST /api/remote/progress`); Studio passes
+  it straight to the chat. Closing the chat stops generation on the host.
+  Older agents still answer in one piece.
+- 3D checks of a host's models. Studio traces the reply itself when it has
+  the identical GGUF (matched by SHA-256), else the host runs OmniCortex's
+  tracer with the classifier Studio sends and returns the trace. New agent
+  tools `model_file` and `trace_reply` (the host can switch the latter
+  off); `hscore.py --trace-out` saves a trace as .npz.
+- A host may only answer or stream the messages queued for it.
+- The Remote page shows when a calling-in host was last heard from and its
+  agent version.
+
+### Added (visualizer)
+- Subject colours in the 3D views. From the neuron review,
+  `neuron_review.subject_map()` finds which neurons go with which subject
+  (Cohen's d against the other subjects, above the review's significance
+  floor). A checked reply's 3D view colours active neurons by subject, in
+  the theme's subject palette, with a legend toggle. Flagged hallucination
+  neurons keep their colour.
+- Camera controls in the browser 3D view.
+  - Manual: Front, Side and Top presets and Reset (keys 1, 2, 3, R).
+  - Automatic: Orbit, and Follow flags, which glides to the flagged neurons
+    of each flagged token (keys O, F).
+  - Moves are smooth and give way to a drag.
+
+### Added (sharing results, opt-in)
+- Score cards (`scripts/score_cards.py`, Settings → **Sharing results**),
+  off unless turned on and given a scoreboard address.
+  - A card holds: the model's SHA-256, name, quant and verified Hugging
+    Face repo; the setup variant (H-Neuron set and scale, LoRA, lineage,
+    engine and its answer-changing options, sampling); coarse hardware;
+    the per-subject counts.
+  - A private verification log holds the replies, used only to re-grade.
+  - Public only for models found on Hugging Face (file SHA-256 verified)
+    or listed by hand. Unlisted models are submitted automatically only
+    with the Advanced switch, and then privately.
+  - Preview of exactly what is sent, and a local copy of every submission.
+- `scripts/scoreboard_server.py`: a reference scoreboard.
+  - It re-grades every reply, rejects cards that do not match their
+    replies, and keeps logs private (admin token only).
+  - It shows public verified results grouped by model file and setup.
+- Jobs: an on_finish hook, used for automatic submission after TestQA.
+- docs/SHARING.md.
+
+### Added (appearance)
+- Named themes (Settings → **Appearance**; the header ◐ button steps
+  through them).
+  - The themes: Midnight, Daylight, Arcade, Ember, Forest, Solar, High
+    contrast and Clinical.
+  - Each colours the pages, the charts and the 3D activation and
+    hallucination views. The 3D views follow the viewer's choice; **Make
+    default** sets it for others and for the Godot 3D view.
+  - All in viz/themes.json, with three new viewer themes (arcade, forest,
+    solar).
+- Model radar (Models → a model): per-subject accuracy and honesty
+  (1 − hallucination rate), DDR-style, with a second model to compare (2P),
+  in the theme's colours.
+
+### Added (concept editing)
+- `scripts/concept_edit.py` (Jobs → Retrain → *Concept edit*): finds the
+  direction or PCA cone that separates two prompt sets in the residual
+  stream, with biprojection against the baseline mean.
+  - It projects that subspace out of W_O and W_out with norm-preserving
+    column rescaling, at per-layer strengths from a peak/floor/distance
+    kernel.
+  - It measures damage as KL against the original on a neutral set, plus
+    remaining separation and an optional behaviour regex.
+  - `--search` optimizes kernel and direction layer, Heretic-style (Optuna
+    TPE when installed) under a KL limit; `--analyze` only locates the
+    concept.
+- `scripts/sage_edit.py` (SAGE, Nonta & Rambhatla 2026): task adaptation
+  through gated per-head additive and multiplicative activation edits
+  (Hard-Concrete L0 gates), constrained to the orthogonal complement of a
+  protected subspace.
+  - The protected subspace can be the decline direction, so retraining
+    does not erode "I don't know".
+  - The invariant is checked in the running model after training.
+  - `chat` applies the edits; `export` writes the additive part as a
+    llama.cpp control vector, tested to load in llama-server.
+- Fixed: merge_export.py did not create its output folder for full models
+  (`finetune.py --method full`, edited models), so their GGUF conversion
+  failed.
+- docs/CONCEPT_EDITING.md.
+
+### Added (engines)
+- Engine options (`scripts/engine_options.py`, model panel → **Engine
+  options**). One table drives the form, the command line and the
+  optimizer.
+  - Covers flash attention, KV cache types, loading mode, context shift
+    with tokens to keep, prompt cache reuse, and speculative decoding
+    (draft model, its device, n-gram draft-free methods, EAGLE-3/MTP).
+  - Also covers devices and RPC servers, CPU core range/mask and strict
+    placement, NUMA, a closed list of documented environment variables
+    (ROCm, Vulkan, CUDA, vLLM), and `numactl`/`taskset` wrappers.
+  - Each option is checked against the installed `llama-server --help`;
+    those a build lacks are folded away and reported after loading.
+- Fixed: llama.cpp renamed `--draft-max`/`--draft-min`, so loading with a
+  draft model failed on current builds. The spelling now follows the build.
+- vLLM as a second engine, per model. Hugging Face checkpoint folders appear
+  in the model list. Options include prefix caching, chunked prefill, fp8
+  KV cache, tensor/pipeline parallel, a speculative config and
+  quantization; `--vllm`/`$NS_VLLM` names the command. The remote agent
+  detects vLLM on port 8000.
+- `scripts/engine_optimizer.py` (Jobs → Setup → *Find the fastest engine
+  settings*): it measures tokens/s per combination of engine options with
+  the real server.
+  - Bayesian search with Optuna TPE when installed, else random search plus
+    refinement.
+  - Baseline first, cached trials, `--apply` to Studio's settings.
+- docs/ENGINE.md: the options, recipes (small GPU and long chats, draft-free
+  speedups, NVIDIA + AMD over Vulkan, ROCm + vLLM, Ryzen core pinning,
+  NUMA), and what is outside an application's reach.
+
 ### Improved (retraining on deficits)
+- `scripts/retrain_cycle.py` (Jobs → Retrain → *Retraining cycle*): one
+  command from baseline to verdict. It serves the base GGUF with
+  llama-server, measures, builds the dataset with the base model probed as
+  the student, then trains, converts and serves each arm, and asks each
+  exactly the baseline's holdout items. It gates each arm and recommends
+  one or none.
+  - Arms are layer choices (`all`, `plan`, `10-17`), so `--arms all,plan`
+    tests focus layers against all layers on the same data.
+  - It resumes after interruption (`--redo STEP`).
+  - It stops with a reason when the baseline is mostly errors or the
+    dataset is too small.
+- finetune.py says when `--max-length` cut every reply off, instead of
+  failing inside the trainer.
 - Knowledge probing (`deficits.py --student`). Each failed fact is
   sampled several times:
   - weakly known facts (some sample right) are trained with the gold
@@ -32,8 +413,8 @@
     tell, and a memorisation warning.
 
 ### Added (remote hosts)
-- NeuronScope Remote (`remote/`): an agent for computers that run LLMs but
-  not NeuronScope. It is distributed on its own: a pip package, a zip from
+- OmniCortex Remote (`remote/`): an agent for computers that run LLMs but
+  not OmniCortex. It is distributed on its own: a pip package, a zip from
   Studio, and launchers for Windows and macOS/Linux. It uses only the
   standard library.
   - Its MCP server is the host's one control surface. Tools: host info,
@@ -133,7 +514,7 @@
 
 ### Added (per-project requirements)
 - Each project has its own requirement list (tools, libraries, Python
-  packages, hardware, NeuronScope features, notes), inferred from its
+  packages, hardware, OmniCortex features, notes), inferred from its
   checkout's build files when created or re-scanned (CMake, Meson, xmake,
   premake, autotools, Cargo, Go, Node, Python, Docker, Gradle, Maven, Zig,
   Godot, Nix, vcpkg, Conan, just, .NET), editable on the project page, and
@@ -146,7 +527,7 @@
 
 ### Added (neuron review)
 - Review page (`/review`) and `scripts/neuron_review.py`: every reply
-  NeuronScope looks at is stored as an activation profile with its source
+  OmniCortex looks at is stored as an activation profile with its source
   (TestQA, other benchmarks, chat checks, project work, live scoring), kind,
   subjects, verdict, risk and time. Per neuron: Cohen's d between wrong and
   right answers, correlation with the classifier's risk, or firing rate,
@@ -173,7 +554,7 @@
 
 ### Added (everything from the browser)
 - After `./install.sh`, no terminal is needed: an app-menu entry (Linux),
-  `./neuronscope` and `NeuronScope.bat` start Studio (`scripts/launch.py`)
+  `./neuronscope` and `OmniCortex.bat` start Studio (`scripts/launch.py`)
   and open it, on Setup until llama-server and models are found. Studio's
   main page points at Setup while they are missing.
 - Setup page (`/setup`): models folders, llama-server, cett-dump, unloading,
@@ -195,7 +576,7 @@
 - Fixed: the timeline's theme list offered `_ui`, which is not a theme.
 
 ### Added (connect)
-- NeuronScope as an MCP server (`scripts/ns_mcp.py`, dependency-free): 26
+- OmniCortex as an MCP server (`scripts/ns_mcp.py`, dependency-free): 26
   tools over Studio's API (models, chat, reply checks, routing, stats,
   devices, doctor, jobs, projects, traces), with read-only and destructive
   hints. Served by Studio at `/mcp` (streamable HTTP; refuses other web

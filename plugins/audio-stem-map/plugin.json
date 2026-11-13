@@ -1,0 +1,15 @@
+{
+  "name": "audio-stem-map",
+  "version": "1.0",
+  "author": "OmniCortex",
+  "default": true,
+  "description": "A frequency map of audio stems: energy per band, harshness (2-5 kHz), sibilance (5-9 kHz), boom, clipping, DC offset and stereo phase problems, with a repair pass that turns the flagged bands down by the amount they stick out. WAV in, WAV and a JSON report out; MIDI files get velocity-spike and stuck-note checks.",
+  "jobs": [
+    {"kind": "analyze", "title": "Audio stems: map and repair", "script": "stems.py",
+     "help": "Each stem's spectrum against its own neighbourhood: a band that stands out (an AI-generated track's metallic 3 kHz, harsh sibilance, a boomy 120 Hz) is flagged with how far it sticks out. With repair, those bands are turned down by that amount (smoothly, in the frequency domain) and the file written beside the original.",
+     "fields": [{"name": "inputs", "flag": "", "multi": true, "required": true, "help": "WAV or MIDI files"},
+                {"name": "out", "required": true, "help": "folder for the report and repaired files"},
+                {"name": "repair", "kind": "bool"}, {"name": "gain", "multi": true, "help": "manual band gains like 2000-5000:-3 (dB)"},
+                {"name": "max_cut", "kind": "float", "default": 6.0, "help": "the most any band is turned down, in dB"}]}
+  ]
+}

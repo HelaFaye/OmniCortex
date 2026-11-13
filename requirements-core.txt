@@ -2,6 +2,7 @@
 # the subject classifier and the llama.cpp (GGUF) path.
 # install.sh --no-torch installs only this file.
 transformers>=4.45   # tokenizers and configs; runs without torch
+regex>=2024.11.6     # timeout-capable regex matching for tool approval rules
 safetensors
 scikit-learn>=1.4
 numpy

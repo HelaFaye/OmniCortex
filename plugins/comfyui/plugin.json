@@ -1,0 +1,129 @@
+{
+  "name": "comfyui",
+  "version": "1.0",
+  "author": "OmniCortex",
+  "homepage": "https://github.com/comfy-org/ComfyUI",
+  "description": "ComfyUI inside Studio: installs it in its own Python environment with the PyTorch build for your GPU, runs it, and shows it as a tab. Optionally adds ComfyUI-Manager, LLM node packs, and OmniCortex nodes (chat through Studio, hallucination checks, graphs).",
+  "tab": {
+    "label": "ComfyUI",
+    "tip": "Node-based image, video and LLM workflows (ComfyUI)"
+  },
+  "page": "page",
+  "jobs": [
+    {
+      "kind": "install",
+      "title": "ComfyUI: install",
+      "script": "install.py",
+      "help": "Clone ComfyUI, make its own virtual environment, install PyTorch for this machine's GPU and ComfyUI's requirements. Run it again to repair.",
+      "fields": [
+        {
+          "name": "folder",
+          "default": "~/.omnicortex/comfyui",
+          "help": "where ComfyUI goes"
+        },
+        {
+          "name": "torch",
+          "choices": [
+            "auto",
+            "cuda",
+            "rocm",
+            "xpu",
+            "cpu",
+            "mps",
+            "directml"
+          ],
+          "default": "auto",
+          "help": "which PyTorch: auto picks from the GPUs found"
+        },
+        {
+          "name": "manager",
+          "kind": "bool",
+          "default": true,
+          "help": "add ComfyUI-Manager (install custom nodes from ComfyUI)"
+        },
+        {
+          "name": "omnicortex_nodes",
+          "kind": "bool",
+          "default": true,
+          "help": "add OmniCortex's nodes: chat through Studio, hallucination check, run a graph"
+        },
+        {
+          "name": "llm_nodes",
+          "multi": true,
+          "choices": [
+            "llm_party",
+            "llms_toolkit",
+            "llms"
+          ],
+          "help": "LLM node packs: comfyui_LLM_party, ComfyUI-LLMs-Toolkit, ComfyUI-LLMs"
+        }
+      ]
+    },
+    {
+      "kind": "run",
+      "title": "ComfyUI: run",
+      "script": "run.py",
+      "help": "Start ComfyUI; it runs until you cancel this job. The ComfyUI tab shows it.",
+      "fields": [
+        {
+          "name": "folder",
+          "default": "~/.omnicortex/comfyui"
+        },
+        {
+          "name": "port",
+          "kind": "int",
+          "default": 8188
+        },
+        {
+          "name": "listen",
+          "default": "127.0.0.1",
+          "help": "0.0.0.0 to reach it from other computers (it has no login of its own)"
+        },
+        {
+          "name": "vram",
+          "choices": [
+            "normal",
+            "low",
+            "high",
+            "cpu"
+          ],
+          "default": "normal"
+        },
+        {
+          "name": "args",
+          "default": "",
+          "help": "more ComfyUI options, e.g. --preview-method auto"
+        }
+      ]
+    },
+    {
+      "kind": "update",
+      "title": "ComfyUI: update",
+      "script": "update.py",
+      "help": "git pull ComfyUI and its custom nodes, then update the requirements.",
+      "fields": [
+        {
+          "name": "folder",
+          "default": "~/.omnicortex/comfyui"
+        }
+      ]
+    },
+    {
+      "kind": "node",
+      "title": "ComfyUI: add a custom node",
+      "script": "node.py",
+      "help": "Clone a custom node repository into custom_nodes and install its requirements.",
+      "fields": [
+        {
+          "name": "folder",
+          "default": "~/.omnicortex/comfyui"
+        },
+        {
+          "name": "repo",
+          "required": true,
+          "help": "https://github.com/owner/repo"
+        }
+      ]
+    }
+  ]
+}

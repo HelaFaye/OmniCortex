@@ -1,0 +1,22 @@
+; OmniCortex Godot client: all of Studio over the network, plus native 3D.
+; main.tscn alone is the 3D viewer (OC_API=… godot --path plugins/godot-client/client res://main.tscn).
+; Third frontend, same backend. Forward+ for real glow; MultiMesh so the whole
+; cell field is one draw call and the GPU stays free for the model.
+
+config_version=5
+
+[application]
+config/name="OmniCortex"
+run/main_scene="res://app.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=800
+
+[rendering]
+renderer/rendering_method="forward_plus"
+; upscale_mode 0 = Linear (Fast); the default is Bicubic (Slow). Cheaper glow
+; matters because the GPU is usually also running the model.
+environment/glow/upscale_mode=0
+anti_aliasing/quality/msaa_3d=0

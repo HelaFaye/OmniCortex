@@ -6,7 +6,7 @@
 # as gfx900 (Vega 64). Same GCN generation, so the kernels are often compatible.
 # Often, not always: it can also hang the GPU or produce silently wrong results.
 #
-# Read this before running it: nothing in NeuronScope currently needs it. The
+# Read this before running it: nothing in OmniCortex currently needs it. The
 # bf16 PyTorch extraction path was replaced by cett-dump on Vulkan, which is
 # faster on this hardware and fits in 12GB where bf16 never would. This is here
 # because "unreliable" was not a good enough answer, not because you need it.

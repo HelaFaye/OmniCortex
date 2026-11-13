@@ -6,7 +6,7 @@ where bf16 in PyTorch does not.
 
 ```bash
 git clone https://github.com/ggml-org/llama.cpp
-cp -r /path/to/neuronscope/llama-tools/cett-dump llama.cpp/tools/
+cp -r /path/to/omnicortex/llama-tools/cett-dump llama.cpp/tools/
 echo 'add_subdirectory(cett-dump)' >> llama.cpp/tools/CMakeLists.txt
 
 cd llama.cpp

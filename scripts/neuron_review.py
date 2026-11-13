@@ -56,7 +56,7 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-DEFAULT_ROOT = Path(os.environ.get("NS_REVIEW_DIR") or Path.home() / ".neuronscope" / "review")
+DEFAULT_ROOT = Path(os.environ.get("OC_REVIEW_DIR") or Path.home() / ".omnicortex" / "review")
 BINS = 512
 VERDICTS = ("correct", "wrong", "abstained", "unknown")
 KINDS = ("test", "benchmark", "observed")
@@ -325,6 +325,45 @@ def summary(store: ReviewStore, model: str, stat: str = "association", how: str 
             "error_rate": error_rate(rows)}
 
 
+def subject_map(store: ReviewStore, model: str, top: int = 400, min_obs: int = 3) -> dict:
+    """Which neurons go with which subject: per subject, the cells (layer, bin) whose
+    activation is higher on that subject's observations than on the others' by more
+    than the review's significance floor (Cohen's d, Bonferroni over the grid).
+    Each cell belongs to the subject it separates most. -> {subjects, cells:
+    {subject: [[layer, bin, d], ...]}, bins, layers, counts}."""
+    rows = store.query(model)
+    if not rows:
+        return {"subjects": [], "cells": {}, "counts": {}}
+    X = store.vecs(model, rows)                                    # [n, L, B]
+    n, L, B = X.shape
+    best_d = np.zeros((L, B), np.float32)
+    best_s = np.full((L, B), -1, np.int32)
+    counts, names = {}, []
+    for s in sorted({x for r in rows for x in r["subjects"] if x != "unknown"}):
+        idx = np.array([s in r["subjects"] for r in rows])
+        if idx.sum() < min_obs or (~idx).sum() < min_obs:
+            continue
+        a, b = X[idx], X[~idx]
+        pooled = np.sqrt(((a.var(0, ddof=1) * (len(a) - 1)) + (b.var(0, ddof=1) * (len(b) - 1))) / (len(a) + len(b) - 2))
+        d = (a.mean(0) - b.mean(0)) / np.maximum(pooled, 1e-6)
+        d[pooled < 1e-5] = 0.0
+        floor = max(D_SHOW, _z(d.size, len(a) + len(b) - 2) * float(np.sqrt(1 / len(a) + 1 / len(b))))
+        d = np.where(d >= floor, d, 0.0)
+        if top and (d > 0).sum() > top:
+            cut = np.sort(d.ravel())[-top]
+            d = np.where(d >= cut, d, 0.0)
+        k = len(names)
+        names.append(s)
+        counts[s] = int(idx.sum())
+        better = d > best_d
+        best_d[better], best_s[better] = d[better], k
+    cells = {s: [] for s in names}
+    for l, bn in zip(*np.nonzero(best_s >= 0)):
+        cells[names[best_s[l, bn]]].append([int(l), int(bn), round(float(best_d[l, bn]), 3)])
+    return {"subjects": [s for s in names if cells[s]], "cells": {s: c for s, c in cells.items() if c},
+            "bins": B, "layers": L, "counts": counts}
+
+
 def deficit_layers(store: ReviewStore, model: str, subjects=None, top: int = 8, **filters) -> dict:
     """The layers where wrong answers differ most from right ones, for focusing a
     fine-tune there (finetune.py --layers plan).
@@ -415,6 +454,42 @@ def view_payload(store: ReviewStore, model: str, stat: str = "association", how:
 
 # ================================================================ ingest
 
+def activation_stats(store: ReviewStore, model: str, max_obs: int = 500, cols: int = 128, **filters) -> dict:
+    """The distribution of recorded activations (CETT profiles) for the stat plots on /work: per layer a
+    five-number summary and mean over every observation and bin, a layer x bin heatmap of the mean
+    (cols wide), wrong minus correct where both exist, and a histogram of every value."""
+    rows = store.query(model, **filters)[-max_obs:]
+    if not rows:
+        return {"model": model, "n": 0}
+    X = store.vecs(model, rows)                                  # [n, layers, bins]
+    n, L, B = X.shape
+    flat = X.transpose(1, 0, 2).reshape(L, -1)
+    q = np.percentile(flat, [5, 25, 50, 75, 95], axis=1)
+    cols = max(1, min(cols, B))
+
+    def squeeze(M):                                              # [L, B] -> [L, cols]
+        return M[:, : B - B % cols].reshape(L, cols, -1).mean(axis=2)
+
+    out = {"model": model, "n": n, "layers": L, "bins": B, "first": rows[0]["t"], "last": rows[-1]["t"],
+           "per_layer": {"p5": q[0], "p25": q[1], "p50": q[2], "p75": q[3], "p95": q[4],
+                         "mean": flat.mean(axis=1), "max": flat.max(axis=1)},
+           "heatmap": squeeze(X.mean(axis=0))}
+    verdict = np.array([r["verdict"] for r in rows])
+    if (verdict == "wrong").any() and (verdict == "correct").any():
+        out["wrong_minus_correct"] = squeeze(X[verdict == "wrong"].mean(axis=0) - X[verdict == "correct"].mean(axis=0))
+        out["n_wrong"], out["n_correct"] = int((verdict == "wrong").sum()), int((verdict == "correct").sum())
+    lo, hi = float(np.percentile(X, 0.5)), float(np.percentile(X, 99.5))
+    counts, edges = np.histogram(np.clip(X, lo, hi), bins=40, range=(lo, hi + 1e-9))
+    out["histogram"] = {"counts": counts, "edges": edges}
+    def plain(v):
+        if isinstance(v, dict):
+            return {k: plain(x) for k, x in v.items()}
+        if isinstance(v, np.ndarray):
+            return np.round(v.astype(np.float64), 5).tolist()
+        return v
+    return plain(out)
+
+
 def _subjects(text: str, given=None) -> list[str]:
     if given:
         return [given] if isinstance(given, str) else list(given)
@@ -428,10 +503,10 @@ def _subjects(text: str, given=None) -> list[str]:
 
 def _scorer(a):
     from hscore import HScorer
-    binary = a.binary or os.environ.get("NS_CETT")
-    gguf = a.gguf or os.environ.get("NS_GGUF")
+    binary = a.binary or os.environ.get("OC_CETT")
+    gguf = a.gguf or os.environ.get("OC_GGUF")
     if not binary or not gguf:
-        raise SystemExit("need --binary (llama-cett-dump) and --gguf, or $NS_CETT and $NS_GGUF")
+        raise SystemExit("need --binary (llama-cett-dump) and --gguf, or $OC_CETT and $OC_GGUF")
     return HScorer(binary, gguf, a.classifier, ngl=a.ngl)
 
 
@@ -485,12 +560,12 @@ def testqa_items(results_path: str, endpoint: str | None = None, bank=None) -> t
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--root", default=str(DEFAULT_ROOT), help="review store (default ~/.neuronscope/review)")
+    common.add_argument("--root", default=str(DEFAULT_ROOT), help="review store (default ~/.omnicortex/review)")
     sub = p.add_subparsers(dest="cmd", required=True)
     for name in ("ingest-testqa", "ingest-items"):
         q = sub.add_parser(name, parents=[common])
-        q.add_argument("--gguf", help="the model that wrote the replies (default $NS_GGUF)")
-        q.add_argument("--binary", help="llama-cett-dump (default $NS_CETT)")
+        q.add_argument("--gguf", help="the model that wrote the replies (default $OC_GGUF)")
+        q.add_argument("--binary", help="llama-cett-dump (default $OC_CETT)")
         q.add_argument("--classifier", help="classifier.npz, to record each reply's risk too")
         q.add_argument("--model-id", help="the model's id in Studio (default: Studio's id for --gguf)")
         q.add_argument("--ngl", type=int, default=99)

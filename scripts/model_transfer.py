@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""NeuronScope Model Transfer: browser/WebRTC signaling and file-transfer UI server.
+"""OmniCortex Model Transfer: browser/WebRTC signaling and file-transfer UI server.
 
 This server only relays signaling metadata (SDP offers/answers, ICE
 candidates). File bytes go peer-to-peer over DTLS-encrypted WebRTC
@@ -36,7 +36,7 @@ from urllib.parse import urlparse
 from aiohttp import web
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 CODE_LEN = 10               # ~49.5 bits: a rendezvous label, not the secret
@@ -287,7 +287,7 @@ async def security_headers(request: web.Request, handler):
 
 
 async def health(_: web.Request) -> web.Response:
-    return web.json_response({"ok": True, "service": "neuronscope-model-transfer", "p2p": True})
+    return web.json_response({"ok": True, "service": "omnicortex-model-transfer", "p2p": True})
 
 
 async def ice_config(request: web.Request) -> web.Response:
@@ -445,7 +445,7 @@ def turn_from_args(a) -> dict:
 
 
 def parse_args(argv=None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="NeuronScope P2P model transfer (WebRTC) server")
+    p = argparse.ArgumentParser(description="OmniCortex P2P model transfer (WebRTC) server")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8798)
     p.add_argument("--public-host", default=None, help="hostname/IP to print in share URLs")
@@ -475,7 +475,7 @@ def main(argv=None) -> int:
     if not sec.is_loopback(args.host) and not tls and not args.allow_plaintext:
         print("error: refusing plain HTTP on a non-loopback address. Browsers only expose the APIs this "
               "page needs (crypto.subtle, showDirectoryPicker) in a secure context, and room keys would "
-              "cross the network in clear. Pass --tls-cert/--tls-key (ns_security.py selfsigned makes a "
+              "cross the network in clear. Pass --tls-cert/--tls-key (oc_security.py selfsigned makes a "
               "LAN cert) or --allow-plaintext behind a TLS reverse proxy.", file=sys.stderr)
         return 2
     if args.ice_mode == "relay" and not args.turn_url:
@@ -489,7 +489,7 @@ def main(argv=None) -> int:
     if not host_for_urls:
         addrs = local_addresses() if args.host in {"0.0.0.0", "::"} else []
         host_for_urls = addrs[0] if addrs else args.host
-    print("NeuronScope Model Transfer")
+    print("OmniCortex Model Transfer")
     print(f"Listening: {scheme}://{args.host}:{args.port}/")
     print(f"Share URL: {scheme}://{host_for_urls}:{args.port}/")
     print(f"ICE mode:  {args.ice_mode}")

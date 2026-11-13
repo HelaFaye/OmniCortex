@@ -1,0 +1,16 @@
+{
+  "name": "jewel-styles",
+  "version": "1.0",
+  "author": "OmniCortex",
+  "description": "Two more styles for the emotion jewel: an icosphere pushed out where each emotion is strong, and a tesseract turning in 4D as emotions rise. For the browser views and the Godot client.",
+  "page": "page",
+  "widgets": {
+    "jewel_styles": [
+      "icosphere",
+      "tesseract"
+    ],
+    "js": "styles.js",
+    "gd": "styles.gd"
+  },
+  "default": true
+}

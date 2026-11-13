@@ -40,7 +40,7 @@ Studio runs this (/projects, /api/projects) and starts the worker models. The
 module itself has no HTTP and starts nothing, so it is testable on its own:
 
     python scripts/director.py analyze notes.md [--repo PATH]
-    python scripts/director.py show ~/.neuronscope/projects/<id>
+    python scripts/director.py show ~/.omnicortex/projects/<id>
 """
 from __future__ import annotations
 
@@ -54,20 +54,24 @@ import time
 import uuid
 from pathlib import Path
 
-import ns_requirements as nrq
+import oc_requirements as nrq
 import subject_classifier as sc
 
 PLAN_STATES = ("draft", "approved", "running", "paused", "done")
 TASK_STATES = ("todo", "running", "review", "rework", "done", "blocked", "dropped")
 REVIEW_POLICIES = ("all", "flagged", "none")
-EDITABLE = ("title", "detail", "labels", "depends_on", "acceptance", "model")
+EDITABLE = ("title", "detail", "labels", "depends_on", "acceptance", "model", "permissions")
 MAX_RESULT_CHARS = 100_000
 RETRY_DELAY = 15.0
 DEFAULT_POLICY = {"review": "all", "max_parallel": 2, "max_attempts": 3, "default_model": None,
                   "director_model": None, "check": True,
                   # Hardware for this project: device ids it may use ([] = any enabled device),
                   # and llama-server settings per device on top of the device's own.
-                  "devices": [], "device_settings": {}}
+                  "devices": [], "device_settings": {},
+                  # A node graph (graph_engine.py) that screens each result before review: inputs task and
+                  # result; output "accepted" passes it, "feedback" fails it. verify_auto sends a failed
+                  # result back to the worker with that feedback instead of waiting for a person.
+                  "verify_graph": None, "verify_auto": False}
 DEVICE_SETTINGS = ("ngl", "ctx", "batch", "threads", "flash_attn", "cache_type", "parallel")
 
 
@@ -466,8 +470,12 @@ def set_policy(plan: dict, values: dict, by: str = "human") -> dict:
             raise PlanError(f"review must be one of {REVIEW_POLICIES}")
         if k in ("max_parallel", "max_attempts"):
             v = max(1, min(16, int(v)))
-        if k == "check":
+        if k in ("check", "verify_auto"):
             v = bool(v)
+        if k == "verify_graph":
+            v = str(v).strip() or None if v else None
+            if v and not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,59}|template:[a-z0-9_-]+", v):
+                raise PlanError("verify_graph: the name of a saved graph")
         if k == "devices":
             if not isinstance(v, list) or not all(isinstance(x, str) and re.fullmatch(r"[a-z]+:\d+", x) for x in v):
                 raise PlanError("devices must be a list like [\"rocm:0\", \"vulkan:1\"]")
@@ -636,6 +644,15 @@ def worker_messages(plan: dict, t: dict, max_input_chars: int = 12_000) -> list[
     lines += ["", f"Your task ({t['id']}): {t['title']}", t["detail"]]
     if t.get("acceptance"):
         lines += ["", f"Done means: {t['acceptance']}"]
+    # what the worker may do (scripts/permissions.py): job project_task, the task's own profile if set
+    try:
+        import permissions as perm
+        model = (t.get("assignee") or {}).get("model") or ""
+        lines += ["", perm.prompt_text(perm.Policy(), model=model, job="project_task",
+                                       profile=t.get("permissions") or "",
+                                       ctx=perm.context(workdir=plan.get("workdir") or plan.get("checkout")))]
+    except (ImportError, ValueError):
+        pass
     budget = max_input_chars
     for d in t["depends_on"]:
         dep = by_id[d]
@@ -696,10 +713,26 @@ def start_attempt(plan: dict, t: dict) -> dict:
     return a
 
 
+def yield_attempt(plan: dict, t: dict, reason: str) -> dict:
+    """The computer the attempt ran on was taken back (its owner came back, a power limit): the task goes
+    back to the queue at once, for another worker, and the attempt does not count as a failure."""
+    a = t["attempts"][-1]
+    a["finished"] = _now()
+    a["yielded"] = str(reason)[:300]
+    t["status"] = "todo"
+    t["not_before"] = 0
+    t["avoid"] = sorted(set(t.get("avoid") or []) | ({a["model"]} if a.get("model") else set()))
+    plan["updated"] = _now()
+    return a
+
+
 def finish_attempt(plan: dict, t: dict, text: str | None, check: dict | None = None,
-                   error: str | None = None, clf: sc.SubjectClassifier | None = None, fatal: bool = False) -> dict:
+                   error: str | None = None, clf: sc.SubjectClassifier | None = None, fatal: bool = False,
+                   screen: dict | None = None) -> dict:
     """Record a worker's answer and decide where it goes: review, done (when
     the policy allows), blocked (worker said so), or back to todo on error.
+    screen: the verification graph's verdict ({"status": passed|failed|person|error, "feedback", "run"}):
+    a failed result never skips review, and with verify_auto goes straight back to the worker.
     Follow-ups become a proposal for a person to accept."""
     a = t["attempts"][-1]
     a["finished"] = _now()
@@ -718,10 +751,16 @@ def finish_attempt(plan: dict, t: dict, text: str | None, check: dict | None = N
         return a
     a["text"] = (text or "")[:MAX_RESULT_CHARS]
     a["check"] = check
+    if screen:
+        a["screen"] = screen
     rep = parse_report(a["text"])
     a["report"] = rep
-    flagged = bool(check and check.get("flagged"))
-    if rep["status"] == "blocked":
+    flagged = bool(check and check.get("flagged")) or bool(screen and screen.get("status") != "passed")
+    if rep["status"] != "blocked" and screen and screen.get("status") == "failed" and pol.get("verify_auto"):
+        t["status"] = "review"
+        review(plan, t["id"], False, "The verification graph sent this back: " + str(screen.get("feedback") or "")[:3000],
+               by="graph")
+    elif rep["status"] == "blocked":
         t["status"] = "blocked"
         t["questions"] += [{"q": q, "answer": None, "attempt": a["n"]} for q in rep["questions"] or
                            ["The worker reported it is blocked; see its reply."]]

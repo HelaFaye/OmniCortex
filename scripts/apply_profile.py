@@ -24,7 +24,7 @@ import torch
 from transformers import AutoConfig
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import load_model
+from oc_common import load_model
 from profiles import Profile, SuppressionHandle, fingerprint
 
 
@@ -41,9 +41,13 @@ def main():
     p.add_argument("--max_new_tokens", type=int, default=256)
     p.add_argument("--gpu_mem")
     p.add_argument("--cpu_mem", default="40GiB")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     a = p.parse_args()
-    trc = not a.no_trust_remote_code
+    trc = a.trust_remote_code
 
     if a.list:
         cfg = AutoConfig.from_pretrained(a.model_path, trust_remote_code=trc)

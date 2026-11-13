@@ -2,7 +2,7 @@
 
 The 3D trace view shows one reply, token by token. The **Review** page
 (`/review` in Studio) shows the opposite slice: every reply a model has
-written that NeuronScope has looked at (tests, benchmarks, chat), and for
+written that OmniCortex has looked at (tests, benchmarks, chat), and for
 each MLP neuron, how its activity relates to whether the model was right.
 Filter by where the data came from and what it was about, and play it over
 time.
@@ -38,7 +38,7 @@ Three ways observations arrive:
   same GGUF that wrote the replies. Vision items are skipped (their image is
   part of the prompt).
 
-Observations live in `~/.neuronscope/review/<model>/` (`index.jsonl` plus one
+Observations live in `~/.omnicortex/review/<model>/` (`index.jsonl` plus one
 small `.npy` per reply, about 30 KB for a 28-layer model). Nothing leaves the
 machine.
 
@@ -107,3 +107,54 @@ runs and chat checks land together. API: `GET /api/review`,
   neurons.
 - Observations from different model files are never mixed: a quantization
   or an edit is a different model id.
+
+## Weighting measurements
+
+A model can be measured several ways:
+- TestQA, LiveBench and SWE-bench (graded answers, by source);
+- published reference scores;
+- how often H-Neuron activation flags its replies;
+- the replies you marked right or wrong here.
+
+They do not always agree. **Tasks → Distribution → How measurements are
+weighted** shows how much each one counts when models are ranked together
+(`scripts/measure_weights.py`):
+
+- **Against your verdicts.** Once at least five models have replies you
+  labelled, each measurement is weighted by its rank correlation with those
+  labels. It counts for as much as it agrees with what you found in use.
+- **By consensus.** Until then, each measurement is weighted by its
+  correlation with the mean of all the others. A measurement that disagrees
+  with everything else counts less.
+
+The rules for turning correlations into weights:
+- A correlation from few models is shrunk toward an equal share
+  (n ÷ (n + 5)).
+- A negative correlation counts as zero.
+- The combined score is the weighted mean of z-scores, over the
+  measurements each model has.
+
+Every fit is added to a history, shown beside each weight, so you can watch
+the weights settle as results come in. A scoreboard computes the same
+weights per subject, and they show which subjects separate models.
+
+## Subject colours in the 3D views
+
+Once the review has observations across subjects (TestQA runs and checked
+chat replies are labelled by subject), it can say which neurons go with
+which subject. A neuron goes with a subject when its activation on that
+subject's observations is higher than on the others':
+- by more than the same Bonferroni-corrected floor the association uses;
+- for the subject it separates most.
+
+A 3D view of a checked reply then colours each active neuron by its
+subject, in the theme's subject palette. Neurons flagged for hallucination
+keep their ring and colour on top. **Colour by subject** in the legend
+turns it off.
+
+Two conditions apply:
+- The map needs at least six observations of the model, and at least three
+  per subject.
+- It only applies when the trace has the review's layer count.
+
+`neuron_review.subject_map()` returns it for other uses.

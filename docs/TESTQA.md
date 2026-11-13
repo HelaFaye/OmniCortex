@@ -118,6 +118,42 @@ Every bundled coding task is verified against a reference solution in
 `tests/test_testqa.py`. Keep doing that for new tasks: that test found a wrong
 expected value in this bank before it could mis-grade a model.
 
+## Concurrency
+
+Every endpoint runs at the same time (`--sequential` runs them one after
+another). Each server has its own limit on requests in flight:
+
+- **`--concurrency auto`** (the default) starts at one request and adds one
+  while throughput still rises by more than 15%. It gives one back when
+  throughput falls, and halves the limit after an error. It never goes past
+  `--max-concurrency` (8) or the slots llama-server reports (`/props`
+  `total_slots`); past those, requests only queue inside the server. A server
+  that takes longer than `--slow` seconds (120) for a single request stays
+  at one request at a time.
+- **`--concurrency N`** sets a fixed limit for every server.
+- **`--parallel LABEL=N`** (or `LABEL=auto`) sets one endpoint's limit, for
+  example `--parallel cpu-box=1`.
+
+Endpoints that name the same server share its limit, so comparing two
+models served from one GPU does not double that GPU's load.
+
+**Pools.** Several servers can serve one model and share its tasks:
+
+```bash
+python scripts/testqa.py --endpoint big=http://gpu-box:8080/v1@big \
+    --pool big=http://second-box:8080/v1@big --pool big=http://laptop:8080/v1@big
+```
+
+All three take tasks from one queue: whichever server frees a slot takes
+the next. A fast server therefore does most of the work, and a slow one
+still contributes at its own pace. A task that fails on one server is
+retried on another. A server that fails three times in a row is dropped
+from the pool. Each result records which server answered it (`served_by`).
+
+The run ends with a scheduling line per server: its final limit and why,
+tasks done, average time, and tokens per second. The results file keeps
+the same under `"scheduling"`.
+
 ## Per-subject runs
 
 ```bash
@@ -146,7 +182,7 @@ paired comparison, or a bigger bank, before acting on the difference.
 ```bash
 python scripts/testqa.py --endpoint m=http://127.0.0.1:7870/v1@<id> --allow-exec \
     --publish-stats http://127.0.0.1:7870            # Studio ties results to the exact model file
-python scripts/testqa.py --endpoint m=... --record-stats   # or write ~/.neuronscope/stats directly
+python scripts/testqa.py --endpoint m=... --record-stats   # or write ~/.omnicortex/stats directly
 ```
 
 Every graded item becomes a rolling observation for that model (see

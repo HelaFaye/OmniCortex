@@ -1,0 +1,31 @@
+omnicortex_testqa:
+  resources_servers:
+    omnicortex_testqa:
+      entrypoint: app.py
+      abstain_reward: 0.25
+      wrong_reward: -1.0
+      risk_weight: 0.0
+      studio_url: null
+      studio_model: null
+      domain: knowledge
+      verified: false
+      description: OmniCortex TestQA items, graded so that confident mistakes cost more than declining
+      value: Fewer confident hallucinations, not just higher accuracy
+omnicortex_testqa_simple_agent:
+  responses_api_agents:
+    simple_agent:
+      entrypoint: app.py
+      resources_server:
+        type: resources_servers
+        name: omnicortex_testqa
+      model_server:
+        type: responses_api_models
+        name: policy_model
+      datasets:
+      - name: train
+        type: train
+        jsonl_fpath: resources_servers/omnicortex_testqa/data/train.jsonl
+        license: same as the items' source (OmniCortex's bank is the repository's license)
+      - name: example
+        type: example
+        jsonl_fpath: resources_servers/omnicortex_testqa/data/example.jsonl

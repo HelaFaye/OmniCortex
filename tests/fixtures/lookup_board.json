@@ -1,0 +1,22 @@
+{"updated": 1700000000, "cards": 4,
+ "rows": [
+  {"model_sha": "a1", "file": "qwen-7b-q4_k_m.gguf", "quant": "Q4_K_M", "hf_repo": "Qwen/Qwen2.5-7B-Instruct", "listed": true,
+   "variant_id": "v1", "submissions": 2, "items": 400, "accuracy": 0.71, "hallucination_rate": 0.12,
+   "per_subject": {"math": {"n": 200, "correct": 130, "wrong": 30, "abstained": 40, "other": 0, "accuracy": 0.65},
+                   "code": {"n": 200, "correct": 154, "wrong": 18, "abstained": 28, "other": 0, "accuracy": 0.77}},
+   "variant": {"engine": "llama.cpp", "suppression": 0.5, "lora": null},
+   "hardware": ["Tesla M10"],
+   "performance": [{"source": "testqa", "gen_tok_s": 11.5, "requests": 80, "parallel": 2, "ngl": 99,
+                    "hardware": {"gpus": [{"name": "Tesla M10"}], "cpu": "Xeon"}}],
+   "extras": {"emotions": {"calm": {"mean": 0.21, "n": 2}, "desperate": {"mean": -0.4, "n": 1}},
+              "features": [{"sae": "res-l12", "id": "1234", "label": "code comments", "freq": 0.05, "n": 2}]}},
+  {"model_sha": "b2", "file": "qwen2.5-7b-instruct-q8_0.gguf", "quant": "Q8_0", "hf_repo": "bartowski/Qwen2.5-7B-Instruct-GGUF",
+   "listed": true, "variant_id": "v2", "submissions": 1, "items": 100, "accuracy": 0.74, "hallucination_rate": 0.1,
+   "per_subject": {}, "variant": {"engine": "llama.cpp"}, "hardware": ["RTX 4090"],
+   "performance": [{"gen_tok_s": 95.0, "requests": 100, "hardware": {"gpus": [{"name": "RTX 4090"}]}}]},
+  {"model_sha": "c3", "file": "other.gguf", "hf_repo": "someone/Other-Model", "accuracy": 0.5, "items": 10,
+   "per_subject": {}, "variant": {}, "performance": []}
+ ],
+ "hw_profiles": {"accepted": [], "pending": [],
+   "reports": {"nvidia-legacy-sm50-70": {"inference": {"reports": 3, "worked": 2, "failed": 1, "hardware": ["Tesla M10"], "median_tok_s": 12}},
+               "amd-rocm": {"inference": {"reports": 1, "worked": 1, "failed": 0, "hardware": ["RX 7900 XTX"], "median_tok_s": 40}}}}}

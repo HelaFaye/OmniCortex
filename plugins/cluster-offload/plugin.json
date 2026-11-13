@@ -1,0 +1,22 @@
+{
+  "name": "cluster-offload",
+  "version": "1.0",
+  "author": "OmniCortex",
+  "default": true,
+  "description": "Where should this run? Free GPU memory on this computer and every connected host, read from Studio's system monitor and (optionally) a Proxmox cluster's API; a placement plan for a model of a given size: one machine when it fits, otherwise a layer split across machines (llama.cpp RPC) with the RPC servers and tensor split to set.",
+  "jobs": [
+    {"kind": "plan", "title": "Cluster: where does this model fit?", "script": "plan.py",
+     "help": "Reads live GPU memory from Studio (this computer and connected hosts) and places a model of the given size: the device with the most free memory if one fits it, otherwise the fewest devices that together do, as RPC servers and a tensor split for the model's settings.",
+     "fields": [{"name": "model_gb", "kind": "float", "required": true, "help": "the GGUF's size in GB"},
+                {"name": "ctx_gb", "kind": "float", "default": 1.5, "help": "room for the KV cache and buffers"},
+                {"name": "headroom", "kind": "float", "default": 0.9, "help": "use at most this share of free memory"},
+                {"name": "rpc_port", "kind": "int", "default": 50052},
+                {"name": "proxmox", "help": "a Proxmox report JSON (the other job) to include its GPUs"}]},
+    {"kind": "proxmox", "title": "Cluster: read a Proxmox cluster", "script": "proxmox.py",
+     "help": "Nodes, their memory and CPU, guests (VMs and LXC containers) and the GPUs each node has, from the Proxmox VE API with an API token (Datacenter → Permissions → API Tokens; PVEAuditor is enough). GPUs given to LXC containers can be shared; a GPU passed through to a VM belongs to that VM.",
+     "fields": [{"name": "url", "required": true, "help": "https://pve:8006"}, {"name": "token", "required": true,
+                 "help": "user@realm!tokenid=secret"}, {"name": "insecure", "kind": "bool", "help": "accept the node's own certificate"},
+                {"name": "out", "required": true}]}
+  ],
+  "page": "page"
+}

@@ -3,7 +3,7 @@
 New to the vocabulary? [GLOSSARY.md](GLOSSARY.md) explains GGUF, CETT,
 H-Neurons, abstention, MCP and the rest, and why each matters here.
 
-NeuronScope is a set of Python tools plus two small llama.cpp additions. Most
+OmniCortex is a set of Python tools plus two small llama.cpp additions. Most
 of it runs anywhere Python 3.10+ runs; the parts that touch model internals
 want either PyTorch (any backend) or a llama.cpp build.
 
@@ -21,22 +21,57 @@ only the wall-clock timeout applies.
 
 ## The short way
 
+Get OmniCortex (clone it, or *Download ZIP* and unpack it), then
+double-click the installer for your system:
+
+| system | double-click | if it will not start |
+|---|---|---|
+| Windows | `Install OmniCortex.bat` | it offers to install Python with winget, or opens python.org |
+| macOS | `Install OmniCortex.command` | right-click → Open the first time (it is a downloaded script); needs Python 3.10+ from python.org or Homebrew, since the built-in one is 3.9 |
+| Linux | `install-gui.sh` | it prints the package to install if Python's venv module is missing |
+
+The installer opens in your browser:
+1. **This computer**: the system, Python, GPUs and free space, and anything
+   peculiar about them. It checks for:
+   - the Microsoft Store's Python;
+   - long Windows paths;
+   - an Intel Mac, which has no current PyTorch;
+   - an AMD GPU on Windows, which has no ROCm PyTorch;
+   - membership of the `video` and `render` groups for AMD on Linux;
+   - an RDNA4 card, which needs ROCm 7 and no `HSA_OVERRIDE_GFX_VERSION`;
+   - older NVIDIA cards, which need the CUDA 12.6 wheels.
+2. **Choices**: the PyTorch build recommended for this computer, or NVIDIA,
+   AMD, CPU only, or none (Studio, TestQA, Projects and the llama.cpp path
+   don't need it); the extras; a shortcut (Start menu, Applications folder,
+   app menu); and where to install.
+3. **Installing**: each step with its output. A failed step says what to
+   try, and *Install* again resumes quickly.
+4. **Done**: *Open OmniCortex* starts Studio on its Setup page, which
+   builds llama.cpp (or uses one you have) and finds your models.
+
+The first time you open Studio it offers a two-minute tour, which is
+optional. It points at each part of Studio in turn. The **?** button at the
+bottom right of every page brings it back, jumps to the current page's
+stop, or opens these help pages inside Studio.
+
+Terminal instead:
+
 ```bash
-git clone <this repo> neuronscope && cd neuronscope
-./install.sh            # add --no-torch for a lighter install without PyTorch
-./neuronscope           # or start "NeuronScope" from the app menu
+python3 scripts/installer.py --yes            # the same, with the recommended choices
+python3 scripts/installer.py --check          # what it found and would do; installs nothing
+python3 scripts/installer.py --yes --torch none
+./install.sh                                  # the original Linux/macOS script, still supported
 ```
 
-Studio opens in your browser on its **Setup** page: build llama.cpp with one
-button (or point it at an existing build), add your models folder, run the
-health check. Everything after that is in the browser; see
-[UI_AND_CLI.md](UI_AND_CLI.md) for where each feature lives, and the steps
-below for doing the same from a terminal.
+Then start it from the shortcut, `OmniCortex.bat` or `./omnicortex`.
+Everything after that is in the browser; see [UI_AND_CLI.md](UI_AND_CLI.md)
+for where each feature lives, and the steps below for doing the same from
+a terminal.
 
 ## 1. Install
 
 ```bash
-git clone <this repo> neuronscope && cd neuronscope
+git clone <this repo> omnicortex && cd omnicortex
 ./install.sh              # creates venv/, picks a PyTorch build for your GPU, smoke-tests it
 source venv/bin/activate
 ```
@@ -63,7 +98,7 @@ python scripts/doctor.py
 ```
 
 It checks, in order, Python and packages, your GPUs and the devices Studio's
-worker models can use, your llama.cpp build, the model in `NS_GGUF`, and which
+worker models can use, your llama.cpp build, the model in `OC_GGUF`, and which
 pipeline stages already have output. Each problem comes with what it blocks
 and the fix, and it ends with what to do next: one line for using models in
 Studio, one for the H-Neuron pipeline.
@@ -86,9 +121,9 @@ build for others), and pre-Turing cards need a CUDA 12.x toolkit, or
 
 `cett-dump` is tested against current llama.cpp: on a model converted with
 llama.cpp's own converter its CETT values match the PyTorch hook path on every
-layer (`tests/test_llamacpp_integration.py`, run with `NS_LLAMA` set).
+layer (`tests/test_llamacpp_integration.py`, run with `OC_LLAMA` set).
 
-## 3. Get a model and point NeuronScope at it
+## 3. Get a model and point OmniCortex at it
 
 No GGUF yet? Start Studio (step 4) and use its **Models** tab to search Hugging
 Face and download one; a 7-8B model at Q4_K_M (about 5 GB) is a good first
@@ -97,9 +132,9 @@ choice. Studio, TestQA and Projects need nothing more.
 For the H-Neuron pipeline, tell the scripts which model to study:
 
 ```bash
-export NS_GGUF=~/models/Qwen3-8B-Q6_K.gguf
-export NS_LLAMA=~/llama.cpp
-source env.sh            # derives NS_CETT, NS_LLAMA_SERVER, NS_LAYERS; checks the file
+export OC_GGUF=~/models/Qwen3-8B-Q6_K.gguf
+export OC_LLAMA=~/llama.cpp
+source env.sh            # derives OC_CETT, OC_LLAMA_SERVER, OC_LAYERS; checks the file
 ```
 
 Put those exports in `env.local.sh` (gitignored) to make them stick. Use a
@@ -108,10 +143,10 @@ sizes the pipeline measures (see [GLOSSARY.md](GLOSSARY.md#models-and-files)).
 
 ## 4. Pick a starting point
 
-**Run models like LM Studio, with the NeuronScope dials:**
+**Run models like LM Studio, with the OmniCortex dials:**
 
 ```bash
-python viz/studio.py --models-dir ~/models --server "$NS_LLAMA_SERVER"
+python viz/studio.py --models-dir ~/models --server "$OC_LLAMA_SERVER"
 ```
 
 Open http://127.0.0.1:7870. Any OpenAI client can use http://127.0.0.1:7870/v1.
@@ -141,7 +176,7 @@ without it only under local CPU and memory limits. See [TESTQA.md](TESTQA.md).
 
 ```bash
 printf 'The capital of France is' > /tmp/seq.txt
-"$NS_CETT" -m "$NS_GGUF" -ngl 99 -b 4096 --n-layers "$NS_LAYERS" \
+"$OC_CETT" -m "$OC_GGUF" -ngl 99 -b 4096 --n-layers "$OC_LAYERS" \
     --prompt-file /tmp/seq.txt --out /tmp/d.bin
 ```
 
@@ -155,13 +190,13 @@ spans, agg = read_aggregate('/tmp/d.bin')[:2]
 print('spans x layers x neurons:', agg.shape)"
 ```
 
-The middle number must equal `$NS_LAYERS`: one averaged row of neuron
+The middle number must equal `$OC_LAYERS`: one averaged row of neuron
 activations per decoder layer. If the run fails with "capture failed (0
 records)", the architecture names its FFN output node differently. List the
 node names:
 
 ```bash
-"$NS_LLAMA"/build/bin/llama-eval-callback -m "$NS_GGUF" -p "hi" -n 1 2>&1 \
+"$OC_LLAMA"/build/bin/llama-eval-callback -m "$OC_GGUF" -p "hi" -n 1 2>&1 \
     | grep -oE '^[a-z_]+-[0-9]+' | sort -u | head -30
 ```
 

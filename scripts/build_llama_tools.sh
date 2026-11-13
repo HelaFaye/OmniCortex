@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build llama.cpp with NeuronScope's cett-dump extractor.
+# Build llama.cpp with OmniCortex's cett-dump extractor.
 #
 #   scripts/build_llama_tools.sh                     # CPU, ~/llama.cpp
 #   scripts/build_llama_tools.sh --backend vulkan    # or cuda, metal, hip
@@ -8,6 +8,9 @@
 #   scripts/build_llama_tools.sh --dir /opt/llama.cpp --ref b6500
 #   scripts/build_llama_tools.sh --portable          # no -march=native: runs on other CPUs
 #   scripts/build_llama_tools.sh --server-activations  # llama-server streams /activations
+#   scripts/build_llama_tools.sh --cmake "-DGGML_AVX=OFF"  # extra CMake flags (CI: 32-bit targets)
+#   scripts/build_llama_tools.sh --rpc                 # also rpc-server, for layer streaming across computers
+#   scripts/build_llama_tools.sh --repo URL --ref SHA  # a fork, e.g. one with a model llama.cpp has not merged yet
 #
 # Clones (or updates) llama.cpp, copies llama-tools/cett-dump into tools/,
 # registers it, and builds llama-cett-dump, llama-server, llama-quantize and
@@ -16,17 +19,20 @@
 # Prints the env exports for env.local.sh at the end.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DIR="${HOME}/llama.cpp"; BACKEND="cpu"; REF=""; NATIVE=ON; ACTS=0; CUDA_ARCH=""; JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+DIR="${HOME}/llama.cpp"; BACKEND="cpu"; REF=""; REPO="https://github.com/ggml-org/llama.cpp"; NATIVE=ON; ACTS=0; RPC=0; CUDA_ARCH=""; EXTRA=""; JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dir) DIR="$2"; shift 2 ;;
     --backend) BACKEND="$2"; shift 2 ;;
     --ref) REF="$2"; shift 2 ;;
+    --repo) REPO="$2"; shift 2 ;;
     -j) JOBS="$2"; shift 2 ;;
     --portable) NATIVE=OFF; shift ;;
     --server-activations) ACTS=1; shift ;;
+    --rpc) RPC=1; shift ;;
     --cuda-arch) CUDA_ARCH="$2"; shift 2 ;;
-    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+    --cmake) EXTRA="$2"; shift 2 ;;
+    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
     *) echo "unknown option $1" >&2; exit 1 ;;
   esac
 done
@@ -66,22 +72,24 @@ case "$BACKEND" in
   hip|rocm) FLAGS=(-DGGML_HIP=ON) ;;
   *) echo "backend must be cpu, vulkan, cuda, metal or hip" >&2; exit 1 ;;
 esac
+TARGETS=(llama-cett-dump llama-server llama-quantize llama-eval-callback)
+if [[ "$RPC" == 1 ]]; then FLAGS+=(-DGGML_RPC=ON); TARGETS+=(rpc-server); fi
 if [[ ! -d "$DIR/.git" ]]; then
   # Shallow: the history is ~1 GB and nothing here needs it (--ref fetches a pinned commit).
-  git clone --depth 1 https://github.com/ggml-org/llama.cpp "$DIR"
+  git clone --depth 1 "$REPO" "$DIR"
 fi
-if [[ -n "$REF" ]]; then git -C "$DIR" fetch --depth 1 origin "$REF" && git -C "$DIR" checkout FETCH_HEAD; fi
+if [[ -n "$REF" ]]; then git -C "$DIR" fetch --depth 1 "$REPO" "$REF" && git -C "$DIR" checkout FETCH_HEAD; fi
 rm -rf "$DIR/tools/cett-dump"
 cp -r "$here/llama-tools/cett-dump" "$DIR/tools/"
 grep -q 'add_subdirectory(cett-dump)' "$DIR/tools/CMakeLists.txt" || echo 'add_subdirectory(cett-dump)' >> "$DIR/tools/CMakeLists.txt"
 if [[ "$ACTS" == 1 ]]; then python3 "$here/llama-tools/server-activations/apply_patch.py" "$DIR"; fi
-cmake -S "$DIR" -B "$DIR/build" -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DGGML_NATIVE="$NATIVE" "${FLAGS[@]}"
+cmake -S "$DIR" -B "$DIR/build" -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DGGML_NATIVE="$NATIVE" "${FLAGS[@]}" $EXTRA
 cmake --build "$DIR/build" --config Release -j "$JOBS" \
-  --target llama-cett-dump llama-server llama-quantize llama-eval-callback
+  --target "${TARGETS[@]}"
 cat <<MSG
 
 Built in $DIR/build/bin. Add to env.local.sh:
-  export NS_LLAMA="$DIR"
-  export NS_CETT="$DIR/build/bin/llama-cett-dump"
-  export NS_LLAMA_SERVER="$DIR/build/bin/llama-server"
+  export OC_LLAMA="$DIR"
+  export OC_CETT="$DIR/build/bin/llama-cett-dump"
+  export OC_LLAMA_SERVER="$DIR/build/bin/llama-server"
 MSG

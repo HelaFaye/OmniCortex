@@ -1,0 +1,109 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pose review</title>
+<style>
+:root{--bg:#fafaf9;--fg:#1c1c1a;--mut:#6b6b66;--line:#e2e2de;--acc:#2d5bd7;--ok:#1f9d55;--bad:#e5323b;--fix:#2d7bff}
+@media (prefers-color-scheme:dark){:root{--bg:#151514;--fg:#ececea;--mut:#9a9a94;--line:#2b2b29;--acc:#6f93ff;--ok:#3ccf7a;--bad:#ff5a61;--fix:#5aa0ff}}
+*{box-sizing:border-box}
+body{margin:0;padding:12px 16px;font:14px/1.45 system-ui;background:var(--bg);color:var(--fg)}
+a{color:var(--acc)}small,.mut{color:var(--mut)}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+input,select,button{font:inherit;color:inherit;background:transparent;border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+button{cursor:pointer}button.ok{border-color:var(--ok);color:var(--ok)}button.bad{border-color:var(--bad);color:var(--bad)}
+.wrap{display:grid;grid-template-columns:260px 1fr;gap:12px}
+@media (max-width:760px){.wrap{grid-template-columns:1fr}}
+#list{max-height:75vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+#list div{padding:4px 8px;border-bottom:1px solid var(--line);cursor:pointer}
+#list div.on{background:color-mix(in srgb,var(--acc) 15%,transparent)}
+.stage{position:relative;max-width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#000}
+.stage img{display:block;max-width:100%}
+.stage svg{position:absolute;inset:0;width:100%;height:100%}
+table{border-collapse:collapse;font-size:13px}td{padding:2px 8px;border-top:1px solid var(--line)}
+.legend span{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 10px;vertical-align:-1px}
+</style>
+<h2>Pose review</h2>
+<p class="mut">Each item is a frame the deficit sieve flagged. Approve it to add the pair (tracked pose rejected, corrected
+pose chosen) to the training pool; discard false alarms (lighting, camera shake, a cut). Keys: <b>a</b> approve, <b>d</b> discard,
+<b>j</b>/<b>k</b> next/previous. <a href="/">← Studio</a></p>
+<div class="bar"><label>Staging folder <input id="dir" size="34" value="runs/pose/staging"></label>
+<button id="load">Load</button><span id="counts" class="mut"></span>
+<label><input type="checkbox" id="showfix" checked> show correction</label>
+<select id="filter"><option value="">every error</option></select></div>
+<div class="wrap"><div id="list"></div><div id="view"><p class="mut">Load a staging folder.</p></div></div>
+<script>
+const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const BONES=[["hips","spine"],["spine","neck"],["neck","head"],["neck","l_shoulder"],["l_shoulder","l_elbow"],["l_elbow","l_wrist"],
+ ["neck","r_shoulder"],["r_shoulder","r_elbow"],["r_elbow","r_wrist"],["hips","l_hip"],["l_hip","l_knee"],["l_knee","l_ankle"],["l_ankle","l_toe"],
+ ["hips","r_hip"],["r_hip","r_knee"],["r_knee","r_ankle"],["r_ankle","r_toe"]];
+let ITEMS=[], CUR=-1, ITEM=null;
+try{ $('#dir').value=localStorage.getItem('pose-dir')||$('#dir').value; }catch(e){}
+
+async function cmd(c){
+  const r=await fetch('/api/plugins/check',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({plugin:'pose',check:'staging',text:JSON.stringify({dir:$('#dir').value,...c})})});
+  const j=await r.json(); if(!r.ok||j.error) throw new Error(j.error||r.status); return j;
+}
+function counts(c){ $('#counts').textContent=`${c.pending} to review · ${c.approved} approved · ${c.discarded} discarded`; }
+async function load(){
+  try{ localStorage.setItem('pose-dir',$('#dir').value); }catch(e){}
+  let j; try{ j=await cmd({op:'list'}); }catch(e){ $('#view').innerHTML=`<p style="color:var(--bad)">${esc(e.message)}</p>`; return; }
+  ITEMS=j.items; counts(j.counts);
+  const kinds=[...new Set(ITEMS.flatMap(i=>i.failures.map(f=>f.error)))];
+  $('#filter').innerHTML='<option value="">every error</option>'+kinds.map(k=>`<option>${esc(k)}</option>`).join('');
+  list(); if(shown().length) open(0); else $('#view').innerHTML='<p class="mut">Nothing to review.</p>';
+}
+const shown=()=>ITEMS.filter(i=>!$('#filter').value||i.failures.some(f=>f.error===$('#filter').value));
+function list(){
+  $('#list').innerHTML=shown().map((it,n)=>`<div data-n="${n}" class="${n===CUR?'on':''}">frame ${it.frame} · actor ${esc(it.track)}
+    <br><small>${esc(it.failures.map(f=>f.joint+' '+f.error).join(', '))}</small></div>`).join('');
+  document.querySelectorAll('#list div').forEach(d=>d.onclick=()=>open(+d.dataset.n));
+}
+// Least-squares weak-perspective camera: px ≈ A·[x y z 1], fitted on the joints that passed.
+function fitCamera(joints,px,skip){
+  const ks=Object.keys(px).filter(k=>joints[k]&&!skip.has(k)); if(ks.length<5) return null;
+  const solve=(M,b)=>{ const n=4,A=M.map((r,i)=>[...r,b[i]]);
+    for(let c=0;c<n;c++){ let p=c; for(let r=c+1;r<n;r++) if(Math.abs(A[r][c])>Math.abs(A[p][c])) p=r; [A[c],A[p]]=[A[p],A[c]];
+      if(Math.abs(A[c][c])<1e-12) return null; for(let r=0;r<n;r++) if(r!==c){ const f=A[r][c]/A[c][c]; for(let k=c;k<=n;k++) A[r][k]-=f*A[c][k]; } }
+    return A.map((r,i)=>r[n]/r[i]); };
+  const M=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]], bu=[0,0,0,0], bv=[0,0,0,0];
+  for(const k of ks){ const x=[...joints[k],1]; for(let i=0;i<4;i++){ for(let j=0;j<4;j++) M[i][j]+=x[i]*x[j]; bu[i]+=x[i]*px[k][0]; bv[i]+=x[i]*px[k][1]; } }
+  for(let i=0;i<4;i++) M[i][i]+=1e-6;
+  const u=solve(M,bu), v=solve(M,bv); return u&&v?(p=>[u[0]*p[0]+u[1]*p[1]+u[2]*p[2]+u[3], v[0]*p[0]+v[1]*p[1]+v[2]*p[2]+v[3]]):null;
+}
+function overlay(it,w,h){
+  const px=it.px||{}, bad=new Set(it.failures.map(f=>f.joint)), P=k=>px[k]?[px[k][0]*w,px[k][1]*h]:null;
+  let s='';
+  for(const [a,b] of BONES){ const p=P(a),q=P(b); if(p&&q) s+=`<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="${bad.has(b)?'var(--bad)':'var(--ok)'}" stroke-width="${bad.has(b)?4:3}" stroke-linecap="round"/>`; }
+  for(const k in px){ const p=P(k); s+=`<circle cx="${p[0]}" cy="${p[1]}" r="${bad.has(k)?7:4}" fill="${bad.has(k)?'var(--bad)':'var(--ok)'}"><title>${esc(k)}</title></circle>`; }
+  if($('#showfix').checked){
+    const cam=fitCamera(it.rejected,px,bad);
+    if(cam){ const C=k=>{ const q=cam(it.chosen[k]); return [q[0]*w,q[1]*h]; };
+      for(const [a,b] of BONES) if(it.chosen[a]&&it.chosen[b]&&(bad.has(a)||bad.has(b))){ const p=C(a),q=C(b);
+        s+=`<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="var(--fix)" stroke-width="3" stroke-dasharray="6 4"/>`; } }
+  }
+  return s;
+}
+async function open(n){
+  const list_=shown(); if(!list_[n]) return; CUR=n; list();
+  const j=await cmd({op:'get',id:list_[n].id}); ITEM=j.item;
+  const it=ITEM, fails=it.failures.map(f=>`<tr><td>${esc(f.joint)}</td><td>${esc(f.error)}</td><td>${esc(f.value)}</td><td class="mut">limit ${esc(f.limit)}</td></tr>`).join('');
+  $('#view').innerHTML=`<div class="bar"><b>frame ${it.frame}</b><span class="mut">actor ${esc(it.track)} · t ${it.t}s${it.model?' · '+esc(it.model):''}</span>
+    <button class="ok" id="ap">Approve (a)</button><button class="bad" id="di">Discard (d)</button></div>
+    ${it.image_data?`<div class="stage"><img id="img" src="${it.image_data}" alt="frame ${it.frame}"><svg id="ov"></svg></div>`
+      :'<p class="mut">No frame image (extract.py --images, sieve.py --images) or no 2D positions: judge from the numbers.</p>'}
+    <p class="legend"><span style="background:var(--ok)"></span>as tracked<span style="background:var(--bad)"></span>failing joint
+    <span style="background:var(--fix)"></span>correction (projected through a camera fitted to the healthy joints)</p>
+    <table>${fails}</table><p class="mut">${esc((it.fix||[]).join(' · '))}</p>`;
+  const img=$('#img'); if(img){ const draw=()=>{ const w=img.naturalWidth,h=img.naturalHeight; $('#ov').setAttribute('viewBox',`0 0 ${w} ${h}`); $('#ov').innerHTML=overlay(it,w,h); };
+    img.complete?draw():img.onload=draw; }
+  $('#ap').onclick=()=>decide('approve'); $('#di').onclick=()=>decide('discard');
+}
+async function decide(op){
+  if(!ITEM) return; const j=await cmd({op,id:ITEM.id}); counts(j.counts);
+  ITEMS=ITEMS.filter(i=>i.id!==ITEM.id); ITEM=null; list();
+  if(shown().length) open(Math.min(CUR,shown().length-1)); else $('#view').innerHTML='<p class="mut">All reviewed.</p>';
+}
+$('#load').onclick=load; $('#filter').onchange=()=>{ list(); open(0); }; $('#showfix').onchange=()=>ITEM&&open(CUR);
+addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT') return;
+  if(e.key==='a') decide('approve'); else if(e.key==='d') decide('discard');
+  else if(e.key==='j') open(CUR+1); else if(e.key==='k') open(Math.max(0,CUR-1)); });
+</script>

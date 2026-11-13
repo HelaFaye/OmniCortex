@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuronScope: watch the NeuronScope pipeline.
+OmniCortex: watch the OmniCortex pipeline.
 
 Deliberately not Qt6 or Electron. You want to watch a sweep running on another
 machine from this one -- that is a web page. Standard library HTTP server plus
@@ -28,7 +28,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 import re
 import urllib.error
 import urllib.request
@@ -225,7 +225,7 @@ class Handler(BaseHTTPRequestHandler):
                                     "verdicts": v}))
 
 
-PAGE = r"""<!DOCTYPE html><meta charset="utf-8"><title>NeuronScope</title>
+PAGE = r"""<!DOCTYPE html><meta charset="utf-8"><title>OmniCortex</title>
 <style>
 :root{--bg:#faf9f7;--fg:#1c1c1a;--mut:#6b6b64;--line:#e3e2dd;--ok:#2f7d4f;--no:#b23c2e;--warn:#a8701c}
 *{box-sizing:border-box}
@@ -257,8 +257,8 @@ th:first-child,td:first-child{text-align:left;font-family:ui-monospace,monospace
 .err{background:#fdf0ee;color:var(--no)}
 .note{color:var(--mut);font-size:13px;margin-top:.5rem}
 </style>
-<header><h1>NeuronScope</h1>
-<div class="sub">NeuronScope pipeline state, layer map, and live suppression sweeps</div></header>
+<header><h1>OmniCortex</h1>
+<div class="sub">OmniCortex pipeline state, layer map, and live suppression sweeps</div></header>
 <main>
 <section><h2>Pipeline</h2><div id="pipe">loading…</div></section>
 <section><h2>H-Neurons per layer</h2><div id="layers" class="bars">loading…</div></section>
@@ -332,7 +332,7 @@ def main():
     a = p.parse_args()
     sec.loopback_only(a.host, "the dashboard", a.allow_unauthenticated)
     ROOT = os.path.abspath(a.root)
-    print(f"NeuronScope on http://{a.host}:{a.port}  (root {ROOT})")
+    print(f"OmniCortex on http://{a.host}:{a.port}  (root {ROOT})")
     ThreadingHTTPServer((a.host, a.port), Handler).serve_forever()
 
 

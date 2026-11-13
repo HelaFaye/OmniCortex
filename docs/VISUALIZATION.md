@@ -80,7 +80,7 @@ Start from the question you have, not the tool:
 The usual path is the first three in order: **check** a reply in Studio, look
 at the shaded text for the flagged span, **open the 3D view** on it to see
 which layers lit up, and go to **timeline** only if you need to measure. Every
-check is saved as a trace session under `~/.neuronscope/traces/<id>`, which
+check is saved as a trace session under `~/.omnicortex/traces/<id>`, which
 the hub's Replay picker, `bloom.py` and `timeline.py` all open.
 
 The 3D views read the same way everywhere:
@@ -150,7 +150,7 @@ variation the animation exists to show.
 | frontend | renderer | for |
 |---|---|---|
 | `viz/timeline.py` | pygfx / WGPU | analysis. Exact sizes, no effects. |
-| `viz/godot/` | Godot 4.7 Forward+ | standalone desktop, real glow |
+| `plugins/godot-client/client/` | Godot 4.7 Forward+ | standalone desktop, real glow |
 | `viz/bloom.py` | three.js in a browser | remote, zero install |
 
 Parity survives because the clients are thin. `viz/bloom.py` serves the API all
@@ -180,7 +180,7 @@ positions once and streams only intensities.
 
 ```bash
 python viz/bloom.py runs/trace-abc --host 0.0.0.0   # backend + web
-NS_API=http://127.0.0.1:7880 godot --path viz/godot                # desktop
+OC_API=http://127.0.0.1:7880 godot --path plugins/godot-client/client                # desktop
 python viz/timeline.py runs/trace-abc                # analysis
 ```
 
@@ -194,15 +194,15 @@ A real trace comes from `scripts/trace_sample.py`.
 
 ```bash
 python viz/bloom.py --demo                                  # terminal 1
-NS_API=http://127.0.0.1:7880 godot --path viz/godot         # terminal 2
-NS_FRAME=67 NS_PAUSED=1 NS_API=... godot --path viz/godot   # open on one token, paused
+OC_API=http://127.0.0.1:7880 godot --path plugins/godot-client/client         # terminal 2
+OC_FRAME=67 OC_PAUSED=1 OC_API=... godot --path plugins/godot-client/client   # open on one token, paused
 ```
 
 Space pauses, Left/Right step a token, N jumps to the next flagged token,
-clicking the risk strip seeks, Esc quits. `NS_API` may include a path (Studio
-serves each checked reply at `.../viz/<id>/`) and `NS_TOKEN` sends a bearer
+clicking the risk strip seeks, Esc quits. `OC_API` may include a path (Studio
+serves each checked reply at `.../viz/<id>/`) and `OC_TOKEN` sends a bearer
 token for a Studio that needs one. It runs the project
-directly, no editor needed; opening `viz/godot/project.godot` in the editor
+directly, no editor needed; opening `plugins/godot-client/client/project.godot` in the editor
 works too. Forward+ needs Vulkan; on a GPU or driver without it, add
 `--rendering-method gl_compatibility` (glow still works, a little softer).
 Verified with the official 4.7.2 build on a software Vulkan driver.
@@ -256,7 +256,7 @@ Four ways to get activations while you work:
 | | how | available | latency |
 |---|---|---|---|
 | **A** | trace the finished response (`scripts/autotrace.py`) | **now** | one prefill behind |
-| **B** | PyTorch hooks during `generate()` | now, needs bf16 in torch | per token |
+| **B** | PyTorch hooks while the decoding lab generates (`scripts/decode_lab.py --watch-*`) | **now**, Hugging Face weights | per token, with emotions and features |
 | **C** | `llama-cpp-python` + `cb_eval` via ctypes | no compile, fiddly | per token |
 | **D** | patched llama-server (`llama-tools/server-activations/`) | **now**, one rebuild | per token |
 
@@ -291,6 +291,39 @@ of tracing everything.
 `viz/stream.py` gained `/api/push`, so a trace produced anywhere on the network
 can drive the viewer.
 
+### B. The decoding lab
+
+`scripts/decode_lab.py` runs a Hugging Face model behind an OpenAI-compatible
+API. With `--watch-*` it reads the model as each token is chosen and sends
+the frame to the viewer before the token reaches the client:
+
+```bash
+python viz/stream.py --token-file viewer.token &
+python scripts/decode_lab.py --model Qwen/Qwen2.5-0.5B-Instruct --port 8091 \
+    --watch-cett --watch-emotions runs/emotions/m --watch-sae runs/features/m-r12 \
+    --publish http://127.0.0.1:7890 --publish-token-file viewer.token \
+    --record runs/traces
+```
+
+Each frame carries:
+
+- **CETT** of every MLP neuron, max-pooled to `--watch-bins` per layer (256 by default);
+- **emotions**: the top three, plus every emotion at least 0.5 standard deviations from its story mean, so the viewer's lanes stay continuous;
+- **features**: the top five of each dictionary, relative to each feature's maximum, with your labels.
+
+`--record` saves each reply as a trace session. The 3D replay, the timeline
+and the Godot client open it like any other, and also show the emotion lanes
+and the features at the current token. A request can skip watching with
+`"omnicortex": {"watch": false}` or skip recording with `{"record": false}`.
+It cannot choose the folder.
+
+Cost on a CPU: 40 tokens of a 0.5B model with all three watched took 6 to 10
+seconds, against about 4 unwatched. Without a classifier nothing is flagged;
+the views show activity, emotions and features, not risk.
+
+[FEATURES.md](FEATURES.md#watch-while-it-generates) covers training the
+dictionaries and emotion vectors these read.
+
 ## D. The patched llama-server
 
 `llama-tools/server-activations/` makes llama-server stream per-token CETT at
@@ -303,12 +336,12 @@ untouched.
 scripts/build_llama_tools.sh --server-activations     # or: apply_patch.py ~/llama.cpp, then rebuild
 python llama-tools/server-activations/export_classifier_bin.py \
     models/classifier.npz models/classifier.bin --gguf model.gguf
-NS_ACTIVATIONS=sparse NS_CLASSIFIER=models/classifier.bin \
+OC_ACTIVATIONS=sparse OC_CLASSIFIER=models/classifier.bin \
   ~/llama.cpp/build/bin/llama-server -m model.gguf --parallel 1 --port 8080
 python viz/stream.py --source http://127.0.0.1:8080 --token-file viewer.token
 ```
 
-A test (`tests/test_llamacpp_integration.py`, needs `NS_LLAMA` pointing at a
+A test (`tests/test_llamacpp_integration.py`, needs `OC_LLAMA` pointing at a
 patched build) checks every frame against PyTorch CETT on all layers, and the
 streamed score against the classifier applied in PyTorch.
 
@@ -368,3 +401,14 @@ because `EventSource` cannot set headers. TLS via `--tls-cert`, though on an
 untrusted network a WireGuard or Tailscale tunnel beats a self-signed cert that
 users learn to click through.
 
+## Camera (browser 3D view)
+
+| control | what it does | key |
+|---|---|---|
+| drag / right-drag / wheel | orbit, pan, zoom (manual) | |
+| **Front**, **Side**, **Top** | glide to a fixed view | 1, 2, 3 |
+| **Reset** | back to the starting view | R |
+| **Orbit** | a slow automatic turn around the model | O |
+| **Follow flags** | on every token with flagged hallucination neurons, glide to them; back to the overview after | F |
+
+Any drag stops a glide in progress, so the camera never fights the hand.

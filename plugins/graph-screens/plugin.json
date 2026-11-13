@@ -1,0 +1,18 @@
+{
+  "name": "graph-screens",
+  "version": "1.0",
+  "author": "OmniCortex",
+  "default": true,
+  "description": "More screening nodes for graphs: risky code in a reply (shell injection, eval, disabled TLS checks, hard-coded secrets, destructive commands) and prompt-injection attempts in text a model is about to read.",
+  "nodes": [
+    {"type": "code_security", "title": "Code security screen", "script": "code_security.py",
+     "inputs": [["code", "text", true]], "outputs": [["pass", "text"], ["fail", "text"], ["findings", "list"]],
+     "params": [{"name": "fail_on", "kind": "choice", "choices": ["high", "medium", "low"], "default": "medium",
+                 "help": "fail at findings of this severity or worse"}],
+     "help": "Looks for risky patterns in code a model wrote: shell=True with input, eval/exec, pickle of untrusted data, disabled certificate checks, hard-coded secrets, destructive commands. A first screen, not a security review."},
+    {"type": "injection_screen", "title": "Prompt-injection screen", "script": "injection.py",
+     "inputs": [["text", "text", true]], "outputs": [["pass", "text"], ["fail", "text"], ["findings", "list"]],
+     "params": [{"name": "threshold", "kind": "int", "default": 2, "help": "fail at this many signs"}],
+     "help": "Signs that fetched or retrieved text tries to give the model instructions: 'ignore previous instructions', role headers, hidden Unicode, requests to reveal the system prompt or call tools. Use before a model reads web pages, documents or tool output."}
+  ]
+}

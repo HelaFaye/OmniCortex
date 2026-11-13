@@ -4,10 +4,12 @@ Near-realtime activation streaming, for a phone or SBC on your network.
 
 The source is llama-server patched with llama-tools/server-activations
 (`scripts/build_llama_tools.sh --server-activations`), started with
-NS_ACTIVATIONS=sparse|binned|raw and --parallel 1. It reduces in-process and
+OC_ACTIVATIONS=sparse|binned|raw and --parallel 1. It reduces in-process and
 serves one frame per generated token at /activations; this relays those frames
 and adds auth, TLS and per-viewer backpressure. --simulate stands in when no
-patched server is running.
+patched server is running, and steps aside while frames are pushed to
+/api/push (scripts/autotrace.py, or the decoding lab's --publish, which adds
+emotion lanes and feature chips).
 
 Bandwidth is the whole design. On a 36-layer, 14336-wide model:
 
@@ -42,7 +44,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 
 STATE = {"token": None, "tier": "binned", "source": None, "simulate": False}
 SUBS = []
@@ -138,6 +140,9 @@ def simulate(layers=36, neurons=14336, rate=4.0):
     hot = [(rng.randrange(layers), rng.randrange(neurons)) for _ in range(6)]
     t = 0
     while True:
+        if time.time() - STATE.get("pushed", 0) < 10:
+            time.sleep(0.5)                     # real frames are arriving; the stand-in steps aside
+            continue
         burst = 40 <= (t % 90) <= 46
         cett = []
         for li in range(layers):
@@ -170,7 +175,7 @@ class Handler(BaseHTTPRequestHandler):
         if raw:
             try:
                 c = http.cookies.SimpleCookie(raw)
-                if "ns_token" in c and hmac.compare_digest(c["ns_token"].value,
+                if "oc_token" in c and hmac.compare_digest(c["oc_token"].value,
                                                            tok):
                     return True
             except Exception:
@@ -217,7 +222,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Set-Cookie",
-                                 f"ns_token={STATE['token']}; Path=/; "
+                                 f"oc_token={STATE['token']}; Path=/; "
                                  "HttpOnly; SameSite=Strict; Max-Age=604800")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -232,7 +237,9 @@ class Handler(BaseHTTPRequestHandler):
             # trace produced anywhere on the network can drive this viewer.
             n = int(self.headers.get("Content-Length", 0))
             try:
-                publish(json.loads(self.rfile.read(n) or b"{}"))
+                fr = json.loads(self.rfile.read(n) or b"{}")
+                STATE["pushed"] = time.time()
+                publish(fr)
             except json.JSONDecodeError:
                 return self._send(400, json.dumps({"error": "bad json"}))
             return self._send(200, json.dumps({"ok": True}))
@@ -277,7 +284,7 @@ class Handler(BaseHTTPRequestHandler):
 
 LOGIN = """<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope</title><style>body{font:16px system-ui;background:#0b0b10;
+<title>OmniCortex</title><style>body{font:16px system-ui;background:#0b0b10;
 color:#c9c9d2;display:flex;align-items:center;justify-content:center;height:100vh;
 margin:0}form{width:300px}input{width:100%;padding:.8rem;font-size:16px;
 border:1px solid #2a2a34;border-radius:8px;background:#14141c;color:#fff}
@@ -291,7 +298,7 @@ headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t.value})
 
 PAGE = r"""<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>NeuronScope live</title>
+<title>OmniCortex live</title>
 <style>
 :root{--hot:#FF4D1A;--act:#3D8BFF}
 *{box-sizing:border-box}
@@ -310,26 +317,45 @@ color:#c9c9d2;border:1px solid #2a2a34;border-radius:8px;min-height:40px}
 line-height:1.7}
 .tok{font:13px ui-monospace,monospace;padding:0 14px 12px;word-break:break-all}
 .tok b{color:var(--hot)}
+#em{width:100%;height:96px;display:block}
+.leg{display:flex;gap:10px;flex-wrap:wrap;padding:2px 14px 6px;font:12px ui-monospace,monospace;color:#8a8a92}
+.leg i{display:inline-block;width:10px;height:3px;margin-right:4px;vertical-align:middle}
+.feats{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 10px}
+.feats span{font:12px ui-monospace,monospace;border:1px solid #2a2a34;border-radius:6px;padding:2px 6px;color:#c9c9d2}
+.feats span em{color:#8a8a92;font-style:normal}
+.sec{font:11px system-ui;color:#6a6a72;text-transform:uppercase;letter-spacing:.05em;padding:6px 14px 2px}
 </style>
 <header><span class="dot" id="d"></span><b id="st">connecting…</b>
 <span style="margin-left:auto;font:12px ui-monospace,monospace" id="rate"></span>
 </header>
 <canvas id="cv"></canvas>
 <canvas id="sc"></canvas>
+<div id="emRow" hidden style="display:flex;align-items:center"><div id="emBox" style="flex:1;min-width:0"><div class="sec">Emotions (z against the stories)</div><canvas id="em"></canvas><div class="leg" id="leg"></div></div>
+<canvas id="jewel" style="width:84px;height:84px;flex:none;margin-right:10px"></canvas></div>
+<div id="ftBox" hidden><div class="sec">Features of this token</div><div class="feats" id="feats"></div></div>
 <div class="bar">
 <select id="tier"></select>
+<select id="colour" title="What colours the tokens below"><option value="">tokens: risk</option></select>
 <button id="pause">Pause</button>
 <button id="clear">Clear</button>
 </div>
 <div class="stat" id="stat"></div>
 <div class="tok" id="toks"></div>
+<script>/*OC_WIDGETS*/</script>
 <script>
 const $=s=>document.querySelector(s);
-const cv=$('#cv'), cx=cv.getContext('2d'), sc=$('#sc'), sx=sc.getContext('2d');
+const cv=$('#cv'), cx=cv.getContext('2d'), sc=$('#sc'), sx=sc.getContext('2d'), em=$('#em'), ex=em.getContext('2d');
+const EMC=['#FF4D1A','#3D8BFF','#1D9E75','#E7B65C','#B07CFF','#c9c9d2'];
+// the emotion jewel (viz/widgets.py): click it to hide or show the lanes; it stays either way
+const jewel=NSWidgets.create('jewel', $('#jewel'), {onToggle(){ const b=$('#emBox'); b.hidden=!b.hidden;
+  NSWidgets.store.set('graph_hidden', b.hidden); if(!b.hidden) fit(em); }});
+const esc=t=>String(t).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+let emoNames=new Set();
 let paused=false, frames=[], toks=[], last=0, bytes=0, t0=Date.now();
 function fit(c){const r=devicePixelRatio||1;c.width=c.clientWidth*r;
   c.height=c.clientHeight*r;c.getContext('2d').setTransform(r,0,0,r,0,0);}
-addEventListener('resize',()=>{fit(cv);fit(sc);draw();}); fit(cv); fit(sc);
+addEventListener('resize',()=>{fit(cv);fit(sc);fit(em);draw();}); fit(cv); fit(sc);
+$('#colour').onchange=()=>draw();
 
 fetch('/api/tiers').then(r=>r.json()).then(t=>{
   $('#tier').innerHTML=Object.entries(t).filter(([k])=>k!=='current')
@@ -353,15 +379,20 @@ es.onmessage=e=>{
   const f=JSON.parse(e.data);
   if(f.drop){ $('#st').textContent='streaming (dropped frames)'; return; }
   frames.push(f); if(frames.length>160) frames.shift();
-  if(f.tok!==undefined){ toks.push({s:f.s,tok:f.tok});
+  if(f.tok!==undefined){ toks.push({s:f.s,tok:f.tok,emo:f.emo,ez:f.ez});
     if(toks.length>60) toks.shift(); }
+  if(f.emo){ if($('#emRow').hidden){ $('#emRow').hidden=false; $('#emRow').style.display='flex';
+      $('#emBox').hidden=NSWidgets.store.get('graph_hidden',false); if(!$('#emBox').hidden) fit(em); }
+    [...f.emo.map(e=>e[0]),...Object.keys(f.ez||{})].forEach(n=>{ if(!emoNames.has(n)){ emoNames.add(n); $('#colour').insertAdjacentHTML('beforeend',`<option value="${esc(n)}">tokens: ${esc(n)}</option>`); } }); }
+  if(f.feat){ $('#ftBox').hidden=false; $('#feats').innerHTML=f.feat.slice(0,8).map(([d,id,r,l])=>`<span title="${esc(d)} #${id}">${esc(l||('#'+id))} <em>${(+r).toFixed(2)}</em></span>`).join(''); }
   draw();
 };
 setInterval(()=>{const kb=bytes/1024, s=(Date.now()-t0)/1000;
   $('#rate').textContent=`${(kb/s).toFixed(1)} KB/s`;},1000);
 
 function cells(f){
-  if(f.t==='sparse') return f.c.map(([l,n,v])=>({l,n,v,L:f.l}));
+  if(f.t==='sparse') return (f.c||[]).map(([l,n,v])=>({l,n,v,L:f.l}));
+  if(!f.v) return [];
   const out=[]; f.v.forEach((row,l)=>row.forEach((v,n)=>{
     if(v>0.25) out.push({l,n,v,L:f.v.length,N:row.length});}));
   return out;
@@ -396,15 +427,31 @@ function draw(){
   sx.stroke();
   sx.strokeStyle='#2a2a34'; sx.lineWidth=1; sx.beginPath();
   sx.moveTo(0,sh/2); sx.lineTo(sw,sh/2); sx.stroke();
+  // emotion lanes: the emotions most active over the visible window
+  // a frame's emotion values: all clearly active ones (ez), else its top three; absent counts as about 0
+  const ev=fr=>fr.ez||Object.fromEntries((fr.emo||[]).map(([n,z])=>[n,z]));
+  if(!$('#emRow').hidden){ const peak={}; frames.forEach(fr=>Object.entries(ev(fr)).forEach(([n,z])=>peak[n]=Math.max(peak[n]||0,Math.abs(z))));
+    const pick=Object.keys(peak).sort((a,b)=>peak[b]-peak[a]).slice(0,5), last=frames[frames.length-1];
+    jewel.set(pick.map((n,k)=>({name:n, z:ev(last)[n]??0, color:EMC[k]})));
+  if(!$('#emBox').hidden){ const ew=em.clientWidth, eh=em.clientHeight; ex.clearRect(0,0,ew,eh);
+    const mx=Math.max(3,...pick.map(n=>peak[n]));
+    ex.strokeStyle='#2a2a34'; ex.beginPath(); ex.moveTo(0,eh/2); ex.lineTo(ew,eh/2); ex.stroke();
+    pick.forEach((n,k)=>{ ex.strokeStyle=EMC[k]; ex.lineWidth=1.6; ex.beginPath();
+      frames.forEach((fr,i)=>{ const z=ev(fr)[n]??0;
+        const x=ew*i/Math.max(frames.length-1,1), y=eh/2-z*(eh/2-4)/mx; i?ex.lineTo(x,y):ex.moveTo(x,y); }); ex.stroke(); });
+    $('#leg').innerHTML=pick.map((n,k)=>`<span><i style="background:${EMC[k]}"></i>${esc(n)}</span>`).join(''); } }
   const f=frames[frames.length-1];
   const scored=f.scored!==false;
-  $('#stat').textContent=`tier ${f.t} · frame ${f.i} · ${
+  $('#stat').textContent=`${f.src==='lab'?'decoding lab · ':''}tier ${f.t} · frame ${f.i} · ${
     scored?'score':'peak (no classifier)'} ${(f.s||0).toFixed(2)}${
-    scored&&f.s>1.5?' · FLAGGED':''}`;
-  $('#toks').innerHTML=toks.map(t=>(scored&&t.s>1.5)?`<b>${
-    t.tok.replace(/</g,'&lt;')}</b>`:t.tok.replace(/</g,'&lt;')).join('');
+    scored&&f.s>1.5?' · FLAGGED':''}${f.emo?' · '+f.emo.map(([n,z])=>`${n} ${z>0?'+':''}${(+z).toFixed(1)}`).join(', '):''}`;
+  const col=$('#colour').value;
+  $('#toks').innerHTML=toks.map(t=>{ if(col){ const zz=(t.ez||{})[col]??((t.emo||[]).find(e=>e[0]===col)||[0,0])[1]; const a=Math.max(0,Math.min(1,zz/3));
+      return `<span style="background:rgba(255,77,26,${(a*0.8).toFixed(2)})">${esc(t.tok)}</span>`; }
+    return (scored&&t.s>1.5)?`<b>${esc(t.tok)}</b>`:esc(t.tok); }).join('');
 }
 </script>"""
+PAGE = PAGE.replace("/*OC_WIDGETS*/", __import__("widgets").WIDGETS_JS)
 
 
 def main():
@@ -419,7 +466,7 @@ def main():
     sec.add_server_security_args(p)
     a = p.parse_args()
 
-    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("NS_STUDIO_TOKEN", ""))
+    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("OC_STUDIO_TOKEN", ""))
     token = sec.resolve_token(a.token, a.token_file) or None
     try:
         for w in sec.check_bind(a.host, token or "", tls=bool(a.tls_cert), allow_plaintext=a.allow_plaintext):
@@ -442,7 +489,7 @@ def main():
         ctx.load_cert_chain(a.tls_cert, a.tls_key or a.tls_cert)
         srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
 
-    print(f"NeuronScope live on {scheme}://{a.host}:{a.port}")
+    print(f"OmniCortex live on {scheme}://{a.host}:{a.port}")
     print(f"tier {a.tier}: {TIERS[a.tier][0]}, "
           f"~{TIERS[a.tier][1] / 1024:.1f} KB/token")
 

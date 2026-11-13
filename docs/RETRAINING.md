@@ -12,6 +12,51 @@ testqa.py ──► deficits.py ──► finetune.py ──► merge_export.py 
                probed)         focus layers                                       to tell"
 ```
 
+## The whole cycle in one command
+
+```bash
+python scripts/retrain_cycle.py --out runs/cycle1 \
+    --base-model org/my-model --base-gguf models/my-model-Q4_K_M.gguf \
+    --teacher http://gpu-host:1234/v1@strong-model \
+    --arms all,plan --review-model acme/my-model-q4_k_m --method lora --dpo --expand 3 --allow-exec
+```
+
+It is also in Studio: Jobs → Retrain → *Retraining cycle*. It runs every step
+below in order:
+
+1. Serve the base GGUF with llama-server and measure it with TestQA.
+2. Build the dataset, probing the base model as `--student`.
+3. For each arm: train, convert to GGUF, serve it, and ask it exactly the
+   baseline's holdout items.
+4. Gate each arm against the baseline, and later arms against the first.
+
+The baseline and every arm are served the same way, at temperature 0, so
+differences come from training, not from serving.
+
+**Arms** are layer choices: `all`, `plan` (the review's focus layers), or a
+range like `10-17`. With `--arms all,plan`, one run answers whether focusing
+on the layers the neuron review points at beats training everywhere, on the
+same data and the same items.
+
+**Results:**
+- `report.txt` has a verdict per arm and a recommendation: the best arm the
+  gate keeps, or *keep the base model*.
+- `cycle.json` has every command, log and result.
+
+**Resuming:** an interrupted cycle continues where it stopped, because
+finished steps are skipped. `--redo train/plan` (or `data`, `all`, …) runs
+a step again.
+
+**When it stops early, and why:**
+- the baseline is mostly request errors, with a pointer to the server log;
+- fewer than `--min-examples` (8) deficit examples to train on;
+- a `plan` arm without focus layers, which is skipped.
+
+Nothing is installed or deleted. Copy the recommended GGUF into your models
+folder when you are satisfied.
+
+The sections below are the same steps run by hand.
+
 ## 1. Measure
 
 ```bash
@@ -200,7 +245,7 @@ projector to `mmproj-model-f16.gguf`. llama.cpp converts projectors for the VLM
 families it serves (Gemma 3, Qwen-VL, SmolVLM, Pixtral and others) but not
 every Hugging Face layout, HF-format LLaVA included. When it cannot, the
 command exits with status 2, records `mmproj_error` in
-`neuronscope-export.json`, and points you at `--freeze-projector`.
+`omnicortex-export.json`, and points you at `--freeze-projector`.
 
 ## 5. Measure again, honestly, and decide
 

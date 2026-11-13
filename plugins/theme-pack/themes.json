@@ -1,0 +1,238 @@
+{
+  "_studio": {
+    "arcade": {
+      "label": "Arcade",
+      "base": "dark",
+      "viz": "arcade",
+      "ui": {
+        "bg": "#060a24",
+        "panel": "#0d1440",
+        "fg": "#e9f2ff",
+        "mut": "#8fa3d9",
+        "line": "#26307a",
+        "acc": "#3cffd0",
+        "accfg": "#04121a",
+        "ok": "#7dff6a",
+        "no": "#ff4fb8",
+        "warn": "#ffd23f",
+        "soft": "#132061",
+        "code": "#0a1238"
+      },
+      "chart": [
+        "#3cffd0",
+        "#ff8a3d",
+        "#ff4fb8",
+        "#ffd23f",
+        "#7d8cff",
+        "#7dff6a"
+      ],
+      "note": "rhythm-game neon: aqua 1P, orange 2P"
+    },
+    "ember": {
+      "label": "Ember",
+      "base": "dark",
+      "viz": "ember",
+      "ui": {
+        "bg": "#0d0907",
+        "panel": "#17110d",
+        "fg": "#f2e6dc",
+        "mut": "#a8917f",
+        "line": "#33261d",
+        "acc": "#ef9f27",
+        "accfg": "#1a0f05",
+        "ok": "#9ccc65",
+        "no": "#36d6ff",
+        "warn": "#ffca28",
+        "soft": "#22180f",
+        "code": "#1c140e"
+      },
+      "chart": [
+        "#ef9f27",
+        "#36d6ff",
+        "#e86a50",
+        "#c5e1a5",
+        "#ce93d8",
+        "#ffd54f"
+      ]
+    },
+    "forest": {
+      "label": "Forest",
+      "base": "dark",
+      "viz": "forest",
+      "ui": {
+        "bg": "#0b120d",
+        "panel": "#121c15",
+        "fg": "#e3eedf",
+        "mut": "#93a88f",
+        "line": "#24352a",
+        "acc": "#8fd16b",
+        "accfg": "#0a1407",
+        "ok": "#8fd16b",
+        "no": "#e8624a",
+        "warn": "#e0b44c",
+        "soft": "#16251a",
+        "code": "#101a13"
+      },
+      "chart": [
+        "#8fd16b",
+        "#e8624a",
+        "#5bb8d6",
+        "#e0b44c",
+        "#c38fd6",
+        "#d6d06b"
+      ]
+    },
+    "solar": {
+      "label": "Solar (light)",
+      "base": "light",
+      "viz": "solar",
+      "ui": {
+        "bg": "#fdf6e3",
+        "panel": "#fffbf0",
+        "fg": "#3b4a50",
+        "mut": "#7b8a8f",
+        "line": "#e6dcc3",
+        "acc": "#268bd2",
+        "accfg": "#ffffff",
+        "ok": "#5f8700",
+        "no": "#d33682",
+        "warn": "#b58900",
+        "soft": "#f3ecd7",
+        "code": "#f1e9d2"
+      },
+      "chart": [
+        "#268bd2",
+        "#d33682",
+        "#859900",
+        "#b58900",
+        "#6c71c4",
+        "#2aa198"
+      ]
+    }
+  },
+  "ember": {
+    "cmap": "magma",
+    "bg": "black",
+    "active": "#EF9F27",
+    "halluc": "#36D6FF",
+    "size": [
+      2.5,
+      7.0
+    ],
+    "alpha": [
+      0.15,
+      1.0
+    ],
+    "note": "dark field, warm ramp; flagged H-neurons in cyan, which stays distinct from amber for every common colour-vision type",
+    "subjects": [
+      "#C5E1A5",
+      "#CE93D8",
+      "#FFD54F",
+      "#80CBC4",
+      "#F48FB1",
+      "#BCAAA4",
+      "#AED581",
+      "#90CAF9"
+    ]
+  },
+  "cool": {
+    "cmap": "viridis",
+    "bg": "#0b1015",
+    "active": "#5DCAA5",
+    "halluc": "#FF8A3D",
+    "size": [
+      2.0,
+      6.0
+    ],
+    "alpha": [
+      0.2,
+      0.95
+    ],
+    "note": "cool ramp; flagged H-neurons in orange against teal (colour-blind safe)",
+    "subjects": [
+      "#E7B65C",
+      "#B48EAD",
+      "#F28FAD",
+      "#9AD0F5",
+      "#FFCB6B",
+      "#C3E88D",
+      "#D4A5FF",
+      "#FFE082"
+    ]
+  },
+  "arcade": {
+    "cmap": "cool",
+    "bg": "#060a24",
+    "active": "#3CFFD0",
+    "halluc": "#FF4FB8",
+    "size": [
+      2.5,
+      7.5
+    ],
+    "alpha": [
+      0.18,
+      1.0
+    ],
+    "note": "neon on midnight blue; flagged H-neurons in magenta against aqua",
+    "subjects": [
+      "#FFD23F",
+      "#7D8CFF",
+      "#7DFF6A",
+      "#FF8A3D",
+      "#B388FF",
+      "#00E5FF",
+      "#FFF59D",
+      "#FF80AB"
+    ]
+  },
+  "forest": {
+    "cmap": "YlGn",
+    "bg": "#0b120d",
+    "active": "#8FD16B",
+    "halluc": "#E8624A",
+    "size": [
+      2.5,
+      7.0
+    ],
+    "alpha": [
+      0.15,
+      1.0
+    ],
+    "note": "greens on near-black; flagged in brick red",
+    "subjects": [
+      "#E0B44C",
+      "#5BB8D6",
+      "#C38FD6",
+      "#D6D06B",
+      "#F2A65A",
+      "#9AD0F5",
+      "#E6C3A1",
+      "#B5E48C"
+    ]
+  },
+  "solar": {
+    "cmap": "cividis",
+    "bg": "#fdf6e3",
+    "active": "#268BD2",
+    "halluc": "#D33682",
+    "size": [
+      2.0,
+      6.0
+    ],
+    "alpha": [
+      0.25,
+      1.0
+    ],
+    "note": "light, warm paper; blue activations, magenta flags",
+    "subjects": [
+      "#859900",
+      "#6C71C4",
+      "#B58900",
+      "#2AA198",
+      "#CB4B16",
+      "#268BD2",
+      "#93A1A1",
+      "#D33682"
+    ]
+  }
+}

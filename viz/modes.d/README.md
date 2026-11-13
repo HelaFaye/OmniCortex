@@ -1,11 +1,11 @@
 # Mode packages
 
-A mode package adds a tab to NeuronScope's interfaces. Drop a directory here
-(`ns-eval/` is an example of the layout; it ships without `ENABLED` because it
+A mode package adds a tab to OmniCortex's interfaces. Drop a directory here
+(`oc-eval/` is an example of the layout; it ships without `ENABLED` because it
 has no implementation behind its route):
 
 ```
-viz/modes.d/ns-eval/
+viz/modes.d/oc-eval/
   mode.json     the registry entry
   ENABLED       present = active; absent = listed but off
   ...           the implementation

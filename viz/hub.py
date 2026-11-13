@@ -38,7 +38,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "scripts"))
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 try:
     import shell            # the mode registry
 except ImportError:
@@ -124,17 +124,19 @@ def declare(root, py):
     }
 
 
-TRACE_DIRS = ["~/.neuronscope/traces", "runs"]
+TRACE_DIRS = ["~/.omnicortex/traces", "runs", "runs/traces"]     # runs/traces: the decoding lab's --record
 
 
-def find_traces(limit=200):
-    """Trace sessions for the Replay picker: Studio's per-reply checks and
-    scripts/trace_sample.py output, newest first."""
-    out = []
-    for base in TRACE_DIRS:
-        base = os.path.join(STATE["root"], os.path.expanduser(base))
-        if not os.path.isdir(base):
+def find_traces(limit=200, extra=()):
+    """Trace sessions for the Replay picker: Studio's per-reply checks,
+    scripts/trace_sample.py output and decoding-lab recordings, newest first.
+    extra: more folders, e.g. the running Studio's traces folder."""
+    out, seen = [], set()
+    for base in [*TRACE_DIRS, *(x for x in extra if x)]:
+        base = os.path.realpath(os.path.join(STATE["root"], os.path.expanduser(base)))
+        if not os.path.isdir(base) or base in seen:
             continue
+        seen.add(base)
         for name in os.listdir(base):
             d = os.path.join(base, name)
             try:
@@ -317,7 +319,7 @@ class Handler(BaseHTTPRequestHandler):
         if raw:
             try:
                 c = http.cookies.SimpleCookie(raw)
-                if "ns" in c and hmac.compare_digest(c["ns"].value, tok):
+                if "oc" in c and hmac.compare_digest(c["oc"].value, tok):
                     return True
             except Exception:
                 pass
@@ -365,7 +367,7 @@ class Handler(BaseHTTPRequestHandler):
                 body = b'{"ok":true}'
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Set-Cookie", f"ns={STATE['token']}; Path=/; "
+                self.send_header("Set-Cookie", f"oc={STATE['token']}; Path=/; "
                                                "HttpOnly; SameSite=Strict")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -427,7 +429,7 @@ def ui_theme():
     try:
         with open(os.path.join(HERE, "themes.json")) as f:
             t = json.load(f).get("_ui", {})
-        return t.get("neuronscope-dark", {})
+        return t.get("omnicortex-dark", {})
     except Exception:
         return {}
 
@@ -443,7 +445,7 @@ def css_vars():
 
 LOGIN = """<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NeuronScope</title><style>body{font:16px system-ui;background:#07070b;
+<title>OmniCortex</title><style>body{font:16px system-ui;background:#07070b;
 color:#d6d6e0;display:flex;align-items:center;justify-content:center;
 height:100vh;margin:0}input,button{width:280px;padding:.8rem;font-size:16px;
 border-radius:8px;border:1px solid #22222e;background:#101018;color:#fff}
@@ -465,7 +467,7 @@ def page():
 
 PAGE = r"""<!DOCTYPE html><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>NeuronScope</title>
+<title>OmniCortex</title>
 <style>
 :root{
 <!--VARS-->
@@ -509,7 +511,7 @@ width:100%}
 label{display:block;font-size:12px;color:var(--fg-dim);margin:8px 0 3px}
 </style>
 <!--TABS-->
-<h1>NeuronScope</h1>
+<h1>OmniCortex</h1>
 
 <div class="card">
   <div class="mut" style="margin-bottom:6px">services</div>
@@ -525,7 +527,7 @@ label{display:block;font-size:12px;color:var(--fg-dim);margin:8px 0 3px}
   <input id="server_bin" placeholder="~/llama.cpp/build/bin/llama-server">
   <label>models directory</label>
   <input id="models_dir" placeholder="/path/to/.models">
-  <label>trace session (for Replay): pick a checked reply or a trace_sample.py run, or type a path</label>
+  <label>trace session (for Replay): pick a checked reply, a trace_sample.py run or a decoding-lab recording, or type a path</label>
   <input id="trace" list="traces" placeholder="runs/trace-abc">
   <datalist id="traces"></datalist>
   <label>live source (for Live): a llama-server patched with llama-tools/server-activations; empty = simulated</label>
@@ -562,7 +564,7 @@ for(const k of ['server_bin','models_dir','trace','live_source']){
 
 fetch('/api/traces').then(r=>r.json()).then(j=>{
   const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  $('#traces').innerHTML=j.traces.map(t=>`<option value="${esc(t.path)}">${esc(t.model||'')} · ${esc(t.created)} · ${t.source==='studio'?'checked reply':'trace run'}</option>`).join('');
+  $('#traces').innerHTML=j.traces.map(t=>`<option value="${esc(t.path)}">${esc(t.model||'')} · ${esc(t.created)} · ${({studio:'checked reply',decode_lab:'decoding lab'})[t.source]||'trace run'}</option>`).join('');
   if(!$('#trace').value && j.traces.length) $('#trace').value=j.traces[0].path;
 }).catch(()=>{});
 
@@ -641,7 +643,7 @@ def main():
     sec.add_server_security_args(p)
     a = p.parse_args()
 
-    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("NS_STUDIO_TOKEN", ""))
+    os.environ.setdefault(sec.TOKEN_ENV, os.environ.get("OC_STUDIO_TOKEN", ""))
     token = sec.resolve_token(a.token, a.token_file) or None
     tls = bool(a.tls_cert and a.tls_key)
     try:
@@ -655,7 +657,7 @@ def main():
                   "idle_after": a.idle_after})
     SERVICES.update(declare(STATE["root"], sys.executable))
 
-    print(f"NeuronScope hub on http://{a.host}:{a.port}")
+    print(f"OmniCortex hub on http://{a.host}:{a.port}")
     print(f"root: {STATE['root']}")
     for n, s in SERVICES.items():
         ok = os.path.exists(os.path.join(STATE["root"], s["script"]))

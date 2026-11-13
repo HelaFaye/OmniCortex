@@ -16,7 +16,7 @@ and the config did not change, the host did.
     python scripts/hostprofiles.py plan --gguf model.gguf --ctx 47104 \\
         --host rig --host laptop
 
-Profiles live in ~/.neuronscope/hosts.json. `detect` fingerprints the current
+Profiles live in ~/.omnicortex/hosts.json. `detect` fingerprints the current
 machine so the right profile is selected automatically when one matches.
 
 The dedicated/shared distinction matters more than the number. A discrete card's
@@ -34,7 +34,7 @@ import subprocess
 import sys
 
 GIB = 1024 ** 3
-STORE = os.path.expanduser("~/.neuronscope/hosts.json")
+STORE = os.path.expanduser("~/.omnicortex/hosts.json")
 
 FIELDS = {"vram_gib": 0.0, "ram_gib": 0.0, "cores": 0, "gpu": "",
           "backend": "cpu", "dedicated": False, "reserve_gib": 0.75,

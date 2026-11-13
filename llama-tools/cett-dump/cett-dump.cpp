@@ -1,6 +1,6 @@
 // cett-dump: capture ffn_down inputs and outputs from a llama.cpp forward pass.
 //
-// This is the piece that lets NeuronScope do activation extraction without PyTorch,
+// This is the piece that lets OmniCortex do activation extraction without PyTorch,
 // without ROCm, and from a quantized GGUF. On a 16GB card a Q6_K 9B model plus
 // this callback fits comfortably, where bf16 in PyTorch does not.
 //
@@ -59,6 +59,7 @@
 #include "llama.h"
 #include "ggml.h"
 
+#include <algorithm> // std::fill
 #include <cmath>     // sqrt, fabsf
 #include <cstdio>
 #include <cstring>
@@ -114,12 +115,19 @@ struct dump_ctx {
     int32_t last_layer = INT32_MAX;  // sentinel: first callback opens ubatch 0
     int32_t pruned     = -1;         // layer that only computed output rows
 
+    // --by-weight: blocks are found by their ffn_down weight, so a block that runs several times in one forward
+    // pass (a looped model) is seen once per pass. occ[block] counts this ubatch's passes so far.
+    std::vector<int32_t> occ;
+    int32_t first_block = -1;        // the first block seen; it coming round again opens a new ubatch
+
     // Called before a layer is accumulated. Returns false if the layer's rows
     // are not one-per-token (llama.cpp computes the final layer's FFN only for
     // tokens that produce logits, usually just the last one) and must be
     // skipped rather than misattributed to the start of the sequence.
-    bool begin_layer(int32_t layer, int32_t n_tok) {
-        if (layer < last_layer) {            // layer index wrapped: new ubatch
+    // new_ub: -1 detect a new ubatch from the layer index wrapping (named nodes), 0/1 told by the caller
+    // (--by-weight, where a looped model's index also falls between loops within one ubatch).
+    bool begin_layer(int32_t layer, int32_t n_tok, int new_ub = -1) {
+        if (new_ub < 0 ? layer < last_layer : new_ub == 1) {   // new ubatch
             ub_off   = next_off;
             ub_size  = n_tok;
             next_off += n_tok;
@@ -214,6 +222,25 @@ static int parse_ffn_down_layer_any(const char * name) {
         if (ok) return v;
     }
     return -1;
+}
+
+// --by-weight L: match the down projection by its weight, "blk.<N>.ffn_down.weight", instead of by the node's
+// name. Some architectures (NVIDIA's Dory fork) never name that node. Pass k of block N is recorded as layer
+// k*L + N, so a looped model's repeated passes stay apart (the reader maps v back with v % L and v / L).
+static int32_t g_by_weight = 0;
+
+static int parse_blk_ffn_down(const char * name) {
+    if (strncmp(name, "blk.", 4) != 0) return -1;
+    const char * p = name + 4;
+    int v = 0, digits = 0;
+    for (; *p >= '0' && *p <= '9'; ++p, ++digits) v = v * 10 + (*p - '0');
+    if (digits == 0 || strcmp(p, ".ffn_down.weight") != 0) return -1;
+    return v;
+}
+
+static int by_weight_block(const ggml_tensor * t) {
+    if (t->op != GGML_OP_MUL_MAT || t->src[0] == nullptr) return -1;
+    return parse_blk_ffn_down(ggml_get_name(t->src[0]));
 }
 
 static int parse_ffn_down_layer(const char * name) {
@@ -444,12 +471,31 @@ static bool eval_callback(ggml_tensor * t, bool ask, void * user_data) {
         return false;   // between sequences: decline everything
     }
 
-    const int moe_layer = parse_moe_down_layer(ggml_get_name(t));
-    const int layer = moe_layer >= 0 ? moe_layer
-                                     : parse_ffn_down_layer_any(ggml_get_name(t));
+    const int block = g_by_weight ? by_weight_block(t) : -1;
+    const int moe_layer = g_by_weight ? -1 : parse_moe_down_layer(ggml_get_name(t));
+    int layer = g_by_weight ? block
+                            : moe_layer >= 0 ? moe_layer : parse_ffn_down_layer_any(ggml_get_name(t));
     if (ask) {
         // Phase 1: llama.cpp asks whether we want this node's data.
         return layer >= 0;
+    }
+    int new_ub = -1;
+    if (g_by_weight && block >= 0) {
+        if (block >= g_by_weight) {
+            fprintf(stderr, "cett-dump: blk.%d is beyond --by-weight %d\n", block, g_by_weight);
+            d->failed = true;
+            return true;
+        }
+        if ((int32_t) d->occ.size() != g_by_weight) d->occ.assign(g_by_weight, 0);
+        new_ub = 0;
+        if (d->first_block < 0) {
+            d->first_block = block;
+            new_ub = 1;
+        } else if (block == d->first_block && d->occ[block] > 0) {
+            std::fill(d->occ.begin(), d->occ.end(), 0);     // the first block again: the next ubatch
+            new_ub = 1;
+        }
+        layer = d->occ[block]++ * g_by_weight + block;
     }
     if (moe_layer >= 0) {
         moe_accumulate(d, t, moe_layer);
@@ -499,7 +545,7 @@ static bool eval_callback(ggml_tensor * t, bool ask, void * user_data) {
         norms[j] = (float) sqrt(acc);
     }
 
-    if (!d->begin_layer(layer, n_tok)) return true;
+    if (!d->begin_layer(layer, n_tok, new_ub)) return true;
     if (d->agg.empty()) {
         d->init(d->n_layers, n_ff, 1);
     }
@@ -704,6 +750,9 @@ int main(int argc, char ** argv) {
                    "  --n-layers N         decoder layers in the model (required unless --tokenize-only)\n"
                    "  --tokenize-only      write token ids only, no forward pass\n"
                    "  --max                max over a span instead of the mean\n"
+                   "  --by-weight L        find each block's down projection by its weight (blk.N.ffn_down.weight)\n"
+                   "                       for models that do not name it; L = the GGUF's block count. Pass k of\n"
+                   "                       block N is layer k*L+N (looped models), so --n-layers is L x passes\n"
                    "  --last-layer-outputs-only\n\n"
                    "Every other flag goes to llama.cpp (-m, -ngl, -b, --device, ...); its options follow.\n\n");
             passthrough.push_back(argv[i]);
@@ -723,6 +772,8 @@ int main(int argc, char ** argv) {
             use_max = true;
         } else if (strcmp(argv[i], "--last-layer-outputs-only") == 0) {
             g_all_outputs = false;
+        } else if (strcmp(argv[i], "--by-weight") == 0 && i + 1 < argc) {
+            g_by_weight = (int32_t) atoi(argv[++i]);
         } else if (strcmp(argv[i], "--n-layers") == 0 && i + 1 < argc) {
             n_layers_arg = (int32_t) atoi(argv[++i]);
         } else {

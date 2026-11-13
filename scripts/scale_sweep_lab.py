@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""NeuronScope Scale Sweep Lab core.
+"""OmniCortex Scale Sweep Lab core.
 
-Builds static GGUF scale variants from an existing NeuronScope H-Neuron profile.
+Builds static GGUF scale variants from an existing OmniCortex H-Neuron profile.
 It delegates actual GGUF editing to scripts/suppress_gguf.py and adds:
 
 - deterministic scale-grid generation (suppression and amplification)
@@ -165,7 +165,7 @@ def choose_scratch(policy: str, model_size: int, candidates: int, requested: str
     if policy == "disk":
         root = Path(os.path.expanduser(requested or tempfile.gettempdir()))
         root.mkdir(parents=True, exist_ok=True)
-        return Path(tempfile.mkdtemp(prefix="neuronscope-scale-", dir=root))
+        return Path(tempfile.mkdtemp(prefix="omnicortex-scale-", dir=root))
     # auto/ram need capacity for the current batch, not the entire sweep.
     if policy == "ram":
         roots = [Path("/dev/shm")] if Path("/dev/shm").is_dir() else []
@@ -177,12 +177,12 @@ def choose_scratch(policy: str, model_size: int, candidates: int, requested: str
         try:
             root.mkdir(parents=True, exist_ok=True)
             if shutil.disk_usage(root).free >= need:
-                return Path(tempfile.mkdtemp(prefix="neuronscope-scale-", dir=root))
+                return Path(tempfile.mkdtemp(prefix="omnicortex-scale-", dir=root))
         except OSError:
             continue
     if policy == "ram":
         raise SweepError(f"insufficient RAM/tmpfs scratch for {candidates} model(s); need about {need/2**30:.2f} GiB")
-    return Path(tempfile.mkdtemp(prefix="neuronscope-scale-", dir=Path(tempfile.gettempdir())))
+    return Path(tempfile.mkdtemp(prefix="omnicortex-scale-", dir=Path(tempfile.gettempdir())))
 
 
 def _run_suppressor(
@@ -229,7 +229,7 @@ def activation_profile_data(profile_path: str) -> dict[str, Any]:
     with open(profile_path, encoding="utf-8") as f:
         d = json.load(f)
     if "by_layer" not in d:
-        raise SweepError(f"not a NeuronScope H-Neuron profile: {profile_path}")
+        raise SweepError(f"not a OmniCortex H-Neuron profile: {profile_path}")
     n = int(d.get("n_neurons", 0))
     layers = int(d.get("n_layers", 0))
     by = {str(k): sorted(int(x) for x in v) for k, v in (d.get("by_layer") or {}).items()}
@@ -347,7 +347,7 @@ class SweepEngine:
                         result = {**asdict(c), "status": "built", "sha256": sha256_file(dest), "size_bytes": dest.stat().st_size}
                         if evaluator_cmd:
                             env = os.environ.copy()
-                            env.update({"NS_MODEL": str(dest), "NS_SCALE": str(c.scale), "NS_BASELINE": str(baseline_score if baseline_score is not None else ""), "NS_PROFILE": profile})
+                            env.update({"OC_MODEL": str(dest), "OC_SCALE": str(c.scale), "OC_BASELINE": str(baseline_score if baseline_score is not None else ""), "OC_PROFILE": profile})
                             cmd = evaluator_cmd.format(model=str(dest), scale=str(c.scale), baseline=str(baseline_score if baseline_score is not None else ""), profile=profile)
                             ep = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout, env=env)
                             if ep.returncode != 0:
@@ -389,7 +389,7 @@ class SweepEngine:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Build and evaluate NeuronScope GGUF scale sweeps")
+    p = argparse.ArgumentParser(description="Build and evaluate OmniCortex GGUF scale sweeps")
     sub = p.add_subparsers(dest="command", required=True)
     s = sub.add_parser("sweep")
     s.add_argument("--model", required=True)

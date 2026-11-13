@@ -33,7 +33,7 @@ import torch
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import THINK_CLOSE, load_model  # noqa: E402
+from oc_common import THINK_CLOSE, load_model  # noqa: E402
 from profiles import Profile, SuppressionHandle, fingerprint  # noqa: E402
 
 # Deliberately generic. Anything matching counts as a decline, not a wrong
@@ -71,7 +71,11 @@ def parse_args():
     p.add_argument("--profiles_root", default="profiles")
     p.add_argument("--save", action="store_true",
                    help="Write the best scale as a profile")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     return p.parse_args()
 
 
@@ -149,7 +153,7 @@ def main():
 
     model, tokenizer = load_model(
         args.model_path, args.gpu_mem, args.cpu_mem,
-        trust_remote_code=not args.no_trust_remote_code,
+        trust_remote_code=args.trust_remote_code,
     )
     device = next(model.parameters()).device
     fp, geom = fingerprint(model.config)

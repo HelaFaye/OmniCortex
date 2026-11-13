@@ -39,20 +39,34 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import math
 import os
 import re
+import itertools
+import regex as timeout_regex
 import sys
+import tempfile
 import threading
 import time
 import uuid
 from pathlib import Path
 
-DEFAULT_PATH = Path.home() / ".neuronscope" / "tool-rules.json"
+DEFAULT_PATH = Path.home() / ".omnicortex" / "tool-rules.json"
 ACTIONS = ("allow", "ask", "deny")
 CAT_ACTIONS = ("default",) + ACTIONS          # "default": this kind follows the overall default
 KINDS = ("read_only", "write", "destructive", "open_world", "unknown")
 MAX_REGEX = 500
 MAX_MATCH_CHARS = 20_000
+MAX_RULES = 500
+MAX_CONDITIONS = 12
+MAX_ARGUMENT_VALUES = 128
+MAX_ARGUMENT_NODES = 4096
+MAX_ARGUMENT_DEPTH = 64
+MAX_ARGUMENT_PATH_CHARS = 256
+MAX_RULE_FILE_BYTES = 2 * 1024 * 1024
+MAX_RATE_HISTORY = 500
+REGEX_TIMEOUT_SECONDS = 0.025
+RULE_MATCH_BUDGET_SECONDS = 0.5
 _LOCK = threading.Lock()
 
 
@@ -77,47 +91,158 @@ def kinds_of(annotations: dict | None) -> list[str]:
     return out
 
 
-def _values(obj, parts):
-    if not parts:
-        yield obj
-        return
-    head, rest = parts[0], parts[1:]
-    if head == "*":
-        items = obj.values() if isinstance(obj, dict) else obj if isinstance(obj, list) else []
-        for v in items:
-            yield from _values(v, rest)
-    elif isinstance(obj, dict) and head in obj:
-        yield from _values(obj[head], rest)
-    elif isinstance(obj, list) and head.isdigit() and int(head) < len(obj):
-        yield from _values(obj[int(head)], rest)
+class RuleRegexTimeout(TimeoutError):
+    """A rule could not be evaluated safely within the configured time budget."""
 
 
-def _strings(obj):
-    if isinstance(obj, str):
-        yield obj
-    elif isinstance(obj, dict):
-        for v in obj.values():
-            yield from _strings(v)
-    elif isinstance(obj, list):
-        for v in obj:
-            yield from _strings(v)
-    elif obj is not None:
-        yield json.dumps(obj)
+def _walk_values(obj, parts=None, deadline=None):
+    """Iteratively traverse JSON-like arguments under node, depth and time limits."""
+    stack = [("visit", obj, 0, 0)]
+    visited = 0
+
+    while stack:
+        if deadline is not None and time.monotonic() >= deadline:
+            raise RuleRegexTimeout("tool-rule evaluation budget exceeded")
+
+        kind, value, part_index, depth = stack.pop()
+
+        if kind == "iter":
+            try:
+                child = next(value)
+            except StopIteration:
+                continue
+            stack.append(("iter", value, part_index, depth))
+            stack.append(("visit", child, part_index, depth + 1))
+            continue
+
+        visited += 1
+        if visited > MAX_ARGUMENT_NODES:
+            raise RuleRegexTimeout(
+                f"argument traversal exceeded {MAX_ARGUMENT_NODES} nodes"
+            )
+        if depth > MAX_ARGUMENT_DEPTH:
+            raise RuleRegexTimeout(
+                f"argument traversal exceeded depth {MAX_ARGUMENT_DEPTH}"
+            )
+
+        if parts is None:
+            if isinstance(value, dict):
+                stack.append(("iter", iter(value.values()), 0, depth))
+            elif isinstance(value, list):
+                stack.append(("iter", iter(value), 0, depth))
+            elif value is not None:
+                yield value
+            continue
+
+        if part_index >= len(parts):
+            yield value
+            continue
+
+        head = parts[part_index]
+        if head == "*":
+            if isinstance(value, dict):
+                stack.append(("iter", iter(value.values()), part_index + 1, depth))
+            elif isinstance(value, list):
+                stack.append(("iter", iter(value), part_index + 1, depth))
+        elif isinstance(value, dict) and head in value:
+            stack.append(("visit", value[head], part_index + 1, depth + 1))
+        elif isinstance(value, list) and head.isdigit():
+            index = int(head)
+            if index < len(value):
+                stack.append(("visit", value[index], part_index + 1, depth + 1))
 
 
-def _text(v) -> str:
-    return (v if isinstance(v, str) else json.dumps(v, ensure_ascii=False))[:MAX_MATCH_CHARS]
+def _values(obj, parts, deadline=None):
+    yield from _walk_values(obj, parts, deadline)
 
 
-def cond_holds(cond: dict, args: dict) -> bool:
-    rx = re.compile(cond["regex"])
+def _strings(obj, deadline=None):
+    yield from _walk_values(obj, None, deadline)
+
+
+def _text(value, deadline=None) -> str:
+    """Convert a value to bounded text without serializing an unlimited object."""
+    if isinstance(value, str):
+        return value[:MAX_MATCH_CHARS]
+
+    encoder = json.JSONEncoder(ensure_ascii=False, separators=(",", ":"))
+    pieces = []
+    length = 0
+
+    try:
+        for chunk in encoder.iterencode(value):
+            if deadline is not None and time.monotonic() >= deadline:
+                raise RuleRegexTimeout("tool-rule evaluation budget exceeded")
+
+            remaining = MAX_MATCH_CHARS - length
+            if remaining <= 0:
+                break
+
+            pieces.append(chunk[:remaining])
+            length += min(len(chunk), remaining)
+            if len(chunk) >= remaining:
+                break
+
+        return "".join(pieces)
+    except RuleRegexTimeout:
+        raise
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise RuleRegexTimeout(
+            "argument value could not be serialized safely"
+        ) from exc
+
+
+def _compile_safe_regex(pattern: str):
+    if len(pattern) > MAX_REGEX:
+        raise ValueError(f"regex longer than {MAX_REGEX} characters")
+    try:
+        return timeout_regex.compile(pattern)
+    except timeout_regex.error as exc:
+        raise ValueError(f"bad regex {pattern!r}: {exc}") from exc
+
+
+def cond_holds(cond: dict, args: dict, deadline: float | None = None) -> bool:
+    rx = _compile_safe_regex(cond["regex"])
+    if deadline is not None and time.monotonic() >= deadline:
+        raise RuleRegexTimeout("tool-rule evaluation budget exceeded")
+
     path = cond.get("path") or "*"
-    vals = list(_strings(args)) if path == "*" else [_text(v) for v in _values(args, path.split("."))]
-    hit = any(rx.search(v) for v in vals)
+    source = (
+        _strings(args, deadline)
+        if path == "*"
+        else _values(args, path.split("."), deadline)
+    )
+
+    hit = False
+    count = 0
+    for value in source:
+        count += 1
+        if count > MAX_ARGUMENT_VALUES:
+            raise RuleRegexTimeout(
+                f"rule argument path matched more than {MAX_ARGUMENT_VALUES} values"
+            )
+
+        text = _text(value, deadline)
+        remaining = REGEX_TIMEOUT_SECONDS
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuleRegexTimeout("tool-rule evaluation budget exceeded")
+            remaining = min(remaining, REGEX_TIMEOUT_SECONDS)
+
+        try:
+            if not hit and rx.search(text, timeout=remaining):
+                hit = True
+        except TimeoutError as exc:
+            raise RuleRegexTimeout(
+                "regular-expression evaluation timed out"
+            ) from exc
+
     return (not hit) if cond.get("negate") else hit
 
 
-def rule_matches(rule: dict, server: str, tool: str, kinds: list[str], args: dict) -> bool:
+def rule_matches(rule: dict, server: str, tool: str, kinds: list[str], args: dict,
+                 deadline: float | None = None) -> bool:
     if not fnmatch.fnmatchcase(server, rule.get("server") or "*"):
         return False
     if not fnmatch.fnmatchcase(tool, rule.get("tool") or "*"):
@@ -125,7 +250,7 @@ def rule_matches(rule: dict, server: str, tool: str, kinds: list[str], args: dic
     k = rule.get("kind") or "any"
     if k != "any" and k not in kinds:
         return False
-    return all(cond_holds(c, args) for c in rule.get("args") or [])
+    return all(cond_holds(c, args, deadline) for c in rule.get("args") or [])
 
 
 def validate_rule(r: dict) -> dict:
@@ -142,60 +267,134 @@ def validate_rule(r: dict) -> dict:
         raise ValueError("rule ids: letters, digits, _ and -")
     if out["kind"] not in KINDS + ("any",):
         raise ValueError(f"kind is one of {KINDS + ('any',)}")
-    for c in r.get("args") or []:
+    conditions = r.get("args") or []
+    if not isinstance(conditions, list) or len(conditions) > MAX_CONDITIONS:
+        raise ValueError(f"a rule may have at most {MAX_CONDITIONS} argument conditions")
+    for c in conditions:
         if not isinstance(c, dict) or not isinstance(c.get("regex"), str):
             raise ValueError("argument conditions are {path, regex, negate}")
-        if len(c["regex"]) > MAX_REGEX:
-            raise ValueError(f"regex longer than {MAX_REGEX} characters")
         try:
-            re.compile(c["regex"])
-        except re.error as e:
-            raise ValueError(f"bad regex {c['regex']!r}: {e}")
+            _compile_safe_regex(c["regex"])
+        except ValueError as e:
+            raise ValueError(str(e)) from e
         path = str(c.get("path") or "*")
-        if not re.fullmatch(r"\*|[A-Za-z0-9_*-]+(\.[A-Za-z0-9_*-]+)*", path):
+        if len(path) > MAX_ARGUMENT_PATH_CHARS:
+            raise ValueError(
+                f"argument path exceeds {MAX_ARGUMENT_PATH_CHARS} characters"
+            )
+        if not re.fullmatch(
+            r"(?:\*|[A-Za-z0-9_-]+)(?:\.(?:\*|[A-Za-z0-9_-]+))*",
+            path,
+        ):
             raise ValueError(f"bad argument path {path!r}")
         out["args"].append({"path": path, "regex": c["regex"], "negate": bool(c.get("negate"))})
     if r.get("max_per_hour") not in (None, "", 0):
-        n = int(r["max_per_hour"])
-        if n < 1:
-            raise ValueError("max_per_hour is 1 or more")
+        try:
+            n = int(r["max_per_hour"])
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("max_per_hour must be an integer") from exc
+        if not 1 <= n <= MAX_RATE_HISTORY:
+            raise ValueError(f"max_per_hour must be between 1 and {MAX_RATE_HISTORY}")
         if action != "allow":
             raise ValueError("max_per_hour limits allow rules")
         out["max_per_hour"] = n
+
     if r.get("expires") not in (None, ""):
-        out["expires"] = float(r["expires"])
-    out["hits"] = int(r.get("hits") or 0)
-    out["recent"] = [float(t) for t in (r.get("recent") or [])][-500:]
+        try:
+            expires = float(r["expires"])
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("expires must be a finite timestamp") from exc
+        if not math.isfinite(expires):
+            raise ValueError("expires must be a finite timestamp")
+        out["expires"] = expires
+
+    try:
+        hits = int(r.get("hits") or 0)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("hits must be a nonnegative integer") from exc
+    if hits < 0:
+        raise ValueError("hits must be a nonnegative integer")
+    out["hits"] = min(hits, 2**31 - 1)
+
+    raw_recent = r.get("recent") or []
+    if not isinstance(raw_recent, list):
+        raise ValueError("recent rate-limit history must be a list")
+    recent = []
+    for timestamp in raw_recent[-MAX_RATE_HISTORY:]:
+        try:
+            value = float(timestamp)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("recent rate-limit timestamps must be finite") from exc
+        if not math.isfinite(value):
+            raise ValueError("recent rate-limit timestamps must be finite")
+        recent.append(value)
+    out["recent"] = recent
     return out
 
 
 class Rules:
     def __init__(self, path: str | Path | None = None):
-        self.path = Path(path or os.environ.get("NS_TOOL_RULES") or DEFAULT_PATH).expanduser()
+        self.path = Path(path or os.environ.get("OC_TOOL_RULES") or DEFAULT_PATH).expanduser()
 
     def load(self) -> dict:
         try:
-            d = json.loads(self.path.read_text())
-        except (OSError, ValueError):
+            with self.path.open("rb") as stream:
+                raw = stream.read(MAX_RULE_FILE_BYTES + 1)
+            if len(raw) > MAX_RULE_FILE_BYTES:
+                return blank()
+            d = json.loads(raw)
+        except (OSError, ValueError, TypeError, UnicodeError):
             return blank()
+
+        if not isinstance(d, dict):
+            return blank()
+
         out = blank()
-        if d.get("default") in ACTIONS:
-            out["default"] = d["default"]
-        for k, v in (d.get("categories") or {}).items():
-            if k in KINDS and v in CAT_ACTIONS:
-                out["categories"][k] = v
-        for r in d.get("rules") or []:
+        default = d.get("default")
+        if isinstance(default, str) and default in ACTIONS:
+            out["default"] = default
+
+        categories = d.get("categories")
+        if isinstance(categories, dict):
+            for key, value in categories.items():
+                if isinstance(key, str) and isinstance(value, str):
+                    if key in KINDS and value in CAT_ACTIONS:
+                        out["categories"][key] = value
+
+        raw_rules = d.get("rules")
+        if not isinstance(raw_rules, list):
+            raw_rules = []
+
+        for rule in raw_rules[:MAX_RULES]:
             try:
-                out["rules"].append(validate_rule(r))
-            except (ValueError, TypeError):
-                continue                      # a hand-edited bad rule is skipped, never fatal
+                out["rules"].append(validate_rule(rule))
+            except (ValueError, TypeError, OverflowError):
+                continue
+
         return out
 
     def save(self, d: dict) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(d, indent=1))
-        os.replace(tmp, self.path)
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=f".{self.path.name}.",
+            suffix=".tmp",
+            dir=self.path.parent,
+        )
+        tmp = Path(tmp_name)
+        try:
+            if hasattr(os, "fchmod"):
+                os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                fd = -1
+                json.dump(d, stream, indent=1)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(tmp, self.path)
+            os.chmod(self.path, 0o600)
+        finally:
+            if fd >= 0:
+                os.close(fd)
+            tmp.unlink(missing_ok=True)
 
     def replace(self, d: dict) -> dict:
         """Save a whole rule set from the Settings page (validated)."""
@@ -207,7 +406,10 @@ class Rules:
             if k not in KINDS or v not in CAT_ACTIONS:
                 raise ValueError(f"categories: {k} -> {v}?")
             out["categories"][k] = v
-        out["rules"] = [validate_rule(r) for r in d.get("rules") or []]
+        raw_rules = d.get("rules") or []
+        if not isinstance(raw_rules, list) or len(raw_rules) > MAX_RULES:
+            raise ValueError(f"a ruleset may contain at most {MAX_RULES} rules")
+        out["rules"] = [validate_rule(r) for r in raw_rules]
         if len({r["id"] for r in out["rules"]}) != len(out["rules"]):
             raise ValueError("rule ids must be unique")
         with _LOCK:
@@ -219,6 +421,8 @@ class Rules:
         with _LOCK:
             d = self.load()
             d["rules"] = [x for x in d["rules"] if x["id"] != r["id"]]
+            if len(d["rules"]) >= MAX_RULES:
+                raise ValueError(f"a ruleset may contain at most {MAX_RULES} rules")
             d["rules"].insert(0 if first else len(d["rules"]), r)
             self.save(d)
         return r
@@ -234,63 +438,210 @@ class Rules:
 
     def decide(self, server: str, tool: str, args: dict, annotations: dict | None = None,
                auto_approve=None, record: bool = True, now: float | None = None) -> dict:
-        """-> {action: allow|ask|deny, by: rule|autoApprove|category|default, rule?, reason}."""
+        """Return allow, ask or deny; evaluation failures require manual approval."""
         now = time.time() if now is None else now
         kinds = kinds_of(annotations)
-        with _LOCK:
+        deadline = time.monotonic() + RULE_MATCH_BUDGET_SECONDS
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not _LOCK.acquire(timeout=max(0.0, remaining)):
+            return {
+                "action": "ask",
+                "by": "rule",
+                "reason": "tool-rule evaluation lock is busy; manual approval required",
+                "kinds": kinds,
+            }
+
+        try:
             d = self.load()
-            for r in d["rules"]:
-                if not r["enabled"] or (r.get("expires") and r["expires"] < now):
+            if time.monotonic() >= deadline:
+                return {
+                    "action": "ask",
+                    "by": "rule",
+                    "reason": "tool-rule evaluation budget exceeded; manual approval required",
+                    "kinds": kinds,
+                }
+
+            for rule in d["rules"]:
+                if time.monotonic() >= deadline:
+                    return {
+                        "action": "ask",
+                        "by": "rule",
+                        "reason": "tool-rule evaluation budget exceeded; manual approval required",
+                        "kinds": kinds,
+                    }
+
+                if not rule["enabled"] or (
+                    rule.get("expires") and rule["expires"] < now
+                ):
                     continue
+
                 try:
-                    if not rule_matches(r, server, tool, kinds, args or {}):
+                    if not rule_matches(
+                        rule, server, tool, kinds, args or {}, deadline
+                    ):
                         continue
+                except RuleRegexTimeout as exc:
+                    return {
+                        "action": "ask",
+                        "by": "rule",
+                        "rule": rule["id"],
+                        "reason": (
+                            "rule evaluation timed out; manual approval required "
+                            f"({exc})"
+                        ),
+                        "kinds": kinds,
+                    }
                 except re.error:
                     continue
-                action, reason = r["action"], f"rule {r['id']}" + (f" ({r['note']})" if r["note"] else "")
-                if action == "allow" and r.get("max_per_hour"):
-                    recent = [t for t in r["recent"] if t > now - 3600]
-                    if len(recent) >= r["max_per_hour"]:
-                        action, reason = "ask", f"rule {r['id']} allows {r['max_per_hour']} an hour; limit reached"
+
+                action = rule["action"]
+                reason = f"rule {rule['id']}" + (
+                    f" ({rule['note']})" if rule["note"] else ""
+                )
+
+                if action == "allow" and rule.get("max_per_hour"):
+                    recent = [
+                        timestamp for timestamp in rule["recent"]
+                        if now - 3600 < timestamp <= now
+                    ]
+                    if len(recent) >= rule["max_per_hour"]:
+                        action = "ask"
+                        reason = (
+                            f"rule {rule['id']} allows "
+                            f"{rule['max_per_hour']} an hour; limit reached"
+                        )
                     elif record:
-                        r["recent"] = recent + [now]
+                        rule["recent"] = recent + [now]
+
                 if record:
-                    r["hits"] += 1
-                    r["last_hit"] = now
+                    rule["hits"] += 1
+                    rule["last_hit"] = now
                     self.save(d)
-                return {"action": action, "by": "rule", "rule": r["id"], "reason": reason, "kinds": kinds}
-        if auto_approve is True or (isinstance(auto_approve, list) and tool in auto_approve):
-            return {"action": "allow", "by": "autoApprove", "reason": f"{server}'s autoApprove in mcp.json",
-                    "kinds": kinds}
-        # The strictest quick setting among the tool's kinds applies; a kind left
-        # at "default" counts as the overall default.
+
+                return {
+                    "action": action,
+                    "by": "rule",
+                    "rule": rule["id"],
+                    "reason": reason,
+                    "kinds": kinds,
+                }
+
+            if time.monotonic() >= deadline:
+                return {
+                    "action": "ask",
+                    "by": "rule",
+                    "reason": "tool-rule evaluation budget exceeded; manual approval required",
+                    "kinds": kinds,
+                }
+        finally:
+            _LOCK.release()
+
+        if auto_approve is True or (
+            isinstance(auto_approve, list) and tool in auto_approve
+        ):
+            return {
+                "action": "allow",
+                "by": "autoApprove",
+                "reason": f"{server}'s autoApprove in mcp.json",
+                "kinds": kinds,
+            }
+
         order = {"deny": 2, "ask": 1, "allow": 0}
-        set_ = [(d["categories"].get(k, "default"), k) for k in kinds]
-        if all(v == "default" for v, _ in set_):
-            return {"action": d["default"], "by": "default", "reason": f"default: {d['default']}", "kinds": kinds}
-        act, k = max((((d["default"] if v == "default" else v), k) for v, k in set_), key=lambda x: order[x[0]])
-        return {"action": act, "by": "category", "reason": f"{k.replace('_', ' ')} tools: {act}", "kinds": kinds}
+        settings = [
+            (d["categories"].get(kind, "default"), kind)
+            for kind in kinds
+        ]
+        if all(value == "default" for value, _ in settings):
+            return {
+                "action": d["default"],
+                "by": "default",
+                "reason": f"default: {d['default']}",
+                "kinds": kinds,
+            }
+
+        action, kind = max(
+            (
+                (d["default"] if value == "default" else value, kind)
+                for value, kind in settings
+            ),
+            key=lambda item: order[item[0]],
+        )
+        return {
+            "action": action,
+            "by": "category",
+            "reason": f"{kind.replace('_', ' ')} tools: {action}",
+            "kinds": kinds,
+        }
 
 
 def rule_from_call(kind: str, server: str, tool: str, args: dict) -> dict:
-    """The rule an 'always' button on an approval card creates.
-    kind: tool (this tool, any arguments), args (these exact top-level argument
-    values), deny (never this tool)."""
+    """Create an approval rule without silently broadening exact-argument rules."""
     if kind == "tool":
-        return {"action": "allow", "server": server, "tool": tool, "note": "always allowed from a chat"}
+        return {
+            "action": "allow",
+            "server": server,
+            "tool": tool,
+            "note": "always allowed from a chat",
+        }
     if kind == "deny":
-        return {"action": "deny", "server": server, "tool": tool, "note": "always denied from a chat"}
+        return {
+            "action": "deny",
+            "server": server,
+            "tool": tool,
+            "note": "always denied from a chat",
+        }
     if kind == "args":
-        conds = [{"path": k, "regex": "^" + re.escape(_text(v)) + "$"} for k, v in sorted((args or {}).items())
-                 if re.fullmatch(r"[A-Za-z0-9_-]+", k)]
-        return {"action": "allow", "server": server, "tool": tool, "args": conds,
-                "note": "these arguments, allowed from a chat"}
+        if not isinstance(args, dict) or not args:
+            raise ValueError("an exact-argument rule requires a non-empty argument object")
+        if len(args) > MAX_CONDITIONS:
+            raise ValueError(
+                f"exact-argument rules support at most {MAX_CONDITIONS} arguments"
+            )
+
+        keys = list(args)
+        for key in keys:
+            if (
+                not isinstance(key, str)
+                or not re.fullmatch(r"[A-Za-z0-9_-]{1,256}", key)
+            ):
+                raise ValueError(
+                    f"argument key {key!r} cannot be represented as a safe exact-match path"
+                )
+
+        conds = []
+        for key in sorted(keys):
+            text = _text(args[key])
+            if len(text) >= MAX_MATCH_CHARS:
+                raise ValueError(
+                    f"argument {key!r} exceeds the exact-match text limit"
+                )
+
+            pattern = "^" + re.escape(text) + "$"
+            if len(pattern) > MAX_REGEX:
+                raise ValueError(
+                    f"argument {key!r} is too complex for an exact-match rule"
+                )
+
+            conds.append({
+                "path": key,
+                "regex": pattern,
+            })
+
+        return {
+            "action": "allow",
+            "server": server,
+            "tool": tool,
+            "args": conds,
+            "note": "these arguments, allowed from a chat",
+        }
+
     raise ValueError("kind is tool, args or deny")
 
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    p.add_argument("--file", help=f"rules file (default {DEFAULT_PATH}, or $NS_TOOL_RULES)")
+    p.add_argument("--file", help=f"rules file (default {DEFAULT_PATH}, or $OC_TOOL_RULES)")
     sub = p.add_subparsers(dest="cmd")
     sub.add_parser("list")
     a_ = sub.add_parser("add", help="add a rule at the top (it wins over later ones)")

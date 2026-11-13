@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-The shared tab shell. Every NeuronScope surface renders its navigation here.
+The shared tab shell. Every OmniCortex surface renders its navigation here.
 
 Four frontends with four hardcoded tab bars would drift within a week, so the
 modes live in viz/modes.json and this turns them into markup. A surface asks

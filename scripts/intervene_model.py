@@ -35,7 +35,7 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import TEXT_LAYER_RE, load_model  # noqa: E402
+from oc_common import TEXT_LAYER_RE, load_model  # noqa: E402
 from profiles import validate_selection  # noqa: E402
 
 
@@ -51,7 +51,11 @@ def parse_args():
                    help="Abort if any single layer has more than this fraction "
                         "of its neurons selected. Guards against a bad C value "
                         "wrecking general capability.")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     return p.parse_args()
 
 
@@ -102,7 +106,7 @@ def main():
     # avoids any offload bookkeeping when saving.
     model, tokenizer = load_model(
         args.model_path, gpu_mem=None,
-        trust_remote_code=not args.no_trust_remote_code,
+        trust_remote_code=args.trust_remote_code,
     )
 
     touched = 0

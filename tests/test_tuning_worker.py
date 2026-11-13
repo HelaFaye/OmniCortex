@@ -11,7 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import adaptive_tuner  # noqa: E402
-import ns_security as sec  # noqa: E402
+import oc_security as sec  # noqa: E402
 import tuning_worker  # noqa: E402
 
 TOKEN = "t" * 43

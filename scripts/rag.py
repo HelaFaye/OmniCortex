@@ -33,7 +33,7 @@ import urllib.request
 from collections import Counter
 from pathlib import Path
 
-DEFAULT_ROOT = Path.home() / ".neuronscope" / "rag"
+DEFAULT_ROOT = Path.home() / ".omnicortex" / "rag"
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_. -]{0,63}$")
 TOKEN_RE = re.compile(r"[A-Za-z0-9_]+")
 TEXT_EXT = {".txt", ".md", ".markdown", ".rst", ".py", ".js", ".ts", ".tsx", ".jsx", ".c", ".h", ".cpp", ".hpp",

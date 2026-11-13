@@ -50,6 +50,9 @@ from pathlib import Path
 
 import numpy as np
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import clip_style as cs  # noqa: E402
+
 TOWER_RE = re.compile(r"(?:^|\.)(vision_model|text_model)\.encoder\.layers\.(\d+)\.mlp\.fc2$")
 TOWER_PREFIX = {"vision": "vision_model", "text": "text_model"}
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
@@ -104,9 +107,11 @@ def views(img, k: int):
     return out[:max(1, k)]
 
 
-def open_image(path: str):
+def open_image(path: str, style: str = "off", target: int = 224):
+    """The image as the model should see it; style pixel / cartoon / auto: see clip_style.py."""
     from PIL import Image
-    return Image.open(path).convert("RGB")
+    img = Image.open(path).convert("RGB")
+    return cs.prepare(img, style, target)[0] if style != "off" else img
 
 
 # ---------------------------------------------------------------- model
@@ -116,10 +121,10 @@ def load(model_path: str, device: str = "cpu", dtype: str = "float32"):
     from transformers import AutoModel, AutoProcessor
     import transformers
     key = "dtype" if int(transformers.__version__.split(".")[0]) >= 5 else "torch_dtype"
-    model = AutoModel.from_pretrained(model_path, **{key: getattr(torch, dtype)}).to(device).eval()
+    model = AutoModel.from_pretrained(model_path, **{key: getattr(torch, dtype)}, trust_remote_code=False).to(device).eval()
     if not (hasattr(model, "vision_model") and hasattr(model, "text_model")):
         raise SystemExit(f"{model_path} is not a dual-encoder (CLIP/SigLIP-style) model")
-    proc = AutoProcessor.from_pretrained(model_path)
+    proc = AutoProcessor.from_pretrained(model_path, trust_remote_code=False)
     return model, proc
 
 
@@ -165,7 +170,8 @@ def cmd_collect(a) -> int:
     labels = sorted({r["label"] for r in rows})
     if a.labels:
         labels = [x.strip() for x in Path(a.labels).read_text().splitlines() if x.strip()]
-    templates = a.template or DEFAULT_TEMPLATES
+    style = a.style or "off"
+    templates = cs.templates(a.template or DEFAULT_TEMPLATES, style)
     model, proc = load(a.model, a.device, a.dtype)
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -185,7 +191,7 @@ def cmd_collect(a) -> int:
             if r["label"] not in cands:
                 continue
             gold = cands.index(r["label"])
-            probs = zero_shot(model, image_embeddings(model, proc, views(open_image(r["image"]), a.views), a.device), txt)
+            probs = zero_shot(model, image_embeddings(model, proc, views(open_image(r["image"], style, cs.target_size(proc)), a.views), a.device), txt)
             preds = probs.argmax(-1).tolist()
             conf = probs.max(-1).values.tolist()
             n_ok = sum(p == gold for p in preds)
@@ -206,7 +212,7 @@ def cmd_collect(a) -> int:
     split = balanced_split(t_ids, f_ids, a.test_frac, a.seed)
     for name, ids in split.items():
         (out / f"{name}_qids.json").write_text(json.dumps(ids, indent=2))
-    meta = {"model": a.model, "labels": labels, "templates": templates, "views": a.views,
+    meta = {"model": a.model, "labels": labels, "templates": templates, "views": a.views, "style": style,
             "min_conf": a.min_conf, "stats": stats,
             "train": {k: len(v) for k, v in split["train"].items()},
             "test": {k: len(v) for k, v in split["test"].items()}}
@@ -292,6 +298,7 @@ def cmd_extract(a) -> int:
     wanted = list(ids.get("t", [])) + list(ids.get("f", []))
     run_meta = json.loads((Path(a.run) / "run.json").read_text())
     templates = run_meta.get("templates") or DEFAULT_TEMPLATES
+    style = a.style or run_meta.get("style") or "off"
     mgr = ClipCETT(model, a.tower)
     out = Path(a.out)
     locs = ["image", "cls"] if a.tower == "vision" else ["text"]
@@ -310,7 +317,8 @@ def cmd_extract(a) -> int:
             continue
         with torch.no_grad():
             if a.tower == "vision":
-                px = proc(images=[open_image(r["image"])], return_tensors="pt")["pixel_values"]
+                px = proc(images=[open_image(r["image"], a.style or run_meta.get("style") or "off",
+                                             cs.target_size(proc))], return_tensors="pt")["pixel_values"]
                 model.get_image_features(pixel_values=px.to(a.device, next(model.parameters()).dtype))
                 c = mgr.cett()
                 np.save(out / "image" / f"act_{qid}.npy", c.mean(1).numpy().astype(np.float16))
@@ -395,6 +403,7 @@ def cmd_evaluate(a) -> int:
     run_meta = json.loads((Path(a.run) / "run.json").read_text())
     labels = run_meta["labels"]
     templates = run_meta.get("templates") or DEFAULT_TEMPLATES
+    style = a.style or run_meta.get("style") or "off"
     hn_meta = json.loads(Path(a.h_neurons).read_text())
     tower = a.tower or hn_meta.get("tower") or "vision"
     mgr = ClipCETT(model, tower)
@@ -413,7 +422,8 @@ def cmd_evaluate(a) -> int:
             key = tuple(cands)
             if key not in txt_cache:
                 txt_cache[key] = text_embeddings(model, proc, cands, templates, a.device)
-            p = zero_shot(model, image_embeddings(model, proc, [open_image(r["image"])], a.device), txt_cache[key])
+            p = zero_shot(model, image_embeddings(model, proc, [open_image(r["image"], style, cs.target_size(proc))],
+                                                  a.device), txt_cache[key])
             probs.append(p[0].cpu().numpy())
             gold.append(cands.index(r["label"]))
         # Candidate sets can differ per row; pad to a common width for the metrics.
@@ -448,7 +458,7 @@ def cmd_export(a) -> int:
     out = Path(a.out)
     model.save_pretrained(out)
     proc.save_pretrained(out)
-    (out / "neuronscope.json").write_text(json.dumps({
+    (out / "omnicortex.json").write_text(json.dumps({
         "source": a.model, "h_neurons": str(Path(a.h_neurons).resolve()), "scale": a.scale,
         "tower": tower, "n_neurons": sum(len(v) for v in by_layer.values()),
         "method": "fc2 weight columns scaled"}, indent=2))
@@ -465,6 +475,9 @@ def main(argv=None) -> int:
         sp.add_argument("--device", default="cuda" if _cuda() else "cpu")
         sp.add_argument("--dtype", default="float32", choices=["float32", "bfloat16", "float16"],
                         help="float32 for extraction: CETT measures magnitudes")
+        sp.add_argument("--style", choices=cs.STYLES, default=None,
+                        help="pixel art / cartoon handling (clip_style.py); extract and evaluate default to "
+                             "the collect run's, collect to off")
 
     c = sub.add_parser("collect", help="zero-shot label images as consistent right/wrong")
     common(c)

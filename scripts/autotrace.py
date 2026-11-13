@@ -76,11 +76,22 @@ def trace_worker():
             STATS["last_ms"] = int((time.time() - t0) * 1000)
 
 
+def _get_tokenizer():
+    """Load the configured tokenizer without trusting Hub code by default."""
+    tok = CFG.get("_tok")
+    if tok is None:
+        from transformers import AutoTokenizer
+        tok = AutoTokenizer.from_pretrained(
+            CFG["tokenizer"],
+            trust_remote_code=bool(CFG.get("trust_remote_code", False)),
+        )
+        CFG["_tok"] = tok
+    return tok
+
+
 def _trace(job, Recorder):
     """One prefill over prompt+response, reduced, published."""
-    from transformers import AutoTokenizer
-    tok = CFG.setdefault("_tok", AutoTokenizer.from_pretrained(
-        CFG["tokenizer"], trust_remote_code=True))
+    tok = _get_tokenizer()
     prompt = tok.apply_chat_template(job["messages"],
                                      add_generation_prompt=True, tokenize=False)
     text = prompt + job["response"]
@@ -267,7 +278,7 @@ class Handler(BaseHTTPRequestHandler):
             STATS["skipped"] += 1
 
 
-def main():
+def parse_args(argv=None):
     p = argparse.ArgumentParser()
     p.add_argument("--upstream", required=True, help="the real llama-server")
     p.add_argument("--binary", required=True, help="llama-cett-dump")
@@ -285,11 +296,17 @@ def main():
     p.add_argument("--max-tokens", type=int, default=2048)
     p.add_argument("--ngl", type=int, default=99)
     p.add_argument("--batch", type=int, default=4096)
+    p.add_argument("--trust-remote-code", action="store_true",
+                   help="allow execution of custom Python code from the tokenizer repository")
     p.add_argument("--port", type=int, default=8088)
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--allow-unauthenticated", action="store_true", help="permit a non-loopback bind (no auth)")
-    a = p.parse_args()
-    import ns_security as sec
+    return p.parse_args(argv)
+
+
+def main():
+    a = parse_args()
+    import oc_security as sec
     sec.loopback_only(a.host, "the tracing proxy", a.allow_unauthenticated)
     CFG.update(vars(a))
     CFG["max_frames"] = a.max_frames

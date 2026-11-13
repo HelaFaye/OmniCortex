@@ -1,9 +1,9 @@
 """Studio's /setup page: everything that used to need a terminal after install.
-Paths and behaviour (saved to ~/.neuronscope/config.json), building llama.cpp,
+Paths and behaviour (saved to ~/.omnicortex/config.json), building llama.cpp,
 hardware (hardware.json), and the doctor's checks."""
 
 PAGE = r"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Studio Setup</title><script>try{document.documentElement.dataset.theme=localStorage.getItem('ns-theme')||'dark'}catch{document.documentElement.dataset.theme='dark'}</script>
+<title>Studio Setup</title><script>try{const d=document.documentElement,t=localStorage.getItem('ns-theme')||'dark';d.dataset.theme=localStorage.getItem('ns-theme-base')||(t==='light'?'light':'dark');const v=JSON.parse(localStorage.getItem('ns-theme-vars')||'{}');for(const k in v)d.style.setProperty('--'+k,v[k])}catch{document.documentElement.dataset.theme='dark'}</script>
 <style>
 a{color:var(--acc)}
 :root{--bg:#fafaf9;--panel:#fff;--fg:#1c1c1a;--mut:#6b6b66;--line:#e4e4df;--acc:#2d5bd7;--accfg:#fff;--ok:#1f8a4c;--no:#c0392b;--warn:#a8701c;--code:#f3f3f0}
@@ -37,23 +37,38 @@ details.feat{border-bottom:1px solid var(--line);padding:.35rem 0}details.feat s
 .ri{display:grid;grid-template-columns:4.2rem 1fr;gap:.1rem .5rem;padding:.25rem 0 .25rem 1rem;font-size:13px}
 .ri code{font-size:12px}.ri .fx{grid-column:2;color:var(--mut);font-size:12px}
 .diffsec{margin:.4rem 0}.diffsec b{font-size:12px;color:var(--mut);text-transform:uppercase}
+a.btn{display:inline-block;padding:.3rem .7rem;border:1px solid var(--line);border-radius:6px;text-decoration:none;color:inherit}
 </style>
-<header><h1>Studio · Setup</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/lab">Lab</a><a href="/review">Review</a><a href="/projects">Projects</a><a href="/jobs">Jobs</a><a href="/connect">Connect</a></header>
+<header><h1>Studio · Setup</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/lab">Lab</a><a href="/review">Review</a><a href="/projects">Projects</a><a href="/workers">Workers</a><a href="/jobs">Jobs</a><a href="/connect">Connect</a></header>
 <main>
 <section class="card" id="status-card"><h2>Status</h2><div id="status" class="note">…</div><div id="next"></div></section>
 
-<section class="card" id="paths"><h2>Paths and behaviour</h2><div class="note">Folders are saved to the running workspace; keep several layouts under <a href="/settings#workspaces">Settings → Workspaces</a>.</div>
+<section class="card" id="paths"><h2>Settings</h2><div class="note">Folders are saved to the running workspace; keep several layouts under <a href="/settings#workspaces">Settings → Workspaces</a>.</div>
 <div class="note">Saved to <code id="cfgpath"></code>. Most changes apply at once; the rest after a restart.</div>
 <form id="form"></form>
 <div class="row" style="margin-top:.8rem"><button class="pri" id="save">Save</button><button id="restart">Restart Studio</button><span id="saved"></span></div>
 </section>
 
 <section class="card" id="build"><h2>Build llama.cpp</h2>
-<div class="note">Studio runs models with llama.cpp's <code>llama-server</code>; the H-Neuron tools also need NeuronScope's <code>cett-dump</code>. This clones llama.cpp, adds cett-dump and builds both (about 5 minutes on a laptop CPU). Vulkan runs on AMD (APUs included), Intel and NVIDIA.</div>
+<div class="note">Studio runs models with llama.cpp's <code>llama-server</code>; the H-Neuron tools also need OmniCortex's <code>cett-dump</code>. This clones llama.cpp, adds cett-dump and builds both (about 5 minutes on a laptop CPU). Vulkan runs on AMD (APUs included), Intel and NVIDIA.</div>
 <div class="row" style="margin-top:.5rem"><select id="backend" style="width:auto"><option>vulkan</option><option>cpu</option><option>hip</option><option>cuda</option><option>metal</option></select>
 <label style="margin:0"><input type="checkbox" id="portable">portable (runs on other CPUs)</label>
 <button class="pri" id="build">Build</button><span id="buildst" class="note"></span></div>
 <pre id="buildlog" style="display:none"></pre></section>
+
+<section class="card" id="hwprofiles"><h2>Hardware support profiles</h2>
+<div class="note">OmniCortex supports legacy and current hardware alike: a Maxwell Tesla, a Vega card, a Raspberry Pi and a new GPU each get the backends and settings that suit them. A profile says what to install and how to configure it for one family of hardware, separately for each purpose (<b>inference</b>, <b>retraining</b>, or one <b>general</b> setup). Profiles are files you can make, share and submit for review.</div>
+<div id="hpMatch" class="note" style="margin:.4rem 0">…</div>
+<div class="row"><label style="flex:2">Profile <select id="hpId"></select></label><label>Purpose <select id="hpPur"></select></label></div>
+<div id="hpPlan" style="margin-top:.4rem"></div>
+<div class="row" style="margin-top:.4rem"><a id="hpApply" class="btn" href="#">Apply (starts a job)</a><button id="hpExport" title="download this profile as a file to share">Export</button>
+<button id="hpSubmit" title="send it to the community board for review (Settings → Sharing results: a github: board and a token)">Submit for review</button>
+<button id="hpWorked" title="tell the board this profile worked on your hardware">It worked here</button><button id="hpFailed" title="tell the board it did not">It did not work</button>
+<span id="hpMsg" class="note"></span></div>
+<details style="margin-top:.5rem"><summary class="note">Make your own (starts from the selected profile)</summary>
+<textarea id="hpEdit" style="min-height:14rem;font:12px ui-monospace,monospace;width:100%"></textarea>
+<div class="row"><button id="hpSave">Save as yours</button><span id="hpEditMsg" class="note"></span></div></details>
+</section>
 
 <section class="card" id="hardware"><h2>Hardware for worker models</h2>
 <div class="note">Where the director's worker models may run. AMD is used first when several devices have room. Saved to <code id="hwpath"></code>.</div>
@@ -66,7 +81,7 @@ details.feat{border-bottom:1px solid var(--line);padding:.35rem 0}details.feat s
 <button id="doctor" style="margin-top:.5rem">Run checks</button><div id="checks"></div></section>
 
 <section class="card" id="requirements"><h2>Requirements</h2>
-<div class="note">What each feature needs (Python packages, programs, llama.cpp builds, drivers, device access, memory) and what this machine has. Python packages install from here into Studio’s Python, at the versions <code>requirements*.txt</code> ask for; system packages show the command for your OS. Same as <code>python scripts/ns_requirements.py</code>.</div>
+<div class="note">What each feature needs (Python packages, programs, llama.cpp builds, drivers, device access, memory) and what this machine has. Python packages install from here into Studio’s Python, at the versions <code>requirements*.txt</code> ask for; system packages show the command for your OS. Same as <code>python scripts/oc_requirements.py</code>.</div>
 <div class="row" style="margin-top:.5rem"><button id="reqcheck">Check requirements</button><span class="note" id="reqsys"></span></div>
 <div id="reqs"></div>
 <h2 style="margin-top:1.2rem" id="snapshots">Environment snapshots</h2>
@@ -92,23 +107,38 @@ function renderStatus(s){
   else nx='Ready. <a href="/">Open Studio</a> to chat, <a href="/jobs">Jobs</a> to evaluate and train, <a href="/connect">Connect</a> to use these models from Cline.';
   $('#next').innerHTML=`<div class="next">${nx}</div>`;
 }
+function fieldHTML(s,k,f){
+    const h=_fieldHTML(s,k,f);
+    // sensitive settings start locked, with what changing them can break (studio.py SENSITIVE_FIELDS)
+    return f.sensitive?h.replace('<div>',`<div data-locked="${esc(f.sensitive)}">`):h; }
+function _fieldHTML(s,k,f){
+    const v=f.value; let inp;
+    if(f.kind==='bool') return `<div><label style="margin-top:1.4rem"><input type="checkbox" data-k="${k}" ${v?'checked':''}>${esc(f.help)}${f.live?'':' <span class="note">(after restart)</span>'}</label><div class="err" data-err="${k}"></div></div>`;
+    const val=f.kind==='dirs'?(v||[]).join('\n'):(v??'');
+    const ph={duration:'e.g. 5m',durations:'e.g. 1h,8h,1d',url:'http://host:port/v1@model',path:'a file (created when needed)',readfile:'a file'}[f.kind]||'';
+    const pick={file:'file',readfile:'file',path:'file',dir:'dir'}[f.kind], ext={rag_embed_gguf:'gguf',mcp_config:'json',hardware:'json',tls_cert:'pem,crt',tls_key:'pem,key'}[k]||'';
+    const dl={host:['127.0.0.1','0.0.0.0'],pair_default:['persistent','1h','8h','1d','7d']}[k];
+    const el=f.kind==='dirs'?`<textarea data-k="${k}" hidden>${esc(val)}</textarea><div data-list="${k}"></div>`
+      :`<input data-k="${k}" value="${esc(val)}" placeholder="${ph}" ${['int','float'].includes(f.kind)?'inputmode="decimal"':''}${pick?` data-pick="${pick}"${ext?` data-ext="${ext}"`:''}`:''}${dl?` list="dl-${k}"`:''}>`+(dl?`<datalist id="dl-${k}">${dl.map(x=>`<option value="${x}">`).join('')}</datalist>`:'');
+    const sug=s.found[k]&&s.found[k]!==v?`<button type="button" data-use="${k}" style="margin-top:.25rem">Use ${esc(s.found[k])}</button>`:'';
+    return `<div><label>${esc(k.replace(/_/g,' '))}<span class="note">${esc(f.help)}${f.live?'':' (after restart)'}</span></label>${el}${sug}<div class="err" data-err="${k}"></div></div>`; }
 function renderForm(s){
   $('#cfgpath').textContent=s.config_path;
-  $('#form').innerHTML='<div class="grid">'+Object.entries(s.fields).map(([k,f])=>{
-    const v=f.value; let inp;
-    if(f.kind==='bool') inp=`<label style="margin-top:1.4rem"><input type="checkbox" data-k="${k}" ${v?'checked':''}>${esc(f.help)}${f.live?'':' <span class="note">(after restart)</span>'}</label>`;
-    else{ const val=f.kind==='dirs'?(v||[]).join('\n'):(v??'');
-      const el=f.kind==='dirs'?`<textarea data-k="${k}" placeholder="one folder per line">${esc(val)}</textarea>`:`<input data-k="${k}" value="${esc(val)}" ${['int','float'].includes(f.kind)?'inputmode="decimal"':''}>`;
-      const sug=s.found[k]&&s.found[k]!==v?`<button type="button" data-use="${k}" style="margin-top:.25rem">Use ${esc(s.found[k])}</button>`:'';
-      inp=`<label>${esc(k.replace(/_/g,' '))}<span class="note">${esc(f.help)}${f.live?'':' (after restart)'}</span></label>${el}${sug}<div class="err" data-err="${k}"></div>`; }
-    return `<div>${inp}</div>`}).join('')+'</div>';
+  const groups={}; for(const [k,f] of Object.entries(s.fields)) (groups[f.group||'Other']??=[]).push([k,f]);
+  const block=(g,xs)=>`<h3 style="margin:1rem 0 .2rem">${esc(g)}</h3><div class="grid">${xs.map(([k,f])=>fieldHTML(s,k,f)).join('')}</div>`;
+  const basic=Object.entries(groups).filter(([g,xs])=>!xs[0][1].advanced), adv=Object.entries(groups).filter(([g,xs])=>xs[0][1].advanced);
+  $('#form').innerHTML=basic.map(([g,xs])=>block(g,xs)).join('')+
+    (adv.length?`<details style="margin-top:1rem" ${location.hash==='#advanced'?'open':''}><summary><b>Advanced</b> <span class="note">${adv.map(([g])=>esc(g)).join(', ')}. These apply after a restart; an address Studio would refuse to start with is refused here first.</span></summary>${adv.map(([g,xs])=>block(g,xs)).join('')}</details>`:'');
+  // Folder lists: one row per folder (Browse…, reorder, remove), kept in the hidden field the save reads.
+  document.querySelectorAll('[data-list]').forEach(d=>{ const k=d.dataset.list, ta=document.querySelector(`textarea[data-k=${k}]`);
+    nsListEditor(d,{values:(s.fields[k].value||[]),want:'dir',addLabel:'+ Add folder',empty:'No folders yet: add the ones that hold your .gguf models.',onchange:v=>ta.value=v.join('\n')}); });
   document.querySelectorAll('[data-use]').forEach(b=>b.onclick=()=>{document.querySelector(`[data-k=${b.dataset.use}]`).value=s.found[b.dataset.use]});
 }
 async function load(){ S=await api('api/setup'); renderStatus(S); renderForm(S); }
 $('#save').onclick=async()=>{
   const values={}; document.querySelectorAll('[data-k]').forEach(e=>{const k=e.dataset.k, f=S.fields[k];
     values[k]=f.kind==='bool'?e.checked:f.kind==='dirs'?e.value.split('\n').map(x=>x.trim()).filter(Boolean):e.value.trim();
-    if(['int','float'].includes(f.kind)){ if(values[k]==='') delete values[k]; else if(!isNaN(+values[k])) values[k]=+values[k]; } if(['file','dir'].includes(f.kind)&&values[k]==='') values[k]=null;
+    if(['int','float'].includes(f.kind)&&values[k]!==''&&!isNaN(+values[k])) values[k]=+values[k]; if(f.kind!=='dirs'&&values[k]==='') values[k]=null;
     // Only what changed: unchanged fields stay out of the config file (and keep following the defaults).
     const was=f.kind==='dirs'?(f.value||[]):f.value; if(k in values && JSON.stringify(values[k]??null)===JSON.stringify(was??null)) delete values[k];});
   if(!Object.keys(values).length){ $('#saved').innerHTML='<span class="note">nothing changed</span>'; return; }
@@ -141,10 +171,10 @@ function renderHW(h){
       <td><b>${esc(d.id)}</b> ${esc(d.name)}${d.note?`<div class="note" style="color:var(--warn)">${esc(d.note)}</div>`:''}</td>
       <td class="note">${d.memory_total==null?'unknown':gib(d.memory_free)+' / '+gib(d.memory_total)+' GiB'+(d.estimated?' (est.)':'')}${d.unified&&d.backend!=='cpu'?'<br>shared with RAM':''}</td>
       <td><details><summary class="note">${c.server||c.rocm_path||env||c.reserve_gib!=null?'customised':'defaults'}</summary>
-        <label>llama-server for this device</label><input data-x="${esc(d.id)}" data-f="server" value="${esc(c.server||'')}">
+        <label>llama-server for this device</label><input data-x="${esc(d.id)}" data-f="server" value="${esc(c.server||'')}" data-pick="file">
         ${d.backend==='rocm'?`<label>pinned ROCm release <span class="note">e.g. /opt/rocm-6.2.4</span></label><input data-x="${esc(d.id)}" data-f="rocm_path" value="${esc(c.rocm_path||'')}">`:''}
         <label>memory to keep free (GiB)</label><input data-x="${esc(d.id)}" data-f="reserve_gib" value="${esc(c.reserve_gib??'')}">
-        <label>environment <span class="note">KEY=value per line; HSA_, HIP_, ROCR_, GGML_, CUDA_, VK_… only</span></label><textarea data-x="${esc(d.id)}" data-f="env">${esc(env)}</textarea>
+        <label>environment <span class="note">KEY=value per line; HSA_, HIP_, ROCR_, GGML_, CUDA_, VK_… only</span></label><textarea data-x="${esc(d.id)}" data-f="env" data-lines="text" data-add="+ Add variable" placeholder="NAME=value">${esc(env)}</textarea>
       </details></td></tr>`}).join('');
   $('#servers').innerHTML=['rocm','vulkan','cuda','metal','cpu'].map(b=>`<div><label>${b}</label><input data-srv="${b}" value="${esc((cfg.servers||{})[b]||'')}"></div>`).join('');
 }
@@ -172,7 +202,7 @@ $('#doctor').onclick=async()=>{ $('#doctor').disabled=true; $('#checks').innerHT
 load().catch(e=>$('#status').innerHTML=`<span class="err">${esc(e.message)}</span>`);
 api('api/hardware').then(renderHW).catch(e=>$('#devs').innerHTML=`<tr><td class="err">${esc(e.message)}</td></tr>`);
 
-// ---------- requirements (scripts/ns_requirements.py)
+// ---------- requirements (scripts/oc_requirements.py)
 function reqItem(i){
   const opt=i.optional?' <span class="note">(optional)</span>':'';
   const need=i.need&&!['installed','built','any'].includes(i.need)?` <span class="note">needs ${esc(i.need)}</span>`:'';
@@ -220,6 +250,40 @@ $('#snapdiff').onclick=async()=>{ try{ const d=await api('api/requirements/diff'
 loadReqs(); loadSnaps();
 
 if(location.hash){ const t=document.querySelector(location.hash); if(t) setTimeout(()=>t.scrollIntoView(),300); }
+let HP=null;
+async function hpLoad(){ HP=await (await fetch('/api/hw-profiles')).json();
+  const ids=new Set(HP.matches.map(m=>m.id));
+  $('#hpMatch').innerHTML=HP.matches.length?'Fits this computer: '+HP.matches.map(m=>`<b>${esc(m.id)}</b> (${esc(m.devices.join('; '))})`).join(', '):'No profile matches the devices found here; pick one by hand.';
+  const era={legacy:'legacy',modern:'current',any:'any hardware'};
+  $('#hpId').innerHTML=HP.profiles.filter(p=>!p.invalid).sort((a,b)=>(ids.has(b.id)-ids.has(a.id))||a.title.localeCompare(b.title)).map(p=>{const r=HP.reports[p.id]||{};const n=Object.values(r).reduce((a,x)=>a+x.worked,0),f=Object.values(r).reduce((a,x)=>a+x.failed,0);
+    return `<option value="${esc(p.id)}" title="${esc((p.examples||[]).join(', '))}">${ids.has(p.id)?'✓ ':''}${esc(p.title)} · ${era[p.era]||p.era||''} · ${esc(p.status||'')}${n+f?` · ${n}✓ ${f}✗`:''}</option>`}).join('');
+  hpPick(); }
+function hpCur(){ return HP.profiles.find(p=>p.id===$('#hpId').value); }
+function hpPick(){ const p=hpCur(); if(!p) return; $('#hpPur').innerHTML=Object.keys(p.purposes).map(k=>`<option>${k}</option>`).join('');
+  $('#hpEdit').value=JSON.stringify({...Object.fromEntries(Object.entries(p).filter(([k])=>!['file','status'].includes(k))),id:p.id+'-mine',author:'',status:undefined},null,1); hpPlan(); }
+async function hpPlan(){ const p=hpCur(), pur=$('#hpPur').value;
+  const r=await (await fetch('/api/hw-profiles/plan?'+new URLSearchParams({id:p.id,purpose:pur}))).json();
+  if(r.error){ $('#hpPlan').innerHTML=`<span class="err">${esc(r.error)}</span>`; return; }
+  const rep=(HP.reports[p.id]||{})[r.purpose];
+  $('#hpPlan').innerHTML=`<div><b>${esc(r.purpose)}</b>: ${esc(r.summary)}</div>`+
+    (p.examples&&p.examples.length?`<div class="note">For example: ${esc(p.examples.join(', '))}</div>`:'')+
+    (r.steps.length?'<ol>'+r.steps.map(s=>`<li>${esc(s.title)}<pre style="margin:.2rem 0">${esc(s.cmd.join(' '))}</pre></li>`).join('')+'</ol>':'<div class="note">Nothing to install.</div>')+
+    (Object.keys(r.engine).length?`<div class="note">Engine settings: <code>${esc(JSON.stringify(r.engine))}</code></div>`:'')+
+    (Object.keys(r.training).length?`<div class="note">Training: <code>${esc(JSON.stringify(r.training))}</code></div>`:'')+
+    (Object.keys(r.env).length?`<div class="note">Environment: ${Object.entries(r.env).map(([k,v])=>`<code>${esc(k)}</code> ${esc(v)}`).join('; ')}</div>`:'')+
+    r.notes.map(n=>`<div class="note">${esc(n)}</div>`).join('')+
+    (rep?`<div class="note">Community: ${rep.worked} worked, ${rep.failed} did not${rep.median_tok_s?`, median ${rep.median_tok_s} tok/s`:''} (${esc(rep.hardware.slice(0,6).join(', '))})</div>`:'');
+  $('#hpApply').href='/jobs#'+new URLSearchParams({kind:'hw_apply',id:p.id,purpose:r.purpose}); }
+async function hpPost(path,body){ const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); return [r.ok,await r.json()]; }
+$('#hpId').onchange=hpPick; $('#hpPur').onchange=hpPlan;
+$('#hpExport').onclick=async()=>{ const [ok,j]=await hpPost('/api/hw-profiles/export',{id:$('#hpId').value});
+  if(!ok){ $('#hpMsg').textContent=j.error; return; } const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(j,null,1)],{type:'application/json'})); a.download=j.id+'.json'; a.click(); };
+$('#hpSubmit').onclick=async()=>{ const [ok,j]=await hpPost('/api/hw-profiles/submit',{id:$('#hpId').value}); $('#hpMsg').innerHTML=ok?`Submitted: <a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>`:esc(j.error); };
+for(const [b,w] of [['#hpWorked',true],['#hpFailed',false]]) $(b).onclick=async()=>{ const note=w?'':prompt('What went wrong? (optional, sent with the report)')||'';
+  const [ok,j]=await hpPost('/api/hw-profiles/report',{id:$('#hpId').value,purpose:$('#hpPur').value,worked:w,note}); $('#hpMsg').innerHTML=ok?`Reported: <a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(j.url)}</a>`:esc(j.error); };
+$('#hpSave').onclick=async()=>{ let p; try{ p=JSON.parse($('#hpEdit').value); }catch(e){ $('#hpEditMsg').textContent='not valid JSON: '+e.message; return; }
+  const [ok,j]=await hpPost('/api/hw-profiles/save',{profile:p}); $('#hpEditMsg').textContent=ok?'Saved: '+j.saved:j.error; if(ok) hpLoad(); };
+hpLoad();
 </script>
 """
 

@@ -2,7 +2,7 @@
 """
 Stage 4: CETT activation extraction.
 
-Replaces scripts/extract_activations.py from the upstream repo. See ns_common.py
+Replaces scripts/extract_activations.py from the upstream repo. See oc_common.py
 for the substantive differences (device-safe hooks, text-layer filtering, exact
 sequence construction, think-block-aware region indexing).
 
@@ -25,7 +25,7 @@ import torch
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_common import CETTManager, build_sequence, find_regions, load_model  # noqa: E402
+from oc_common import CETTManager, build_sequence, find_regions, load_model  # noqa: E402
 
 
 def parse_args():
@@ -38,6 +38,9 @@ def parse_args():
                    choices=["input", "output", "answer_tokens",
                             "all_except_answer_tokens"])
     p.add_argument("--method", choices=["mean", "max"], default="mean")
+    p.add_argument("--capture", choices=CETTManager.MODES, default="auto",
+                   help="how activations leave the GPU: auto (device when it fits, else stream), "
+                        "stream (async pinned copies overlapping compute), device, or sync (oc_common.CETTManager)")
     p.add_argument("--gpu_mem", default=None, help="e.g. 14GiB. Omit for CPU only.")
     p.add_argument("--cpu_mem", default="40GiB")
     p.add_argument("--max_tokens", type=int, default=2048,
@@ -46,7 +49,11 @@ def parse_args():
     p.add_argument("--keep_think", action="store_true",
                    help="Search for answer tokens from the start of the response "
                         "instead of after </think>.")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     return p.parse_args()
 
 
@@ -54,9 +61,9 @@ def main():
     args = parse_args()
     model, tokenizer = load_model(
         args.model_path, args.gpu_mem, args.cpu_mem,
-        trust_remote_code=not args.no_trust_remote_code,
+        trust_remote_code=args.trust_remote_code,
     )
-    mgr = CETTManager(model)
+    mgr = CETTManager(model, capture=args.capture)
     entry_device = next(model.parameters()).device
     print(f"hooked {mgr.n_layers} layers x {mgr.n_neurons} neurons "
           f"= {mgr.n_layers * mgr.n_neurons:,} features")
@@ -98,9 +105,9 @@ def main():
             continue
 
         mgr.clear()
-        with torch.no_grad():
+        mgr.prepare(len(full_ids))
+        with torch.inference_mode():
             model(full_ids.unsqueeze(0).to(entry_device))
-        cett = mgr.cett()
 
         regions = find_regions(
             tokenizer, full_ids, prompt_len,
@@ -116,17 +123,16 @@ def main():
                 if span is None:
                     continue
                 s, e = span
-                out_start = regions["output"][0]
-                sel = torch.cat([cett[:, out_start:s, :], cett[:, e:, :]], dim=1)
+                spans = [(regions["output"][0], s), (e, len(full_ids))]
             else:
                 span = regions[loc]
                 if span is None or span[1] <= span[0]:
                     continue
-                sel = cett[:, span[0]:span[1], :]
-
-            if sel.shape[1] == 0:
+                spans = [span]
+            # only these spans' CETT is computed, on whichever device holds the activations
+            agg = mgr.aggregate([(a, b) for a, b in spans if b > a], args.method)
+            if agg is None:
                 continue
-            agg = sel.mean(dim=1) if args.method == "mean" else sel.max(dim=1)[0]
             np.save(
                 os.path.join(args.output_root, loc, f"act_{qid}.npy"),
                 agg.numpy().astype(np.float16),

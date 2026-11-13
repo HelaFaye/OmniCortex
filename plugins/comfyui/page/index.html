@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ComfyUI</title>
+<style>
+:root{color-scheme:dark light}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;font:14px/1.5 ui-sans-serif,system-ui;background:var(--bg,#151514);color:var(--fg,#ececea)}
+header{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.45rem 12px;border-bottom:1px solid var(--line,#33332f);background:var(--panel,#1d1d1b)}
+header b{font-size:15px}.note{color:var(--mut,#9a9a94);font-size:12.5px}
+a.btn,button{font:inherit;color:inherit;background:transparent;border:1px solid var(--line,#33332f);border-radius:7px;padding:.3rem .65rem;text-decoration:none;cursor:pointer}
+a.pri{background:var(--acc,#6f93ff);color:#0b0b0a;border-color:var(--acc,#6f93ff)}
+iframe{flex:1;border:0;width:100%;background:#202020}
+#empty{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:2rem}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:#888}.dot.on{background:#5fcf8f}
+</style>
+<header><b>ComfyUI</b><span class="dot" id="dot"></span><span id="st" class="note">looking…</span><span style="flex:1"></span>
+  <a class="btn" href="/jobs#kind=plugin:comfyui:run" target="_top">Run…</a>
+  <a class="btn" href="/jobs#kind=plugin:comfyui:install" target="_top">Install / repair…</a>
+  <a class="btn" href="/jobs#kind=plugin:comfyui:update" target="_top">Update</a>
+  <a class="btn" href="/jobs#kind=plugin:comfyui:node" target="_top">Add a custom node…</a>
+  <a class="btn" id="newtab" href="#" target="_blank" rel="noopener">Open in a tab</a></header>
+<div id="empty"><div><p>ComfyUI is not running.</p>
+  <p class="note">First time: <b>Install</b> puts ComfyUI in its own Python environment with the right PyTorch for your GPU (and, if you like, ComfyUI-Manager, LLM node packs and OmniCortex's nodes). Then <b>Run</b> starts it; it shows here.</p>
+  <p><a class="btn pri" href="/jobs#kind=plugin:comfyui:install" target="_top">Install ComfyUI</a> <a class="btn" href="/jobs#kind=plugin:comfyui:run" target="_top">Run it</a></p></div></div>
+<iframe id="ui" hidden title="ComfyUI" allow="clipboard-read; clipboard-write"></iframe>
+<script>
+// Theme colours from Studio, so the frame around ComfyUI matches.
+try{ const v=JSON.parse(localStorage.getItem('ns-theme-vars')||'{}'); for(const k in v) document.documentElement.style.setProperty('--'+k,v[k]); }catch(e){}
+let shown='';
+async function look(){
+  let job=null;
+  try{ const jobs=await (await fetch('/api/jobs')).json(); job=(jobs||[]).find(j=>j.kind==='plugin:comfyui:run'&&j.status==='running'); }catch(e){}
+  const st=document.getElementById('st'), dot=document.getElementById('dot');
+  if(!job){ dot.className='dot'; st.textContent='not running'; document.getElementById('ui').hidden=true; document.getElementById('empty').hidden=false; shown=''; return; }
+  const v=job.values||{}, port=v.port||8188, host=(v.listen&&v.listen!=='127.0.0.1'&&v.listen!=='0.0.0.0')?v.listen:location.hostname;
+  const url=`${location.protocol==='https:'?'http:':location.protocol}//${host}:${port}/`;
+  dot.className='dot on'; st.textContent='running on port '+port; document.getElementById('newtab').href=url;
+  if(shown!==url){ shown=url; const f=document.getElementById('ui'); f.src=url; f.hidden=false; document.getElementById('empty').hidden=true; } }
+look(); setInterval(look,5000);
+</script>

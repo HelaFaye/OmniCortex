@@ -54,7 +54,7 @@ real failure mode is one of those, the neurons you find may not transfer.
 
 Written against the papers and the upstream source, but **not executed against
 real weights** — treat the first run of each stage as a debugging session. The
-likeliest thing to need adjusting is `TEXT_LAYER_RE` in `ns_common.py` if your
+likeliest thing to need adjusting is `TEXT_LAYER_RE` in `oc_common.py` if your
 model's remote code names its modules unconventionally. `preflight.py` will
 show you the names.
 
@@ -99,7 +99,7 @@ Retraining on measured deficits is now built in: see [RETRAINING.md](RETRAINING.
 
 ### Why suppression alone is not training
 
-There is no training loop here. NeuronScope suppresses; it cannot add capability.
+There is no training loop here. OmniCortex suppresses; it cannot add capability.
 If the goal is a better local model over time, the order of leverage is:
 
 **1. Upgrade the checkpoint.** A newer open-weight release in the same size
@@ -108,13 +108,13 @@ Do this before anything else.
 
 **2. Train an abstention LoRA.** `export_sft_dataset.py` turns the collected
 pairs into it directly: consistently-correct questions teach "answer",
-consistently-hallucinated teach "decline". Same behavioural target as NeuronScope,
+consistently-hallucinated teach "decline". Same behavioural target as OmniCortex,
 reached by gradient descent instead of a scalar on a neuron column, so it can
 shape *when* to decline in a way clamping cannot. Needs a rented 24GB card for
 an afternoon; integrated GPUs and 16 GB cards are not enough.
 
 **3. Compare the two** on the same held-out set with
-`eval_code_hallucination.py`. If the LoRA wins clearly, NeuronScope was scaffolding.
+`eval_code_hallucination.py`. If the LoRA wins clearly, OmniCortex was scaffolding.
 If it does not, that is a real result about how localised this behaviour is.
 
 Replicating a vendor's RL self-improvement loop (GRPO and friends) is a

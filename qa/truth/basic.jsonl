@@ -1,0 +1,44 @@
+{"question": "What is the capital of Australia?", "answer": "Canberra", "wrong": ["Sydney", "Melbourne"]}
+{"question": "What is the capital of Canada?", "answer": "Ottawa", "wrong": ["Toronto", "Vancouver"]}
+{"question": "What is the capital of Japan?", "answer": "Tokyo", "wrong": ["Kyoto"]}
+{"question": "What is the capital of Brazil?", "answer": "Brasília", "wrong": ["Rio de Janeiro", "São Paulo"]}
+{"question": "What is the capital of Turkey?", "answer": "Ankara", "wrong": ["Istanbul"]}
+{"question": "What is the capital of Kenya?", "answer": "Nairobi", "wrong": ["Mombasa"]}
+{"question": "What is the largest planet in the Solar System?", "answer": "Jupiter", "wrong": ["Saturn"]}
+{"question": "Which planet is closest to the Sun?", "answer": "Mercury", "wrong": ["Venus"]}
+{"question": "What is the chemical symbol for gold?", "answer": "Au", "wrong": ["Ag", "Gd"]}
+{"question": "What is the chemical symbol for sodium?", "answer": "Na", "wrong": ["So"]}
+{"question": "How many sides does a hexagon have?", "answer": "6", "wrong": ["8"]}
+{"question": "What is 7 times 8?", "answer": "56", "wrong": ["54", "64"]}
+{"question": "What is the square root of 144?", "answer": "12", "wrong": ["14"]}
+{"question": "What is 15 plus 27?", "answer": "42", "wrong": ["32"]}
+{"question": "Who wrote Hamlet?", "answer": "William Shakespeare", "wrong": ["Christopher Marlowe"]}
+{"question": "Who wrote Pride and Prejudice?", "answer": "Jane Austen", "wrong": ["Charlotte Brontë"]}
+{"question": "Who painted the Mona Lisa?", "answer": "Leonardo da Vinci", "wrong": ["Michelangelo"]}
+{"question": "Who developed the theory of general relativity?", "answer": "Albert Einstein", "wrong": ["Isaac Newton"]}
+{"question": "What gas do plants absorb from the air for photosynthesis?", "answer": "Carbon dioxide", "wrong": ["Oxygen"]}
+{"question": "What is the boiling point of water at sea level in degrees Celsius?", "answer": "100", "wrong": ["90"]}
+{"question": "What is the freezing point of water in degrees Fahrenheit?", "answer": "32", "wrong": ["0"]}
+{"question": "How many continents are there?", "answer": "7", "wrong": ["5"]}
+{"question": "What is the longest river in South America?", "answer": "The Amazon", "wrong": ["The Paraná"]}
+{"question": "Which ocean is the largest?", "answer": "The Pacific Ocean", "wrong": ["The Atlantic Ocean"]}
+{"question": "What is the hardest natural mineral?", "answer": "Diamond", "wrong": ["Quartz"]}
+{"question": "How many chromosomes do humans usually have?", "answer": "46", "wrong": ["48"]}
+{"question": "What organ pumps blood around the human body?", "answer": "The heart", "wrong": ["The liver"]}
+{"question": "What is the smallest prime number?", "answer": "2", "wrong": ["1"]}
+{"question": "In which year did the Apollo 11 Moon landing take place?", "answer": "1969", "wrong": ["1972"]}
+{"question": "What is the main language spoken in Brazil?", "answer": "Portuguese", "wrong": ["Spanish"]}
+{"question": "What is the currency of Japan?", "answer": "The yen", "wrong": ["The won"]}
+{"question": "Which element has atomic number 1?", "answer": "Hydrogen", "wrong": ["Helium"]}
+{"question": "What is the speed of light in a vacuum, roughly, in kilometres per second?", "answer": "300,000", "wrong": ["30,000"]}
+{"question": "How many bits are in a byte?", "answer": "8", "wrong": ["16"]}
+{"question": "What does CPU stand for?", "answer": "Central processing unit", "wrong": ["Computer power unit"]}
+{"question": "Which programming language uses the keyword 'def' to define functions?", "answer": "Python", "wrong": ["C"]}
+{"question": "What is the largest mammal?", "answer": "The blue whale", "wrong": ["The African elephant"]}
+{"question": "What is the tallest mountain above sea level?", "answer": "Mount Everest", "wrong": ["K2"]}
+{"question": "Which country has the largest population as of 2024?", "answer": "India", "wrong": ["The United States"]}
+{"question": "What is H2O commonly called?", "answer": "Water", "wrong": ["Hydrogen peroxide"]}
+{"question": "How many degrees are in a right angle?", "answer": "90", "wrong": ["180"]}
+{"question": "What is the plural of 'mouse' (the animal)?", "answer": "Mice", "wrong": ["Mouses"]}
+{"question": "Which instrument has 88 keys in its standard modern form?", "answer": "The piano", "wrong": ["The organ"]}
+{"question": "What is the opposite of 'ancient'?", "answer": "Modern", "wrong": ["Old"]}

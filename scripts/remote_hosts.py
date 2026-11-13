@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-The controller side of NeuronScope Remote: Studio driving LLM hosts that do not
-run NeuronScope (a Windows box with LM Studio, a server with Ollama...).
+The controller side of OmniCortex Remote: Studio driving LLM hosts that do not
+run OmniCortex (a Windows box with LM Studio, a server with Ollama...).
 
 Roles: this computer (Studio) is the CONTROLLER; the computer that runs the
-models and the agent (remote/neuronscope_remote) is the HOST. Everything Studio
+models and the agent (remote/omnicortex_remote) is the HOST. Everything Studio
 does on a host is an MCP tool call to the agent; chat also goes through the
 agent's OpenAI-compatible pass-through when the host is reachable directly.
 
@@ -16,7 +16,7 @@ Link methods, as Studio's Remote page offers them:
   callhome  the host connects out to this Studio and waits for instructions
 
 The pairing protocol and the pinned-certificate client are the agent's own
-(remote/neuronscope_remote/agent.py), so both sides speak exactly the same thing.
+(remote/omnicortex_remote/agent.py), so both sides speak exactly the same thing.
 """
 from __future__ import annotations
 
@@ -40,10 +40,12 @@ REMOTE_PKG = ROOT / "remote"
 import sys  # noqa: E402
 
 sys.path.insert(0, str(REMOTE_PKG))
-from neuronscope_remote import agent as nsr  # noqa: E402
+from omnicortex_remote import agent as nsr  # noqa: E402
 
 METHODS = ("lan", "vpn", "ssh", "tunnel", "callhome")
 CHUNK = 16 * 1024 * 1024
+MAX_ACTIVE_REMOTE_SENDS = 4
+MAX_REMOTE_SEND_HISTORY = 100
 
 
 RemoteError = nsr.LinkError
@@ -162,90 +164,359 @@ class Tunnels:
 # ------------------------------------------------------------------ hosts that call in
 
 class CallHomeHub:
-    """Invites, host tokens and the message queues for hosts that connect out to
-    Studio (the host long-polls /api/remote/next, answers on /api/remote/reply)."""
+    """Bounded invites, pending calls, host polls, progress buffers and tickets."""
+
+    MAX_HOSTS = 256
+    MAX_INVITES = 1024
+    MAX_PENDING_CALLS = 256
+    MAX_PENDING_PER_HOST = 32
+    MAX_LONG_POLLS = 256
+    MAX_POLLS_PER_HOST = 4
+    MAX_PROGRESS_PIECES = 64
+    MAX_PROGRESS_PIECE_BYTES = 64 * 1024
+    MAX_PROGRESS_BYTES = 256 * 1024
+    HOST_IDLE_TTL = 300.0
 
     def __init__(self):
         self.lock = threading.Condition()
-        self.invites: dict = {}       # code -> {name, fingerprint, expires}
-        self.queues: dict = collections.defaultdict(collections.deque)
-        self.waiting: dict = {}       # message id -> [Event, response]
-        self.seen: dict = {}          # host name -> last poll time
-        self.tickets: dict = {}       # file ticket -> {path, expires, host}
+        self.invites: dict = {}
+        self.queues: dict = {}
+        self.waiting: dict = {}
+        self.seen: dict = {}
+        self.polling: dict = collections.Counter()
+        self.host_pending: dict = collections.Counter()
+        self.active_polls = 0
+        self.tickets: dict = {}
+        self.max_tickets = 4096
 
-    def invite(self, url: str, name: str, fingerprint: str, controller: str, ttl: float = 900) -> dict:
+    @staticmethod
+    def _valid_host(host: str) -> bool:
+        return isinstance(host, str) and 0 < len(host) <= 128 and "\\0" not in host
+
+    def _prune_hosts_locked(self, now: float) -> None:
+        for host, last_seen in list(self.seen.items()):
+            if (now - float(last_seen) > self.HOST_IDLE_TTL
+                    and not self.polling.get(host, 0)
+                    and not self.host_pending.get(host, 0)
+                    and not self.queues.get(host)):
+                self.seen.pop(host, None)
+                self.queues.pop(host, None)
+                self.polling.pop(host, None)
+                self.host_pending.pop(host, None)
+
+    def _online_locked(self, host: str) -> bool:
+        if self.polling.get(host, 0):
+            return True
+        seen = self.seen.get(host)
+        return seen is not None and time.time() - seen < 70
+
+    def invite(self, url: str, name: str, fingerprint: str,
+               controller: str, ttl: float = 900) -> dict:
         code = nsr.new_code()
         with self.lock:
             now = time.time()
-            self.invites = {c: v for c, v in self.invites.items() if v["expires"] > now}
-            self.invites[code] = {"name": name, "fingerprint": fingerprint, "expires": now + ttl,
-                                  "controller": controller, "attempts": 0}
-        return {"invite": nsr.make_invite(url, code, fingerprint, controller), "expires": time.time() + ttl,
-                "code": nsr.fmt_code(code), "name": name}
+            self.invites = {
+                c: v for c, v in self.invites.items()
+                if float(v.get("expires", 0)) > now
+            }
+            if len(self.invites) >= self.MAX_INVITES:
+                raise RemoteError("too many outstanding remote invites; wait for some to expire")
+            ttl = max(1.0, min(float(ttl), 900.0))
+            self.invites[code] = {
+                "name": name, "fingerprint": fingerprint,
+                "expires": now + ttl, "controller": controller, "attempts": 0,
+            }
+        return {
+            "invite": nsr.make_invite(url, code, fingerprint, controller),
+            "expires": time.time() + ttl,
+            "code": nsr.fmt_code(code),
+            "name": name,
+        }
 
     def claim(self, proof: str) -> tuple[dict, str] | None:
-        """-> (invite, code) for a matching proof; the invite is used up."""
+        """Return and consume a matching invite proof."""
         with self.lock:
             now = time.time()
             for code, inv in list(self.invites.items()):
                 if inv["expires"] < now:
-                    self.invites.pop(code)
+                    self.invites.pop(code, None)
                     continue
-                if hmac.compare_digest(str(proof), nsr.pair_proof(code, inv["fingerprint"], "claim")):
+                if hmac.compare_digest(
+                    str(proof), nsr.pair_proof(code, inv["fingerprint"], "claim")
+                ):
                     return self.invites.pop(code), code
         return None
 
-    def request(self, host: str, message: dict, timeout: float = 120) -> dict:
-        if not self.online(host):
-            raise RemoteError(f"{host} is not connected: the agent there is not running, or cannot reach this "
-                              "Studio")
+    def request(self, host: str, message: dict, timeout: float = 120,
+                on_progress=None) -> dict:
+        """Queue a bounded request and wait for its answer or streamed progress."""
+        if not self._valid_host(host):
+            raise RemoteError("invalid call-home host name")
+        try:
+            timeout = float(timeout)
+        except (TypeError, ValueError) as exc:
+            raise RemoteError("invalid call-home request timeout") from exc
+        if not 0 < timeout <= 86400:
+            raise RemoteError("call-home request timeout must be between 0 and 86400 seconds")
+        if not isinstance(message, dict):
+            raise RemoteError("call-home request must be an object")
+
         mid = secrets.token_hex(8)
-        ev = threading.Event()
+        w = {
+            "ev": threading.Event(),
+            "resp": None,
+            "host": host,
+            "chunks": collections.deque(),
+            "chunk_sizes": collections.deque(),
+            "chunks_bytes": 0,
+            "cancel": False,
+            "error": None,
+            "touched": time.time(),
+        }
+        if on_progress is not None:
+            params = message.setdefault("params", {})
+            if not isinstance(params, dict):
+                raise RemoteError("call-home request params must be an object")
+            meta = params.get("_meta", {})
+            if not isinstance(meta, dict):
+                raise RemoteError("call-home request _meta must be an object")
+            params["_meta"] = {
+                **meta,
+                "progressToken": mid,
+            }
+
         with self.lock:
-            self.waiting[mid] = [ev, None]
-            self.queues[host].append({"id": mid, "message": message})
+            now = time.time()
+            self._prune_hosts_locked(now)
+            if not self._online_locked(host):
+                raise RemoteError(f"{host} is not connected")
+            if len(self.waiting) >= self.MAX_PENDING_CALLS:
+                raise RemoteError("call-home request capacity is full")
+            if self.host_pending.get(host, 0) >= self.MAX_PENDING_PER_HOST:
+                raise RemoteError(f"too many pending call-home requests for {host}")
+            if mid in self.waiting:
+                raise RemoteError("call-home request ID collision")
+            self.waiting[mid] = w
+            self.host_pending[host] += 1
+            self.queues.setdefault(host, collections.deque()).append(
+                {"id": mid, "message": message}
+            )
             self.lock.notify_all()
-        if not ev.wait(timeout):
+
+        try:
+            while not w["ev"].wait(0.05 if on_progress else timeout):
+                if on_progress is not None:
+                    self._drain(w, on_progress)
+                if time.time() - w["touched"] > timeout:
+                    raise RemoteError(f"{host} did not answer within {timeout:.0f}s")
+
+            if w["error"] is not None:
+                raise w["error"]
+            if on_progress is not None:
+                self._drain(w, on_progress)
+            return w["resp"]
+
+        except BaseException:
+            with self.lock:
+                w["cancel"] = True
+            raise
+
+        finally:
+            # Removal is immediate. A late host reply/progress receives cancel=True;
+            # no per-request Timer thread is needed.
             with self.lock:
                 self.waiting.pop(mid, None)
-                self.queues[host] = collections.deque(m for m in self.queues[host] if m["id"] != mid)
-            raise RemoteError(f"{host} did not answer within {timeout:.0f}s")
-        with self.lock:
-            return self.waiting.pop(mid)[1]
+                self.host_pending[host] -= 1
+                if self.host_pending[host] <= 0:
+                    self.host_pending.pop(host, None)
+
+                queue = self.queues.get(host)
+                if queue:
+                    remaining = collections.deque(
+                        item for item in queue if item.get("id") != mid
+                    )
+                    if remaining:
+                        self.queues[host] = remaining
+                    else:
+                        self.queues.pop(host, None)
+                self.lock.notify_all()
+
+    def _drain(self, w: dict, on_progress) -> None:
+        while True:
+            with self.lock:
+                if not w["chunks"]:
+                    return
+                piece = w["chunks"].popleft()
+                size = w["chunk_sizes"].popleft()
+                w["chunks_bytes"] = max(0, w["chunks_bytes"] - size)
+            on_progress(piece)
 
     def next(self, host: str, wait: float = 25) -> list:
-        end = time.time() + max(0.0, min(wait, 55))
-        with self.lock:
-            self.seen[host] = time.time()
-            while not self.queues[host] and time.time() < end:
-                self.lock.wait(max(0.05, end - time.time()))
-            out = list(self.queues[host])
-            self.queues[host].clear()
-            self.seen[host] = time.time()
-        return out
+        if not self._valid_host(host):
+            raise RemoteError("invalid call-home host name")
+        end = time.monotonic() + max(0.0, min(float(wait), 55.0))
 
-    def reply(self, mid: str, response) -> bool:
         with self.lock:
-            w = self.waiting.get(mid)
-            if w is None:
+            now = time.time()
+            self._prune_hosts_locked(now)
+            if host not in self.seen:
+                if len(self.seen) >= self.MAX_HOSTS:
+                    raise RemoteError("call-home host capacity is full")
+                self.seen[host] = now
+
+            if self.polling.get(host, 0) >= self.MAX_POLLS_PER_HOST:
+                raise RemoteError(f"too many simultaneous long polls for {host}")
+            if self.active_polls >= self.MAX_LONG_POLLS:
+                raise RemoteError("call-home long-poll capacity is full")
+
+            self.polling[host] += 1
+            self.active_polls += 1
+            try:
+                while not self.queues.get(host) and time.monotonic() < end:
+                    self.lock.wait(max(0.05, end - time.monotonic()))
+                out = list(self.queues.get(host, ()))
+                self.queues.pop(host, None)
+                return out
+            finally:
+                self.polling[host] -= 1
+                self.active_polls -= 1
+                if self.polling[host] <= 0:
+                    self.polling.pop(host, None)
+                self.seen[host] = time.time()
+
+    def last_seen(self, host: str) -> float | None:
+        with self.lock:
+            if self.polling.get(host, 0):
+                return 0.0
+            seen = self.seen.get(host)
+            return None if seen is None else time.time() - seen
+
+    def _mine(self, mid: str, host: str | None):
+        # Called while holding self.lock.
+        w = self.waiting.get(mid)
+        return w if w is not None and (host is None or w["host"] == host) else None
+
+    def reply(self, mid: str, response, host: str | None = None) -> bool:
+        with self.lock:
+            w = self._mine(mid, host)
+            if w is None or w["ev"].is_set():
                 return False
-            w[1] = response
-            w[0].set()
+            w["resp"] = response
+            w["ev"].set()
             return True
 
+    def progress(self, mid: str, pieces: list, host: str | None = None) -> dict:
+        """Append bounded streamed pieces, or cancel an overflowing request."""
+        with self.lock:
+            w = self._mine(mid, host)
+            if w is None:
+                return {"ok": False, "cancel": True}
+
+            now = time.time()
+            self.seen[w["host"]] = w["touched"] = now
+            if w["cancel"] or w["ev"].is_set():
+                return {"ok": True, "cancel": True}
+
+            for piece in pieces if isinstance(pieces, list) else ():
+                if not isinstance(piece, (str, dict)):
+                    continue
+                try:
+                    if isinstance(piece, str):
+                        size = len(piece.encode("utf-8"))
+                    else:
+                        size = len(json.dumps(
+                            piece, ensure_ascii=False, separators=(",", ":")
+                        ).encode("utf-8"))
+                except (TypeError, ValueError, UnicodeError):
+                    continue
+
+                if (size > self.MAX_PROGRESS_PIECE_BYTES
+                        or len(w["chunks"]) >= self.MAX_PROGRESS_PIECES
+                        or w["chunks_bytes"] + size > self.MAX_PROGRESS_BYTES):
+                    w["cancel"] = True
+                    w["error"] = RemoteError("call-home progress buffer limit exceeded")
+                    w["chunks"].clear()
+                    w["chunk_sizes"].clear()
+                    w["chunks_bytes"] = 0
+                    w["ev"].set()
+                    self.lock.notify_all()
+                    return {"ok": True, "cancel": True}
+
+                w["chunks"].append(piece)
+                w["chunk_sizes"].append(size)
+                w["chunks_bytes"] += size
+
+            return {"ok": True, "cancel": False}
+
     def online(self, host: str) -> bool:
-        return time.time() - self.seen.get(host, 0) < 70
+        with self.lock:
+            return self._online_locked(host)
 
     def ticket(self, path: str, host: str, ttl: float = 6 * 3600) -> str:
         t = secrets.token_urlsafe(24)
         with self.lock:
-            self.tickets[t] = {"path": path, "host": host, "expires": time.time() + ttl}
+            now = time.time()
+            self._prune_tickets(now)
+            if len(self.tickets) >= self.max_tickets:
+                eligible = [
+                    key for key, value in self.tickets.items()
+                    if not value.get("in_use")
+                ]
+                if not eligible:
+                    raise RemoteError("remote download ticket capacity is full")
+                oldest = min(
+                    eligible,
+                    key=lambda key: self.tickets[key]["expires"],
+                )
+                self.tickets.pop(oldest, None)
+            self.tickets[t] = {
+                "path": path,
+                "host": host,
+                "expires": now + max(1.0, min(float(ttl), 6 * 3600)),
+                "in_use": False,
+            }
         return t
 
-    def ticket_path(self, t: str) -> str | None:
+    def ticket_acquire(self, t: str) -> str | None:
+        """Acquire an exclusive download lease without consuming the ticket."""
         with self.lock:
-            v = self.tickets.get(t)
-        return v["path"] if v and v["expires"] > time.time() else None
+            now = time.time()
+            self._prune_tickets(now)
+            value = self.tickets.get(t)
+            if value is None or value.get("expires", 0) <= now:
+                return None
+            if value.get("in_use"):
+                return None
+            value["in_use"] = True
+            return value["path"]
+
+    def ticket_release(self, t: str, *, completed: bool) -> None:
+        """Consume a completed ticket or release an interrupted download for retry."""
+        with self.lock:
+            value = self.tickets.get(t)
+            if value is None:
+                return
+            if completed:
+                self.tickets.pop(t, None)
+            else:
+                value["in_use"] = False
+
+    def ticket_revoke(self, t: str) -> None:
+        """Revoke a download capability after the host finishes or fails."""
+        with self.lock:
+            self.tickets.pop(t, None)
+
+    def ticket_path(self, t: str) -> str | None:
+        # Preserve the existing immediate, one-shot redemption API.
+        path = self.ticket_acquire(t)
+        if path is not None:
+            self.ticket_release(t, completed=True)
+        return path
+
+    def _prune_tickets(self, now: float) -> None:
+        for key, value in list(self.tickets.items()):
+            if float(value.get("expires", 0)) <= now:
+                self.tickets.pop(key, None)
 
 
 # ------------------------------------------------------------------ talking to a host
@@ -263,6 +534,8 @@ class Remote:
         self.tunnels = Tunnels()
         self.hub = CallHomeHub()
         self.sends: dict = {}
+        self.send_lock = threading.RLock()
+        self.send_slots = threading.BoundedSemaphore(MAX_ACTIVE_REMOTE_SENDS)
         self.ids = 0
 
     def hosts(self) -> list[dict]:
@@ -292,11 +565,11 @@ class Remote:
         return None
 
     # -- MCP
-    def rpc(self, rec: dict, method: str, params: dict | None = None, timeout: float = 120):
+    def rpc(self, rec: dict, method: str, params: dict | None = None, timeout: float = 120, on_progress=None):
         self.ids += 1
         msg = {"jsonrpc": "2.0", "id": self.ids, "method": method, "params": params or {}}
         if rec.get("method") == "callhome":
-            resp = self.hub.request(rec["name"], msg, timeout)
+            resp = self.hub.request(rec["name"], msg, timeout, on_progress=on_progress)
         else:
             self.tunnels.ensure(rec)
             st, resp, _ = nsr.http_json(rec["url"], "POST", "/mcp", msg, token=rec["token"],
@@ -311,9 +584,9 @@ class Remote:
             raise RemoteError(f"{rec['name']}: {resp['error'].get('message')}")
         return resp.get("result") or {}
 
-    def call(self, name: str, tool: str, args: dict | None = None, timeout: float = 900) -> dict:
+    def call(self, name: str, tool: str, args: dict | None = None, timeout: float = 900, on_progress=None) -> dict:
         rec = self.get(name)
-        res = self.rpc(rec, "tools/call", {"name": tool, "arguments": args or {}}, timeout)
+        res = self.rpc(rec, "tools/call", {"name": tool, "arguments": args or {}}, timeout, on_progress)
         if res.get("isError"):
             raise RemoteError(" ".join(c.get("text", "") for c in res.get("content") or []) or f"{tool} failed")
         return res.get("structuredContent") or {"text": " ".join(c.get("text", "") for c in res.get("content") or [])}
@@ -346,74 +619,215 @@ class Remote:
             out["ssh"] = rec["ssh"].get("target")
         if rec.get("method") == "callhome":
             out["online"] = self.hub.online(rec["name"])
+            ago = self.hub.last_seen(rec["name"])
+            out["last_seen"] = None if ago is None else round(ago)
+            out["agent_version"] = rec.get("agent_version") or ""
         return out
 
     # -- files
+    def _trim_sends_locked(self) -> None:
+        """Keep recent terminal records; never evict an active transfer."""
+        terminal = {"done", "failed"}
+        while len(self.sends) > MAX_REMOTE_SEND_HISTORY:
+            oldest = next(
+                (
+                    sid for sid, record in self.sends.items()
+                    if record.get("status") in terminal
+                ),
+                None,
+            )
+            if oldest is None:
+                break
+            self.sends.pop(oldest, None)
+
+    def _send_update(self, sid: str, **fields) -> None:
+        with self.send_lock:
+            record = self.sends.get(sid)
+            if record is not None:
+                record.update(fields)
+                self._trim_sends_locked()
+
+    def send_snapshot(self, limit: int = 20) -> list[dict]:
+        """Return a stable, detached view for the Studio status API."""
+        limit = max(0, int(limit))
+        if limit == 0:
+            return []
+        with self.send_lock:
+            records = list(self.sends.values())[-limit:]
+            return [dict(record) for record in records]
+
     def send(self, name: str, path: str, public_base: str = "", install: bool = False) -> str:
-        """Put a file into the host's incoming folder, in the background. -> send id."""
+        """Put a file into the host's incoming folder, in the background."""
         rec = self.get(name)
         p = Path(path).expanduser()
+        try:
+            file_stat = p.stat()
+        except OSError:
+            raise RemoteError(f"no such file: {path}") from None
         if not p.is_file():
-            raise RemoteError(f"no such file: {path}")
-        sid = secrets.token_hex(4)
-        self.sends[sid] = {"id": sid, "host": name, "file": p.name, "size": p.stat().st_size, "done": 0,
-                           "status": "hashing", "started": time.time()}
-        threading.Thread(target=self._send, args=(sid, rec, p, public_base, install), daemon=True).start()
-        return sid
+            raise RemoteError(f"not a regular file: {path}")
+
+        if not self.send_slots.acquire(blocking=False):
+            raise RemoteError(
+                f"too many active remote sends (limit {MAX_ACTIVE_REMOTE_SENDS}); "
+                "wait for one to finish"
+            )
+
+        sid = None
+        try:
+            with self.send_lock:
+                sid = secrets.token_urlsafe(16)
+                while sid in self.sends:
+                    sid = secrets.token_urlsafe(16)
+
+                self.sends[sid] = {
+                    "id": sid,
+                    "host": name,
+                    "file": p.name,
+                    "size": file_stat.st_size,
+                    "done": 0,
+                    "status": "hashing",
+                    "started": time.time(),
+                }
+                self._trim_sends_locked()
+
+            worker = threading.Thread(
+                target=self._send,
+                args=(sid, rec, p, public_base, install),
+                daemon=True,
+                name=f"remote-send-{sid[:8]}",
+            )
+            worker.start()
+            return sid
+        except BaseException:
+            if sid is not None:
+                with self.send_lock:
+                    self.sends.pop(sid, None)
+            self.send_slots.release()
+            raise
 
     def _send(self, sid: str, rec: dict, p: Path, public_base: str, install: bool = False):
-        s = self.sends[sid]
+        ticket = None
         try:
+            with self.send_lock:
+                record = self.sends.get(sid)
+                if record is None:
+                    return
+                size = int(record["size"])
+
             sha = nsr.file_sha256(p)
-            s["status"] = "sending"
+            self._send_update(sid, status="sending")
+
             if rec.get("method") == "callhome":
                 if not public_base:
                     raise RemoteError("Studio's own address is needed for a host that calls in")
-                t = self.hub.ticket(str(p), rec["name"])
-                r = self.call(rec["name"], "receive_file", {"url": f"{public_base}/api/remote/file/{t}", "name": p.name,
-                                                            "sha256": sha, "fingerprint": rec.get("studio_fingerprint")
-                                                            or None})
-                s.update(status="host downloading", transfer=r.get("transfer"))
+
+                ticket = self.hub.ticket(str(p), rec["name"])
+                result = self.call(
+                    rec["name"],
+                    "receive_file",
+                    {
+                        "url": f"{public_base}/api/remote/file/{ticket}",
+                        "name": p.name,
+                        "sha256": sha,
+                        "fingerprint": rec.get("studio_fingerprint") or None,
+                    },
+                )
+                self._send_update(
+                    sid,
+                    status="host downloading",
+                    transfer=result.get("transfer"),
+                )
+
                 while True:
                     time.sleep(3)
-                    tr = next((x for x in self.call(rec["name"], "transfers", timeout=60).get("transfers", [])
-                               if x["id"] == r.get("transfer")), None)
-                    if tr is None:
+                    transfers = self.call(
+                        rec["name"], "transfers", timeout=60
+                    ).get("transfers", [])
+                    transfer = next(
+                        (
+                            item for item in transfers
+                            if item["id"] == result.get("transfer")
+                        ),
+                        None,
+                    )
+                    if transfer is None:
                         raise RemoteError("the host lost track of the transfer")
-                    s["done"] = tr.get("done") or 0
-                    if tr["status"] == "done":
+
+                    self._send_update(sid, done=transfer.get("done") or 0)
+                    if transfer["status"] == "done":
                         break
-                    if tr["status"] == "failed":
-                        raise RemoteError(tr.get("error", "failed"))
+                    if transfer["status"] == "failed":
+                        raise RemoteError(transfer.get("error", "failed"))
+
             else:
                 self.tunnels.ensure(rec)
-                q = urllib.parse.quote(p.name)
-                st, info, _ = nsr.http_json(rec["url"], "GET", f"/upload/{q}", token=rec["token"],
-                                            fingerprint=self._trust(rec), timeout=30)
-                if st >= 400:
-                    raise RemoteError(info.get("error") or f"HTTP {st}")
-                off = 0 if info.get("complete") else int(info.get("size") or 0)
-                with open(p, "rb") as f:
-                    f.seek(off)
+                quoted_name = urllib.parse.quote(p.name)
+                status, info, _ = nsr.http_json(
+                    rec["url"],
+                    "GET",
+                    f"/upload/{quoted_name}",
+                    token=rec["token"],
+                    fingerprint=self._trust(rec),
+                    timeout=30,
+                )
+                if status >= 400:
+                    raise RemoteError(info.get("error") or f"HTTP {status}")
+
+                offset = 0 if info.get("complete") else int(info.get("size") or 0)
+                with open(p, "rb") as source:
+                    source.seek(offset)
                     while True:
-                        chunk = f.read(CHUNK)
-                        last = f.tell() >= s["size"]
-                        path = f"/upload/{q}?offset={off}" + (f"&final=1&sha256={sha}" if last else "")
-                        out = self._put(rec, path, chunk)
-                        if out.get("size") is not None and not out.get("complete") and out.get("error"):
-                            off = int(out["size"])
-                            f.seek(off)
+                        chunk = source.read(CHUNK)
+                        last = source.tell() >= size
+                        request_path = (
+                            f"/upload/{quoted_name}?offset={offset}"
+                            + (f"&final=1&sha256={sha}" if last else "")
+                        )
+                        result = self._put(rec, request_path, chunk)
+
+                        if (
+                            result.get("size") is not None
+                            and not result.get("complete")
+                            and result.get("error")
+                        ):
+                            offset = int(result["size"])
+                            source.seek(offset)
                             continue
-                        off += len(chunk)
-                        s["done"] = off
+
+                        offset += len(chunk)
+                        self._send_update(sid, done=offset)
                         if last:
                             break
+
             if install:
-                s["status"] = "installing"
-                s["installed"] = self.call(rec["name"], "install_model", {"file": p.name}, timeout=3600).get("installed")
-            s.update(status="done", done=s["size"], finished=time.time())
-        except Exception as e:
-            s.update(status="failed", error=f"{type(e).__name__}: {e}"[:300])
+                self._send_update(sid, status="installing")
+                installed = self.call(
+                    rec["name"],
+                    "install_model",
+                    {"file": p.name},
+                    timeout=3600,
+                ).get("installed")
+                self._send_update(sid, installed=installed)
+
+            self._send_update(
+                sid,
+                status="done",
+                done=size,
+                finished=time.time(),
+            )
+
+        except Exception as exc:
+            self._send_update(
+                sid,
+                status="failed",
+                error=f"{type(exc).__name__}: {exc}"[:300],
+                finished=time.time(),
+            )
+        finally:
+            if ticket is not None:
+                self.hub.ticket_revoke(ticket)
+            self.send_slots.release()
 
     def _put(self, rec: dict, path: str, data: bytes) -> dict:
         conn = nsr.open_conn(rec["url"], self._trust(rec), 600)
@@ -439,5 +853,5 @@ def package_zip() -> bytes:
         for p in sorted(REMOTE_PKG.rglob("*")):
             if p.is_file() and "__pycache__" not in p.parts and not p.name.endswith((".pyc", ".egg-info")) \
                     and ".egg-info" not in str(p) and "build" not in p.relative_to(REMOTE_PKG).parts:
-                z.write(p, "neuronscope-remote/" + p.relative_to(REMOTE_PKG).as_posix())
+                z.write(p, "omnicortex-remote/" + p.relative_to(REMOTE_PKG).as_posix())
     return buf.getvalue()

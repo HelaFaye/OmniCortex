@@ -1,9 +1,9 @@
 """Real llama.cpp integration: compiled cett-dump against PyTorch hooks.
 
-Skipped unless NS_LLAMA points at a llama.cpp checkout built with
+Skipped unless OC_LLAMA points at a llama.cpp checkout built with
 scripts/build_llama_tools.sh (needs sentencepiece). Builds a tiny random Llama,
 converts it to GGUF with llama.cpp's own converter, and checks that
-cett-dump's CETT matches ns_common.CETTManager on every layer, and that
+cett-dump's CETT matches oc_common.CETTManager on every layer, and that
 hscore scores a reply end to end."""
 import json
 import os
@@ -16,9 +16,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-LLAMA = Path(os.environ.get("NS_LLAMA", "")).expanduser()
+LLAMA = Path(os.environ.get("OC_LLAMA", "")).expanduser()
 CETT = LLAMA / "build" / "bin" / "llama-cett-dump"
-pytestmark = pytest.mark.skipif(not CETT.exists(), reason="set NS_LLAMA to a llama.cpp build with cett-dump")
+pytestmark = pytest.mark.skipif(not CETT.exists(), reason="set OC_LLAMA to a llama.cpp build with cett-dump")
 
 
 @pytest.fixture(scope="module")
@@ -52,7 +52,7 @@ def tiny_gguf(tmp_path_factory):
 def test_cett_dump_matches_pytorch(tiny_gguf, tmp_path):
     import torch
     from transformers import LlamaForCausalLM
-    import ns_common
+    import oc_common
     from extract_activations_gguf import read_aggregate, read_tokens, weight_col_norms
     hf, gguf = tiny_gguf
     text = "the cat sat on the mat and the dog wrote hamlet"
@@ -68,7 +68,7 @@ def test_cett_dump_matches_pytorch(tiny_gguf, tmp_path):
     assert seen.all(), "every layer, including the last, must be captured"
     wn = np.stack([weight_col_norms(str(gguf), 4)[l] for l in range(4)])
     m = LlamaForCausalLM.from_pretrained(hf, dtype=torch.float32).eval()
-    mgr = ns_common.CETTManager(m)
+    mgr = oc_common.CETTManager(m)
     with torch.no_grad():
         m(torch.tensor([ids.tolist()]))
     ref = mgr.cett().numpy()
@@ -77,6 +77,30 @@ def test_cett_dump_matches_pytorch(tiny_gguf, tmp_path):
         got = agg[si] * wn
         assert np.abs(got - want).max() / np.abs(want).max() < 5e-3
 
+
+
+def test_by_weight_matches_named_nodes(tiny_gguf, tmp_path):
+    """--by-weight (finding the down projection by its blk.N.ffn_down.weight, for looped models whose graph does
+    not name it) records exactly what name matching does, across several ubatches; room for a second pass stays
+    unseen on a model that runs each block once."""
+    from extract_activations_gguf import read_aggregate
+    _, gguf = tiny_gguf
+    text = " ".join(["the cat sat on the mat and the dog wrote hamlet"] * 6)
+    (tmp_path / "m.jsonl").write_text(json.dumps({"id": "x", "text": text, "spans": [[0, 10], [5, 50], [30, -1]]}) + "\n")
+
+    def run(name, *extra):
+        (tmp_path / name).mkdir()
+        r = subprocess.run([str(CETT), "-m", str(gguf), "-ngl", "0", "-c", "512", "-b", "512", "-ub", "16",
+                            "--manifest", str(tmp_path / "m.jsonl"), "--outdir", str(tmp_path / name), *extra],
+                           capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr[-800:]
+        return read_aggregate(tmp_path / name / "x.bin")
+    ids, a, sa, _, _ = run("named", "--n-layers", "4")
+    assert len(ids) > 32                                     # several 16-token ubatches
+    _, b, sb, _, _ = run("weight", "--n-layers", "4", "--by-weight", "4")
+    assert np.array_equal(sa, sb) and np.array_equal(a, b)
+    _, c, sc, _, _ = run("weight2", "--n-layers", "8", "--by-weight", "4")
+    assert np.array_equal(c[:, :4], a) and not sc[:, 4:].any()
 
 def test_hscore_end_to_end(tiny_gguf, tmp_path):
     import hscore
@@ -94,7 +118,7 @@ def test_extraction_pipeline_matches_pytorch(tiny_gguf, tmp_path):
     import torch
     from transformers import LlamaForCausalLM
     import gguf_tokenizer
-    import ns_common
+    import oc_common
     from extract_activations_gguf import read_tokens
     hf, gguf = tiny_gguf
     samples = {"q1": ("who wrote hamlet", "shakespeare wrote hamlet"),
@@ -111,7 +135,7 @@ def test_extraction_pipeline_matches_pytorch(tiny_gguf, tmp_path):
                         "--ngl", "0", "--batch", "512"], capture_output=True, text=True)
     assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
     m = LlamaForCausalLM.from_pretrained(hf, dtype=torch.float32).eval()
-    mgr = ns_common.CETTManager(m)
+    mgr = oc_common.CETTManager(m)
     gt = gguf_tokenizer.load(str(gguf))
     for q, (question, _) in samples.items():
         got = np.load(out / "output" / f"act_{q}.npy").astype(np.float32)
@@ -131,22 +155,22 @@ def test_extraction_pipeline_matches_pytorch(tiny_gguf, tmp_path):
 SERVER = LLAMA / "build" / "bin" / "llama-server"
 
 
-DOCKER_IMAGE = os.environ.get("NS_DOCKER_IMAGE", "")
+DOCKER_IMAGE = os.environ.get("OC_DOCKER_IMAGE", "")
 # For a CUDA image on a machine without an NVIDIA driver: a libcuda.so.1 (the
 # toolkit's stub) to mount, so the binaries load and llama.cpp falls back to CPU.
-DOCKER_LIBCUDA = os.environ.get("NS_DOCKER_LIBCUDA", "")
+DOCKER_LIBCUDA = os.environ.get("OC_DOCKER_LIBCUDA", "")
 
 
 def _launch(where, gguf, clf, port, env_extra):
-    """Start a patched llama-server on the host build, or inside NS_DOCKER_IMAGE."""
+    """Start a patched llama-server on the host build, or inside OC_DOCKER_IMAGE."""
     args = ["-m", "MODEL", "--port", str(port), "--parallel", "1", "-c", "256", "-ngl", "0"]
     if where == "host":
         args[1] = str(gguf)
-        return subprocess.Popen([str(SERVER), *args], env=dict(os.environ, **env_extra, NS_CLASSIFIER=str(clf)),
+        return subprocess.Popen([str(SERVER), *args], env=dict(os.environ, **env_extra, OC_CLASSIFIER=str(clf)),
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     args[1] = "/m/" + gguf.name
     cmd = ["docker", "run", "--rm", "--network", "host", "-v", f"{gguf.parent}:/m:ro", "-v", f"{clf.parent}:/c:ro",
-           *[x for k, v in env_extra.items() for x in ("-e", f"{k}={v}")], "-e", f"NS_CLASSIFIER=/c/{clf.name}"]
+           *[x for k, v in env_extra.items() for x in ("-e", f"{k}={v}")], "-e", f"OC_CLASSIFIER=/c/{clf.name}"]
     if DOCKER_LIBCUDA:
         cmd += ["-v", f"{DOCKER_LIBCUDA}:/usr/lib/x86_64-linux-gnu/libcuda.so.1:ro"]
     return subprocess.Popen([*cmd, DOCKER_IMAGE, "llama-server", *args],
@@ -165,12 +189,12 @@ def test_server_activations_match_pytorch(tiny_gguf, tmp_path, where):
     import urllib.request
     import torch
     from transformers import LlamaForCausalLM
-    import ns_common
+    import oc_common
     from extract_activations_gguf import weight_col_norms
-    if where == "host" and not (LLAMA / "tools" / "server" / "ns_server_glue.h").exists():
+    if where == "host" and not (LLAMA / "tools" / "server" / "oc_server_glue.h").exists():
         pytest.skip("llama-server not patched with llama-tools/server-activations/apply_patch.py")
     if where == "docker" and not DOCKER_IMAGE:
-        pytest.skip("set NS_DOCKER_IMAGE (e.g. neuronscope-llama:cuda) to test the container's server")
+        pytest.skip("set OC_DOCKER_IMAGE (e.g. omnicortex-llama:cuda) to test the container's server")
     hf, gguf = tiny_gguf
     coef = np.random.default_rng(2).normal(size=4 * 128).astype(np.float32)
     np.savez(tmp_path / "clf.npz", coef=coef, intercept=0.25, n_layers=4, n_neurons=128)
@@ -179,7 +203,7 @@ def test_server_activations_match_pytorch(tiny_gguf, tmp_path, where):
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
-    proc = _launch(where, gguf, tmp_path / "clf.bin", port, {"NS_ACTIVATIONS": "raw"})
+    proc = _launch(where, gguf, tmp_path / "clf.bin", port, {"OC_ACTIVATIONS": "raw"})
     base = f"http://127.0.0.1:{port}"
     try:
         for _ in range(300):
@@ -214,7 +238,7 @@ def test_server_activations_match_pytorch(tiny_gguf, tmp_path, where):
     assert all(f["scored"] and f["t"] == "raw" and f["l"] == 4 for f in frames)
     # frame k is the decode of gen[k], at position len(prompt) + k
     m = LlamaForCausalLM.from_pretrained(hf, dtype=torch.float32).eval()
-    mgr = ns_common.CETTManager(m)
+    mgr = oc_common.CETTManager(m)
     with torch.no_grad():
         m(torch.tensor([prompt + gen]))
     cett = mgr.cett().numpy()                                   # [layers, tokens, n_ff]
@@ -229,7 +253,7 @@ def test_server_activations_match_pytorch(tiny_gguf, tmp_path, where):
 def test_docker_cett_dump_matches_host(tiny_gguf, tmp_path):
     """The container's cett-dump writes the same CETT as the host build."""
     if not DOCKER_IMAGE:
-        pytest.skip("set NS_DOCKER_IMAGE to test the container's cett-dump")
+        pytest.skip("set OC_DOCKER_IMAGE to test the container's cett-dump")
     from extract_activations_gguf import read_aggregate
     _, gguf = tiny_gguf
     text = "the cat sat on the mat and the dog wrote hamlet"

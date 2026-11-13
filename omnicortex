@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Start OmniCortex Studio (if it is not running) and open it in the browser.
+# Same as the "OmniCortex" entry install.sh adds to the app menu.
+#   ./omnicortex cli …     the terminal client (scripts/oc.py)
+#   ./omnicortex godot     the Godot client (connects to a Studio, here or on another machine)
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+py="$here/venv/bin/python"; [[ -x "$py" ]] || py="$(command -v python3)"
+case "${1:-}" in
+  cli)   shift; exec "$py" "$here/scripts/oc.py" "$@" ;;          # the terminal client: ./omnicortex cli list-models
+  godot) shift                                                     # the Godot client (the godot-client add-on)
+         c="$here/plugins/godot-client/client"
+         [[ -f "$c/project.godot" ]] || { echo "the Godot client add-on is not installed: Studio -> Add-ons" >&2; exit 1; }
+         g="${OC_GODOT:-$(command -v godot4 || command -v godot || true)}"
+         [[ -n "$g" ]] || { [[ -x "$HOME/.omnicortex/godot/godot" ]] && g="$HOME/.omnicortex/godot/godot"; }
+         [[ -n "$g" ]] || { echo "Godot 4 not found: run the job 'Godot client: get Godot', install it, or set OC_GODOT" >&2; exit 1; }
+         exec "$g" --path "$c" "$@" ;;
+esac
+exec "$py" "$here/scripts/launch.py" "$@"

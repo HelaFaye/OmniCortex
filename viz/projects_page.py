@@ -5,7 +5,7 @@ as text (escaped), never as markup.
 """
 
 PAGE = r"""<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Studio Projects</title><script>try{document.documentElement.dataset.theme=localStorage.getItem('ns-theme')||'dark'}catch{document.documentElement.dataset.theme='dark'}</script>
+<title>Studio Projects</title><script>try{const d=document.documentElement,t=localStorage.getItem('ns-theme')||'dark';d.dataset.theme=localStorage.getItem('ns-theme-base')||(t==='light'?'light':'dark');const v=JSON.parse(localStorage.getItem('ns-theme-vars')||'{}');for(const k in v)d.style.setProperty('--'+k,v[k])}catch{document.documentElement.dataset.theme='dark'}</script>
 <style>
 a{color:var(--acc)}
 :root{--bg:#fafaf9;--panel:#fff;--fg:#1c1c1a;--mut:#6b6b66;--line:#e4e4df;--acc:#2d5bd7;--accfg:#fff;--ok:#1f8a4c;--no:#c0392b;--warn:#a8701c;--code:#f3f3f0;--chip:#eef1fb}
@@ -33,6 +33,9 @@ button:disabled{opacity:.5;cursor:default}
 .st{font-size:11px;padding:0 .4rem;border-radius:4px;border:1px solid var(--line);white-space:nowrap}
 .st.running,.st.review{color:var(--acc)}.st.done,.st.approved{color:var(--ok)}.st.blocked,.st.rework{color:var(--warn)}
 .st.dropped{opacity:.5;text-decoration:line-through}.st.draft,.st.paused,.st.todo{color:var(--mut)}
+.chips{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.15rem}
+.chipb{font-size:12px;padding:.1rem .5rem;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--mut);cursor:pointer;max-width:14rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chipb.on{background:var(--chip);color:var(--fg);border-color:var(--acc,var(--line))}
 .chip{display:inline-block;font-size:11px;padding:0 .45rem;border-radius:9px;background:var(--chip);margin:0 .2rem .2rem 0}
 .chip.unknown{background:transparent;border:1px dashed var(--line);color:var(--mut)}
 table{width:100%;border-collapse:collapse}td,th{padding:.4rem .35rem;border-bottom:1px solid var(--line);vertical-align:top;text-align:left;font-size:13px}
@@ -50,7 +53,7 @@ details summary{cursor:pointer;color:var(--mut);font-size:12px}
 .risk.lo{background:color-mix(in srgb,var(--ok) 20%,transparent)}
 .empty{color:var(--mut);padding:2rem;text-align:center}
 </style>
-<header><h1>Studio · Projects</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/lab">Lab</a><a href="/review">Review</a><a href="/projects">Projects</a><a href="/jobs">Jobs</a><a href="/connect">Connect</a><span class="note" id="hint"></span></header>
+<header><h1>Studio · Projects</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/lab">Lab</a><a href="/review">Review</a><a href="/projects">Projects</a><a href="/workers">Workers</a><a href="/jobs">Jobs</a><a href="/connect">Connect</a><span class="note" id="hint"></span></header>
 <main>
 <div>
  <section class="card"><h2>Projects</h2><div id="plist" class="note">none yet</div></section>
@@ -118,22 +121,34 @@ function attemptHtml(t,a,last){
   const rep=a.report||{}; const ck=a.check;
   const risk=ck&&ck.max!=null?`<a class="risk ${ck.flagged?'hi':'lo'}" href="${esc(ck.url)}" target="_blank" title="activation check: open the 3D view">${ck.flagged?ck.n_flagged+' flagged token(s)':'no flags'} · peak ${(ck.max*100).toFixed(0)}%</a>`
     :ck&&ck.error?`<span class="risk hi">check failed</span>`:(meta.checks?'<span class="note">unchecked (no classifier for this model)</span>':'');
+  const sc=a.screen, scr=sc?`<a class="risk ${sc.status==='passed'?'lo':'hi'}" href="/graphs#graph=${encodeURIComponent(sc.graph||'')}" title="${esc(sc.feedback||'')}">graph ${esc(sc.graph||'')}: ${esc({passed:'passed',failed:'failed',person:'asks a person',error:'did not finish'}[sc.status]||sc.status)}</a>`:'';
   const rv=a.review?(a.review.accepted?`<span class="st done">accepted by ${esc(a.review.by)}</span>`:`<span class="st rework">sent back</span> <span class="note">${esc(a.review.feedback)}</span>`):'';
   let h=`<div style="margin:.5rem 0"><div class="row"><b>attempt ${a.n}</b><span class="note">${esc(a.model)} · ${dur}</span>
-    ${rep.status?`<span class="st ${rep.status==='done'?'done':rep.status==='blocked'?'blocked':'todo'}">reported ${esc(rep.status)}</span>`:''}${risk}${rv}</div>`;
+    ${rep.status?`<span class="st ${rep.status==='done'?'done':rep.status==='blocked'?'blocked':'todo'}">reported ${esc(rep.status)}</span>`:''}${risk}${scr}${rv}</div>`;
+  if(sc&&sc.status!=='passed'&&sc.feedback) h+=`<div class="note">verification: ${esc(sc.feedback).slice(0,600)}</div>`;
   if(a.error) h+=`<div class="err">${esc(a.error)}</div>`;
   if(rep.summary) h+=`<div class="note">${esc(rep.summary)}</div>`;
   if(a.text) h+=`<details ${last?'open':''}><summary>worker's reply (${a.text.length} chars)</summary><pre>${esc(a.text)}</pre></details>`;
   return h+'</div>';
 }
 
+// A set picked from known values: toggle chips over a hidden input that holds "a, b, c" for the save code.
+function chipPick(field,options,selected,tipFor){
+  const on=new Set(selected||[]), extra=[...on].filter(x=>!options.includes(x));
+  return `<input type="hidden" data-f="${field}" value="${esc([...on].join(', '))}"><div class="chips">`+
+    [...options,...extra].map(o=>`<button type="button" class="chipb${on.has(o)?' on':''}" data-chip="${field}" data-v="${esc(o)}" title="${esc((tipFor&&tipFor(o))||o)}">${esc(o)}</button>`).join('')+
+    (options.length||extra.length?'':'<span class="note">none</span>')+'</div>'; }
+document.addEventListener('click',e=>{ const b=e.target.closest('[data-chip]'); if(!b) return;
+  b.classList.toggle('on'); const box=b.parentNode, inp=box.previousElementSibling;
+  inp.value=[...box.querySelectorAll('.chipb.on')].map(x=>x.dataset.v).join(', '); });
+
 function taskDetail(t){
   const draft=plan.status==='draft';
   let h=`<div class="detail">`;
   h+=`<label>detail</label><textarea data-f="detail">${esc(t.detail)}</textarea>
    <label>done means (acceptance criteria a reviewer can check)</label><input data-f="acceptance" value="${esc(t.acceptance)}">
-   <div class="row"><div class="grow"><label>skills (${esc(meta.subjects.join(', '))})</label><input data-f="labels" value="${esc(t.labels.join(', '))}"></div>
-   <div class="grow"><label>after tasks</label><input data-f="depends_on" value="${esc(t.depends_on.join(', '))}" placeholder="T1, T2"></div>
+   <div class="row"><div class="grow"><label title="Pick the skills this task needs: they decide which model takes it">skills</label>${chipPick('labels',meta.subjects,t.labels)}</div>
+   <div class="grow"><label title="Tasks that must be done before this one starts">after tasks</label>${chipPick('depends_on',plan.tasks.map(x=>x.id).filter(x=>x!==t.id),t.depends_on,id=>{const o=plan.tasks.find(x=>x.id===id);return o?o.title:''})}</div>
    <div class="grow"><label>model (pin)</label><select data-f="model">${modelOpts(t.model,'assign automatically')}</select></div></div>
    <div class="row" style="margin-top:.5rem"><button class="pri" data-a="save">Save task</button>
    ${t.status!=='dropped'&&t.status!=='running'?'<button class="bad" data-a="drop">Drop</button>':''}
@@ -174,6 +189,11 @@ function render(){
       <div><label>attempts</label><input data-p="max_attempts" type="number" min="1" max="16" value="${p.policy.max_attempts}" style="width:5rem"></div>
       <div class="grow"><label>default model (when none has graded results)</label><select data-p="default_model">${modelOpts(p.policy.default_model,'largest that fits')}</select></div>
       <div><label><input type="checkbox" data-p="check" ${p.policy.check?'checked':''}>activation check</label></div></div>
+    <div class="row"><div class="grow"><label>verification graph (screens each result before review; inputs task and result, outputs accepted or feedback)</label>
+      <input data-p="verify_graph" list="graphList" value="${esc(p.policy.verify_graph||'')}" placeholder="none · e.g. template:verify-delegated-result"></div>
+      <div><label><input type="checkbox" data-p="verify_auto" ${p.policy.verify_auto?'checked':''}>send failures back automatically</label></div>
+      <a class="note" href="/graphs#graph=template:verify-delegated-result" style="align-self:end">edit graphs</a></div>
+    <datalist id="graphList"></datalist>
       <label>devices this project may use (none ticked = any enabled device; AMD first)</label>
       <div class="row">${devices.map(d=>`<label style="margin:0"><input type="checkbox" data-dev="${esc(d.id)}" ${(p.policy.devices||[]).includes(d.id)?'checked':''} ${d.enabled?'':'disabled'}>${esc(d.id)}</label>`).join('')||'<span class="note">no devices detected</span>'}</div>
       <label>llama-server settings per device for this project, JSON (ngl, ctx, batch, threads, flash_attn, cache_type, parallel)</label>
@@ -198,7 +218,7 @@ function render(){
   $('#view').innerHTML=h; wire();
 }
 
-// ---------- per-project requirements (scripts/ns_requirements.py)
+// ---------- per-project requirements (scripts/oc_requirements.py)
 function reqCard(p){
   const r=p.requirements||{items:[]}, last=r.last, byKey={};
   if(last) for(const i of last.items) byKey[i.kind+':'+i.name.toLowerCase()]=i;
@@ -212,10 +232,10 @@ function reqCard(p){
   const summary=last?`${last.status==='ok'?'<span class="st ok">ok</span> everything required is here':last.status==='missing'?`<span class="st missing">missing</span> ${esc(last.missing.join(', '))}`:'<span class="st warn">warn</span> required items are here; some optional ones are not'} · checked ${ago(last.checked)}${last.python_from?` · Python packages checked in ${esc(last.python_from)}`:''}`:'not checked yet';
   const kindOpts=meta.req_kinds.map(k=>`<option>${k}</option>`).join('');
   return `<section class="card"><h2>Requirements</h2>
-    <div class="note">What this project needs on the machine that builds it: the toolchain, libraries and Python packages from its build files, hardware, NeuronScope features, and your notes. Workers are told what is available; Start waits until required items are here (or you start anyway).</div>
+    <div class="note">What this project needs on the machine that builds it: the toolchain, libraries and Python packages from its build files, hardware, OmniCortex features, and your notes. Workers are told what is available; Start waits until required items are here (or you start anyway).</div>
     <div class="row" style="margin:.5rem 0"><span class="grow">${summary}</span><button id="rqcheck">Check now</button></div>
     ${r.items.length?`<div class="tscroll"><table class="rq"><tr><th></th><th>kind</th><th>what</th><th>needs</th><th>this machine</th><th></th></tr>${rows}</table></div>`:'<div class="note">No requirements yet. Scan the checkout, or add them below.</div>'}
-    <div class="row" style="margin-top:.6rem"><input id="rqroot" class="grow" placeholder="project checkout folder" value="${esc(r.root||(p.census&&p.census.path)||'')}"><button id="rqscan">Scan build files</button></div>
+    <div class="row" style="margin-top:.6rem"><input id="rqroot" class="grow" data-pick="dir" placeholder="project checkout folder" value="${esc(r.root||(p.census&&p.census.path)||'')}"><button id="rqscan">Scan build files</button></div>
     ${r.files&&r.files.length?`<div class="note">read: ${esc(r.files.join(', '))}</div>`:''}
     <details style="margin-top:.5rem"><summary>add a requirement</summary><div class="row">
       <select id="rqkind" style="width:auto">${kindOpts}</select><span id="rqnamebox" class="grow"></span>
@@ -250,6 +270,7 @@ function wire(){
   on('#add',()=>act('edit',{changes:[{op:'add',task:{title:$('#atitle').value,detail:$('#adetail').value}}],reason:'added by hand'}));
   document.querySelectorAll('[data-p]').forEach(e=>e.onchange=()=>{const k=e.dataset.p; let v=e.type==='checkbox'?e.checked:e.value; if(e.type==='number') v=+v; if(k==='default_model'&&!v) v=null; act('policy',{policy:{[k]:v}})});
   document.querySelectorAll('[data-dev]').forEach(e=>e.onchange=()=>act('policy',{policy:{devices:[...document.querySelectorAll('[data-dev]:checked')].map(x=>x.dataset.dev)}}));
+  fetch('/api/graphs').then(r=>r.json()).then(j=>{ const d=document.getElementById('graphList'); if(d) d.innerHTML=[...(j.graphs||[]).map(g=>g.name),...(j.templates||[]).map(t=>'template:'+t.name)].map(n=>`<option value="${esc(n)}">`).join(''); }).catch(()=>{});
   on('#savedev',()=>{ let v={}; const t=$('#devset').value.trim(); if(t){ try{ v=JSON.parse(t) }catch(e){ return alert('not JSON: '+e.message) } } act('policy',{policy:{device_settings:v}}) });
   document.querySelectorAll('[data-pa]').forEach(b=>b.onclick=()=>act('decide',{proposal:b.dataset.pa,accept:true}));
   document.querySelectorAll('[data-pr]').forEach(b=>b.onclick=()=>act('decide',{proposal:b.dataset.pr,accept:false}));

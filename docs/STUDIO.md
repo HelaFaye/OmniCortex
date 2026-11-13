@@ -16,16 +16,48 @@ apps share one library.
 Studio does not implement inference, tokenization or sampling; llama.cpp does
 that. Studio handles everything around it.
 
+## Built around what people do most
+
+People who run OmniCortex most often come to do these things, in roughly
+this order. Each is a click or two from where they start:
+
+| what people come to do | the short path |
+|---|---|
+| chat with a local model | the home page; with the model picker on *auto*, sending a message loads the best model for the question |
+| get a model that fits this computer | **Discover**: each file says whether it fits in memory, and **Tasks → Distribution** predicts how fast it would run on each device |
+| know whether a reply can be trusted | *check replies* under the chat box: token risk from the model's own neurons, with a 3D view of the reply |
+| compare models on their own questions | **Compare models on your own questions** on the home page opens a TestQA run with two models already filled in |
+| use the models from another app | **Connect**, and the `/v1` address in the header |
+| look inside a reply | **Studio → Features**, the 3D replay and the live viewer |
+| split larger work across models | **Tasks → Projects**, with **Workers** and **Distribution** to see where the work went |
+
+How the pages get people there:
+
+- **First run.** The home page shows a three-step checklist (engine, a model,
+  load it) and a Setup banner until both the engine and a model are present.
+  Once all three are done, the checklist shrinks to one line.
+- **After setup.** The home page offers the common tasks above. The ones you
+  use most move to the front. Visits are counted in this browser only
+  (`localStorage`), and nothing is sent anywhere.
+- **Search** (Ctrl+K or /) lists your most recent pages first, before typing
+  anything. It finds every page, setting, job, help page and control on the
+  current page.
+- **Fewer things to type.** Fields with known values are dropdowns, and cut
+  text has a tooltip ([UI_AND_CLI.md](UI_AND_CLI.md#long-text-and-known-values)).
+- **The sidebar** groups pages by purpose (Models, Tasks, Studio, Connect).
+  Parts you do not use can be removed under **Add-ons**, which shortens it.
+
 ## Feature map
 
 | | LM Studio | Studio |
 |---|---|---|
 | Model library with metadata (arch, quant, MoE, size, fit) | yes | yes; fit is estimated against this host before loading |
 | Hugging Face search and resumable download | yes | yes; multi-part GGUFs offered as one set; `HF_TOKEN` for gated repos |
+| Will it run here | yes (green/yellow/red) | Discover and My Models: *Full GPU offload*, *Partial GPU offload*, *Runs on the CPU* or *Likely too large*, for NVIDIA, AMD, Intel and Apple GPUs (integrated ones share RAM); ★ *Recommended* marks the largest file that runs fully on the GPU |
 | Per-model load settings (GPU layers, context, batch, threads, flash-attn, KV cache type) | yes | yes; persisted per file |
 | Several GPUs (split mode, tensor split, main GPU, which GPUs) | yes | yes; shown when NVIDIA GPUs are present, with a suggested split; fit estimate counts free VRAM on all of them ([HARDWARE.md](HARDWARE.md#nvidia--cuda)) |
 | Chat with streaming, reasoning shown separately | yes | yes |
-| Saved conversations, export | yes | yes; one JSON file per chat in `~/.neuronscope/chats`, Markdown export |
+| Saved conversations, export | yes | yes; one JSON file per chat in `~/.omnicortex/chats`, Markdown export |
 | Image input for vision models | yes | yes; an `mmproj-*.gguf` beside the model is loaded automatically |
 | Presets (system prompt, sampling) | yes | yes; includes JSON-schema and GBNF constrained output |
 | OpenAI-compatible local server | yes | yes, at `/v1` on the same port |
@@ -93,9 +125,40 @@ there and in the model list; hovering explains why and how to add stats. Each
 reply notes which model answered, and for auto picks, why (e.g.
 `auto → coder-7b: subject code (97%) -> expected +0.56`).
 
+## Context usage and outputs
+
+The strip above the chat shows the loaded model and how much of its context
+window the next request would take. Click it (or Tab to it and press Enter)
+for three panes:
+
+- **Environment**: the model, its context window and what it was trained
+  for, GPU layers, vision, LoRA, workspace and computer, with a link to the
+  model's settings.
+- **Context usage**: the system prompt, documents (the passages the last
+  reply cited, when a collection is picked), tool definitions (when tools are
+  on) and messages, including what you are typing, plus the room kept for the
+  reply (the preset's max tokens). Counts come from the running engine's
+  tokenizer, or are estimated at about 4 characters a token when no model is
+  loaded. The chat template adds a little. Past 75% the count turns amber;
+  when the next request would not fit, the strip says so. The last reply's
+  measured prompt and reply tokens are shown next to it. `POST /api/context`
+  returns the same counts.
+- **Compression** (two controls under the usage bar, kept in this browser):
+  *Trim document passages* keeps only the sentences of each retrieved chunk
+  that share the question's words (BM25-weighted, with the sentence on
+  either side), within about a fifth of the window. *When the chat no longer
+  fits* can **summarize the oldest messages**: the model writes a summary of
+  them once, the summary stands in for them, and it is kept with the chat
+  and extended when more messages fall out of the window. Or it can **drop
+  the oldest messages**. The newest four messages are always sent word for
+  word. Both are lossy: each reply's stats line says what was trimmed, and
+  summaries are listed under Outputs (`scripts/context_compress.py`).
+- **Outputs**: what this chat produced: 3D views and neuron review links of
+  checked replies, tool calls, cited sources, plugin checks, and Export .md.
+
 ## Rolling stats
 
-Stats live in `~/.neuronscope/stats/<model id>.jsonl` (append-only) and are
+Stats live in `~/.omnicortex/stats/<model id>.jsonl` (append-only) and are
 tied to the model *file*: re-downloading or re-quantizing under the same name
 starts from zero. Summaries count only the last `--stats-window` (default
 500) observations of each kind, and nothing older than 180 days.
@@ -103,7 +166,7 @@ starts from zero. Summaries count only the last `--stats-window` (default
 | kind | source | used by auto? |
 |---|---|---|
 | graded: right / hallucinated / abstained, per subject | `testqa.py --publish-stats` or `--record-stats` | **yes** |
-| activation: H-Neuron classifier score per reply | Studio, for models with a classifier set in the load panel, when `--cett` (or `$NS_CETT`) is available | no, shown only |
+| activation: H-Neuron classifier score per reply | Studio, for models with a classifier set in the load panel, when `--cett` (or `$OC_CETT`) is available | no, shown only |
 | live: replies and how often the model declined | every chat and `/v1` reply | no, shown only |
 
 Activation scoring runs one extra prefill per reply in the background, after
@@ -119,7 +182,7 @@ CPU, scores every token, and shows the result under the reply: how many tokens
 crossed the classifier's 0.5 boundary, the peak and mean risk, and the reply
 text shaded by risk with the flagged tokens underlined. The check is saved
 with the chat and as a trace session in `--traces-dir`
-(`~/.neuronscope/traces/<id>`); *open 3D view* shows it at `/viz/<id>/` on
+(`~/.omnicortex/traces/<id>`); *open 3D view* shows it at `/viz/<id>/` on
 the same Studio, with the same login. `POST /api/trace` with `{model,
 messages, text}` does the same from a script; paired devices may call it.
 See VISUALIZATION.md, "Which view when", for what to do with a flagged span.
@@ -132,7 +195,7 @@ curl http://127.0.0.1:7870/api/stats
 
 ## Runtime controls
 
-**Suppression α.** Load a model with a NeuronScope LoRA (`export_lora.py`) in
+**Suppression α.** Load a model with a OmniCortex LoRA (`export_lora.py`) in
 the adapter field, then drag the slider. It sets the adapter scale through
 llama-server's `/lora-adapters` with no reload, so you can compare behaviour
 at several suppression strengths in one conversation.
@@ -162,7 +225,7 @@ python viz/studio.py ... --rag-embed http://127.0.0.1:1234/v1@text-embedding-mod
 The embedding sidecar is a second llama-server (`--embedding`, port
 `--backend-port + 1`, CPU unless `--rag-embed-ngl`), so it never displaces the
 chat model. A collection remembers which embedding model built it and refuses
-to mix in vectors from another. Collections live in `~/.neuronscope/rag`
+to mix in vectors from another. Collections live in `~/.omnicortex/rag`
 (`--rag-dir`) and work from the command line too:
 
 ```bash
@@ -172,17 +235,32 @@ python scripts/rag.py search --collection notes "how does auto routing pick a mo
 
 ## Tools (MCP)
 
-Studio connects to the MCP servers listed in `~/.neuronscope/mcp.json`
-(`--mcp-config`), in the format LM Studio and Claude Desktop use:
+Add, edit, test, turn off and remove MCP servers under **Settings →
+Connectors** (the Tools tab links there). **+ Add connector** asks for a name
+and either the server's URL, with an optional sign-in (a token file, an
+environment variable or headers), or the program to start with its
+arguments and environment. Saved secrets are never sent back to the page:
+they show as dots, and leaving them as dots keeps them. The page writes
+`~/.omnicortex/mcp.json` (`--mcp-config`), and the file can be edited by
+hand too. It uses the format LM Studio and Claude Desktop use:
 
 ```json
 {"mcpServers": {
   "files":  {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/me/notes"]},
   "search": {"url": "https://mcp.example.com/mcp", "headers": {"Authorization": "Bearer ..."}},
+  "box":    {"url": "https://box.example.ts.net/mcp", "token_file": "~/.config/omnicortex/secrets/box.token"},
   "clock":  {"command": "python", "args": ["clock_server.py"], "autoApprove": ["now"]},
   "old":    {"command": "...", "disabled": true}
 }}
 ```
+
+Keep tokens out of this file:
+- `"token_file"` (or `"token_env"`) becomes the server's
+  `Authorization: Bearer` header;
+- any header or `env` value may say `${file:PATH}` or `${env:NAME}`.
+
+They are read each time the server connects, so after rotating a token,
+press **Reconnect / reload config** on the Tools tab; there is nothing to edit here.
 
 Tick **tools** under the chat and the model is offered every connected tool
 (as `<server>__<tool>`; llama-server's Jinja templates, on by default, turn
@@ -193,7 +271,9 @@ tool. Results are shown under the call and fed back to the model, for up to 8
 rounds per message. A declined call is reported to the model as declined.
 
 The **Tools** tab shows each server's status and tools, and reconnects after
-you edit the file. Stdio servers' logs go to `~/.neuronscope/mcp-logs/`.
+you edit the file. **Test** next to a server asks it for its tools again, and
+calls one tool it marks read-only and that needs no arguments (for the
+transfer server, `list_targets`). It shows the time taken and the answer. Stdio servers' logs go to `~/.omnicortex/mcp-logs/`.
 `python scripts/mcp_client.py tools` checks a config from the command line.
 
 MCP servers run with your permissions. Only configure servers you trust, and
@@ -208,7 +288,7 @@ links instead of sharing the master token.
 `https://studio.lan:7870/pair#c=K7QX-M2PA-9DTE&fp=…`, claimable for five
 minutes by default.
 Opened in a browser, it pairs that browser and logs it in; on the command line,
-`python scripts/ns_pairing.py claim '<link>' --out laptop.token` writes a token
+`python scripts/oc_pairing.py claim '<link>' --out laptop.token` writes a token
 file for API clients. Each device gets its own token, stored on the host only
 as a SHA-256 hash, listed with when it was last seen, and revocable at once.
 Paired devices can chat (with documents), use `/v1` and keep saved chats.
@@ -251,7 +331,7 @@ python viz/studio.py ... --no-persistent-pairing --pair-durations 1h,8h,1d --pai
 `POST /api/devices/update` takes the same plus the device `id`.
 
 **Use another machine's models.** On the GPU box's Studio create a pairing
-link, and paste it into this Studio's Link page with a name (say `gpu`). Its
+link, and paste it into this Studio's Connect → Devices page with a name (say `gpu`). Its
 models appear in the picker and in `/v1/models` as `gpu:<model id>`; requests
 for them, from the chat or from any OpenAI client pointed at this Studio, are
 forwarded to that machine with this Studio's device token, streamed back, and
@@ -265,17 +345,17 @@ self-signed LAN certificate is pinned, not trusted blindly, and a machine in
 the middle can neither take the code nor read the traffic. Pairing requires
 the host to run with a token; without TLS the link has no fingerprint and
 should only be used inside a VPN. Tokens for linked hosts are kept in
-`~/.neuronscope/links.json` (0600); devices in `~/.neuronscope/devices.json`.
+`~/.omnicortex/links.json` (0600); devices in `~/.omnicortex/devices.json`.
 
 ## Jobs
 
-`/jobs` (the **Jobs** link in the header) starts evaluation, retraining and
+`/jobs` (**Jobs** in the sidebar) starts evaluation, retraining and
 benchmark runs without a terminal: TestQA, deficit datasets, SWE-bench training
 data, fine-tuning, merge and GGUF conversion, SWE-bench predict / evaluate /
 import, LiveBench and CLIP_benchmark. Each job is a fixed script with a form of
 typed fields; there is no free-form command line, and no value may start with
 `-`, so a field cannot add flags. Output streams into the page and is kept in
-`~/.neuronscope/jobs/<id>/` (`--jobs-dir`); jobs keep running when the browser
+`~/.omnicortex/jobs/<id>/` (`--jobs-dir`); jobs keep running when the browser
 closes, and can be cancelled. `--max-jobs` (default 2) limits how many run at
 once.
 
@@ -293,9 +373,9 @@ Studio loads models, downloads files and runs inference, so binding beyond
 loopback is gated:
 
 ```bash
-python scripts/ns_security.py token --out ~/.config/neuronscope/studio.token
-python scripts/ns_security.py selfsigned --host studio.lan --host 192.0.2.10
-python viz/studio.py --host 0.0.0.0 --token-file ~/.config/neuronscope/studio.token \
+python scripts/oc_security.py token --out ~/.config/omnicortex/studio.token
+python scripts/oc_security.py selfsigned --host studio.lan --host 192.0.2.10
+python viz/studio.py --host 0.0.0.0 --token-file ~/.config/omnicortex/studio.token \
     --tls-cert ns-cert.pem --tls-key ns-key.pem
 ```
 
@@ -340,4 +420,4 @@ compare. See [REQUIREMENTS.md](REQUIREMENTS.md).
 
 `/connect` has ready-made settings for Cline, Claude Desktop and other
 OpenAI-compatible apps, and Studio serves MCP at `/mcp` so agents can use
-NeuronScope's tools. See [CONNECT.md](CONNECT.md).
+OmniCortex's tools. See [CONNECT.md](CONNECT.md).

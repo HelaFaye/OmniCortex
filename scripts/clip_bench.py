@@ -15,7 +15,7 @@ to the open_clip interface CLIP_benchmark expects. Class names and prompt
 templates come from CLIP_benchmark, and classification runs through its own
 `zero_shot_classifier` / `run_classification`, so top-1/top-5 are comparable
 with its published numbers for the same checkpoint. Each scale additionally
-reports the selective metrics NeuronScope cares about (coverage, confident
+reports the selective metrics OmniCortex cares about (coverage, confident
 error rate, selective accuracy) from the same logits.
 
 Datasets: CLIP_benchmark downloads most automatically into --dataset-root.
@@ -39,6 +39,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import clip_neurons as cn  # noqa: E402
+import clip_style as cs  # noqa: E402
 
 DEFAULT_TEMPLATES = ["a photo of a {c}.", "a blurry photo of a {c}.", "a photo of the large {c}.",
                      "a photo of the small {c}.", "a sketch of a {c}.", "a rendition of a {c}."]
@@ -70,8 +71,13 @@ class HFClipAdapter:
                 return Tok({k: v.to(device) for k, v in self.items()})
         return Tok({k: v for k, v in enc.items() if k in ("input_ids", "attention_mask")})
 
+    style = "off"
+
     def transform(self, img):
-        return self.proc(images=img.convert("RGB"), return_tensors="pt")["pixel_values"][0]
+        img = img.convert("RGB")
+        if self.style != "off":
+            img = cs.prepare(img, self.style, cs.target_size(self.proc))[0]
+        return self.proc(images=img, return_tensors="pt")["pixel_values"][0]
 
 
 def build(name: str, root: str, transform, split: str):
@@ -90,6 +96,7 @@ def evaluate_one(adapter, ds, scaler, scales, args) -> dict:
     from clip_benchmark.metrics.zeroshot_classification import run_classification, zero_shot_classifier
     templates = getattr(ds, "templates", None) or DEFAULT_TEMPLATES
     if isinstance(templates, list):
+        templates = cs.templates(templates, args.style)
         templates = [t.replace("{}", "{c}") for t in templates]
     loader = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, num_workers=args.num_workers,
                                          shuffle=False)
@@ -114,6 +121,7 @@ def evaluate_one(adapter, ds, scaler, scales, args) -> dict:
 def cmd_eval(a) -> int:
     model, proc = cn.load(a.model, a.device, a.dtype)
     adapter = HFClipAdapter(model, proc, a.device)
+    adapter.style = a.style
     scaler, tower = None, None
     scales = a.scales if a.h_neurons else [1.0]
     if a.h_neurons:
@@ -121,7 +129,7 @@ def cmd_eval(a) -> int:
         mgr = cn.ClipCETT(model, tower)
         mgr.remove()
         scaler = cn.Scaler(mgr, cn.load_profile(a.h_neurons, mgr.n_neurons))
-    report = {"model": a.model, "h_neurons": a.h_neurons, "tower": tower, "threshold": a.threshold,
+    report = {"model": a.model, "h_neurons": a.h_neurons, "tower": tower, "threshold": a.threshold, "style": a.style,
               "benchmark": "CLIP_benchmark zero-shot classification", "datasets": {}}
     for name in a.dataset:
         ds = build(name, a.dataset_root, adapter.transform, a.split)
@@ -179,6 +187,8 @@ def main(argv=None) -> int:
     e.add_argument("--tower", choices=["vision", "text"])
     e.add_argument("--scales", type=float, nargs="+", default=[1.0, 0.5, 0.0])
     e.add_argument("--threshold", type=float, default=0.5, help="abstain below this top-1 probability")
+    e.add_argument("--style", choices=cs.STYLES, default="off",
+                   help="pixel art / cartoon handling: nearest-neighbour upscaling, padding, style prompts")
     e.add_argument("--batch-size", type=int, default=64)
     e.add_argument("--num-workers", type=int, default=4)
     e.add_argument("--limit", type=int, default=0, help="random subset of N images per dataset (quick runs)")

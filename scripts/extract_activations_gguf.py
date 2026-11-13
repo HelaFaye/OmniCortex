@@ -44,7 +44,7 @@ import numpy as np
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ns_constants import THINK_CLOSE, normalise_piece  # noqa: E402
+from oc_constants import THINK_CLOSE, normalise_piece  # noqa: E402
 
 MAGIC = b"CETT"
 FORMAT_VERSION = 1
@@ -52,8 +52,8 @@ FORMAT_VERSION = 1
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--binary", default=None, help="path to llama-cett-dump (default $NS_CETT)")
-    p.add_argument("--gguf", default=None, help="the model to extract from (default $NS_GGUF)")
+    p.add_argument("--binary", default=None, help="path to llama-cett-dump (default $OC_CETT)")
+    p.add_argument("--gguf", default=None, help="the model to extract from (default $OC_GGUF)")
     p.add_argument("--tokenizer", default=None,
                    help="HF repo or path. Optional: without it the tokenizer "
                         "is read from the GGUF, which avoids needing "
@@ -72,7 +72,12 @@ def parse_args():
     p.add_argument("--max_tokens", type=int, default=2048)
     p.add_argument("--device", help="passed through, e.g. Vulkan0")
     p.add_argument("--keep_think", action="store_true")
-    p.add_argument("--no_trust_remote_code", action="store_true")
+    p.add_argument("--loops", type=int, help="looped models (Dory): the loop count, if not the GGUF's own")
+    try:
+        from oc_cli import add_trust_remote_code_argument
+    except ImportError:
+        from scripts.oc_cli import add_trust_remote_code_argument
+    add_trust_remote_code_argument(p)
     return p.parse_args()
 
 
@@ -124,7 +129,55 @@ def read_aggregate(path):
     return token_ids, view, seen, counts.reshape(seen.shape), n_experts
 
 
-def weight_col_norms(gguf_path, n_layers):
+def looped_layout(gguf_path, loops=None):
+    """(blocks, passes, arch) for a looped GGUF -- one whose metadata has <arch>.num_loops, like NVIDIA's Dory --
+    else None. cett-dump then runs with --by-weight blocks, and records pass k of block N as layer k*blocks + N
+    (docs/DORY.md), so the layer count is blocks x passes."""
+    import gguf
+    try:
+        r = gguf.GGUFReader(gguf_path)
+    except (OSError, ValueError):
+        return None                 # unreadable here: not treated as looped (cett-dump reports the file itself)
+
+    def kv(key):
+        f = r.fields.get(key)
+        if f is None:
+            return None
+        v = f.contents()
+        return v.decode("utf-8") if isinstance(v, bytes) else v
+    arch = kv("general.architecture")
+    n = kv(f"{arch}.num_loops")
+    if n is None:
+        return None
+    return int(kv(f"{arch}.block_count")), int(loops or n), arch
+
+
+def looped_args(layout, loops_override=False):
+    """cett-dump flags for a looped layout (and the loop count, when it is not the GGUF's own)."""
+    if not layout:
+        return []
+    blocks, passes, arch = layout
+    out = ["--by-weight", str(blocks)]
+    if loops_override:
+        out += ["--override-kv", f"{arch}.num_loops=int:{passes}"]
+    return out
+
+
+def layer_norms(gguf_path, n_layers, layout=None):
+    """[n_layers, n_ff] column norms, in cett-dump's layer order: for a looped layout, each pass repeats the blocks'
+    norms, and blocks without an MLP (attention-only) get zeros (cett-dump leaves them unseen)."""
+    if not layout:
+        norms = weight_col_norms(gguf_path, n_layers)
+        return np.stack([norms[i] for i in range(n_layers)])
+    blocks, passes, _ = layout
+    norms = weight_col_norms(gguf_path, blocks, allow_missing=True)
+    n_ff = max(len(v) for v in norms.values())
+    base = np.stack([norms[i] if i in norms and len(norms[i]) == n_ff else np.zeros(n_ff, np.float32)
+                     for i in range(blocks)])
+    return np.tile(base, (passes, 1))[:n_layers]
+
+
+def weight_col_norms(gguf_path, n_layers, allow_missing=False):
     """||W[:, j]|| per layer, from the same file the activations came from."""
     try:
         import gguf
@@ -137,6 +190,8 @@ def weight_col_norms(gguf_path, n_layers):
         name = f"blk.{layer}.ffn_down.weight"
         t = by_name.get(name)
         if t is None:
+            if allow_missing:
+                continue            # a block without an MLP
             raise SystemExit(f"{name} not in {gguf_path}")
         w = gguf.quants.dequantize(t.data, t.tensor_type).astype(np.float32)
         # ffn_down is [n_embd, n_ff] once numpy reverses GGUF's dim order;
@@ -238,6 +293,7 @@ def run_tool(args, manifest, outdir, tokenize_only, n_layers=None):
                 "-c", str(args.batch), "--n-layers", str(n_layers)]
         if args.method == "max":
             cmd += ["--max"]
+        cmd += looped_args(getattr(args, "layout", None), getattr(args, "loops", None) is not None)
     if args.device:
         cmd += ["--device", args.device]
     print("running:", " ".join(cmd))
@@ -274,15 +330,15 @@ def _require_paths(args):
     numpy traceback. An empty --gguf used to surface as
     `FileNotFoundError: ''` four frames deep inside np.memmap."""
     import os as _os
-    args.gguf = args.gguf or _os.environ.get("NS_GGUF", "")
-    args.binary = args.binary or _os.environ.get("NS_CETT", "")
+    args.gguf = args.gguf or _os.environ.get("OC_GGUF", "")
+    args.binary = args.binary or _os.environ.get("OC_CETT", "")
     problems = []
     if not args.gguf:
-        problems.append("--gguf is empty and $NS_GGUF is not set")
+        problems.append("--gguf is empty and $OC_GGUF is not set")
     elif not _os.path.isfile(args.gguf):
         problems.append(f"--gguf does not exist: {args.gguf}")
     if not args.binary:
-        problems.append("--binary is empty and $NS_CETT is not set")
+        problems.append("--binary is empty and $OC_CETT is not set")
     elif not _os.access(args.binary, _os.X_OK):
         problems.append(f"--binary is not executable: {args.binary}")
     if problems:
@@ -297,7 +353,7 @@ def main():
     if args.tokenizer:
         from transformers import AutoTokenizer
         tok = AutoTokenizer.from_pretrained(
-            args.tokenizer, trust_remote_code=not args.no_trust_remote_code)
+            args.tokenizer, trust_remote_code=args.trust_remote_code)
         use_gguf_tok = False
     else:
         # The GGUF carries the vocab and the chat template, so nothing here
@@ -415,7 +471,7 @@ def main():
     if args.tokenizer:
         from transformers import AutoConfig
         cfg = AutoConfig.from_pretrained(
-            args.tokenizer, trust_remote_code=not args.no_trust_remote_code)
+            args.tokenizer, trust_remote_code=args.trust_remote_code)
         n_layers = getattr(cfg, "text_config", cfg).num_hidden_layers
     else:
         # Layer count from the GGUF itself: no transformers, no torch.
@@ -430,6 +486,11 @@ def main():
         n_layers = int(_kv(f"{_kv('general.architecture')}.block_count") or 0)
         if not n_layers:
             raise SystemExit(f"could not read block_count from {args.gguf}")
+    args.layout = looped_layout(args.gguf, args.loops)
+    if args.layout:
+        n_layers = args.layout[0] * args.layout[1]
+        print(f"looped model: {args.layout[0]} blocks x {args.layout[1]} passes; pass k of block N is layer k*"
+              f"{args.layout[0]}+N")
 
     print(f"\nphase 2/2: {len(plans)} forward passes, {n_layers} layers")
     if run_tool(args, m2, dump_dir, tokenize_only=False, n_layers=n_layers) != 0:
@@ -450,12 +511,14 @@ def main():
                 col_norms = expert_col_norms(args.gguf, n_layers, n_experts,
                                              n_ff)
             else:
-                col_norms = np.stack([weight_col_norms(args.gguf, n_layers)[l]
-                                      for l in range(n_layers)])
+                col_norms = layer_norms(args.gguf, n_layers, args.layout)
             with open(os.path.join(args.output_root, "neuron_index.json"), "w") as f:
                 meta = {"n_layers": int(n_layers), "n_neurons": int(n_ff),
                         "model_path": args.gguf,
                         "source": "llama.cpp cett-dump"}
+                if args.layout:
+                    meta.update(looped={"blocks": args.layout[0], "passes": args.layout[1]},
+                                layer_order="layer = pass * blocks + block")
                 if n_experts > 1:
                     meta["n_experts"] = int(n_experts)
                     meta["order"] = ("flat = (layer * n_experts + expert) "
