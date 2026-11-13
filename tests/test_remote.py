@@ -163,8 +163,8 @@ def test_permissions_uploads_and_install(tmp_path, backend):
         st, out = put(f"/upload/m-q4.gguf?offset=1000&final=1&sha256={sha}", data[1000:])
         assert st == 200 and out["complete"]
         st, out = put("/upload/..%2F..%2Fevil.gguf?offset=0&final=1", b"x")
-        assert st == 200 and out["file"] == "evil.gguf"             # names cannot leave the incoming folder
-        assert (ag.incoming() / "evil.gguf").exists()
+        assert st == 400, out  # encoded path traversal must be rejected
+        assert not (ag.incoming() / "evil.gguf").exists()
         files = tool("list_files")["structuredContent"]["files"]
         assert {"file": "m-q4.gguf", "size": len(data), "partial": False} in files
         r = tool("install_model", {"file": "m-q4.gguf"})["structuredContent"]
@@ -175,7 +175,7 @@ def test_permissions_uploads_and_install(tmp_path, backend):
             "omnicortex/m-q4/m-q4.gguf"
         ag.cfg["allow"]["delete"] = True
         assert tool("delete_file", {"file": "../outside", "where": "models"})["isError"]
-        assert not tool("delete_file", {"file": "evil.gguf"})["isError"]
+        assert tool("delete_file", {"file": "evil.gguf"})["isError"]
         # OpenAI pass-through: models and chat
         st, out, _ = nsr.http_json(url, "GET", "/v1/models", token=tok)
         assert [m["id"] for m in out["data"]] == ["tiny-chat"]
@@ -652,5 +652,300 @@ def test_host_gives_the_computer_back_to_its_owner(tmp_path, backend):
         assert ag.call_tool("t" and "telemetry", {}, "t")["structuredContent"]["busy"]["why"] == "monthly energy cap"
         ag.busy["until"] = time.time() - 1                                 # its time is up
         assert not ag.call_tool("chat", {"messages": [{"role": "user", "content": "hi"}]}, "t")["isError"]
+    finally:
+        rt.close_api()
+
+class _FakeDownloadResponse:
+    def __init__(self, status, headers=None, body=b""):
+        self.status = status
+        self.headers = list((headers or {}).items())
+        self.stream = io.BytesIO(body)
+
+    def getheaders(self):
+        return list(self.headers)
+
+    def read(self, amount=-1):
+        return self.stream.read(amount)
+
+
+class _FakeDownloadConnection:
+    def __init__(self, response):
+        self.response = response
+        self.request_args = None
+        self.closed = False
+
+    def request(self, method, path, headers=None, **kwargs):
+        self.request_args = (method, path, dict(headers or {}))
+
+    def getresponse(self):
+        return self.response
+
+    def close(self):
+        self.closed = True
+
+
+def _run_fake_download(monkeypatch, agent, dest, response, sha=""):
+    tid = "test-download"
+    agent.download_slots.acquire()
+    agent.transfers[tid] = {
+        "id": tid,
+        "file": dest.name,
+        "status": "running",
+        "done": 0,
+        "size": None,
+        "started": time.time(),
+    }
+    agent.active_download_names.add(dest.name)
+
+    conn = _FakeDownloadConnection(response)
+    monkeypatch.setattr(nsr, "open_conn", lambda *args, **kwargs: conn)
+    agent._download(
+        tid,
+        "http://download.test/model.gguf",
+        dest,
+        sha,
+        "",
+        None,
+    )
+    return agent.transfers[tid], conn
+
+
+def test_download_resumed_206_validates_range_and_completes(tmp_path, monkeypatch):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    data = b"already received|" + os.urandom(4096)
+    prefix = data[:17]
+    suffix = data[len(prefix):]
+    part = dest.with_name(dest.name + ".part")
+    part.write_bytes(prefix)
+
+    response = _FakeDownloadResponse(
+        206,
+        {
+            "Content-Range": f"bytes {len(prefix)}-{len(data) - 1}/{len(data)}",
+            "Content-Length": str(len(suffix)),
+        },
+        suffix,
+    )
+    row, conn = _run_fake_download(
+        monkeypatch,
+        ag,
+        dest,
+        response,
+        hashlib.sha256(data).hexdigest(),
+    )
+
+    assert row["status"] == "done", row
+    assert dest.read_bytes() == data
+    assert not part.exists()
+    assert conn.request_args[2]["Range"] == f"bytes={len(prefix)}-"
+    assert conn.request_args[2]["Accept-Encoding"] == "identity"
+    assert conn.closed
+
+
+@pytest.mark.parametrize(
+    ("content_range", "content_length"),
+    [
+        ("bytes 16-99/100", "84"),  # Wrong starting offset.
+        ("bytes 17-99/100", "82"),  # Wrong Content-Length.
+        ("bytes 17-98/100", "82"),  # Does not contain the full requested tail.
+        ("bytes 17-99/*", "83"),    # Unknown total size.
+    ],
+)
+def test_download_rejects_invalid_206_range(
+    tmp_path, monkeypatch, content_range, content_length
+):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    prefix = b"seventeen bytes!!"
+    assert len(prefix) == 17
+    part = dest.with_name(dest.name + ".part")
+    part.write_bytes(prefix)
+
+    response = _FakeDownloadResponse(
+        206,
+        {
+            "Content-Range": content_range,
+            "Content-Length": content_length,
+        },
+        b"x" * 83,
+    )
+    row, _ = _run_fake_download(monkeypatch, ag, dest, response)
+
+    assert row["status"] == "failed", row
+    assert not dest.exists()
+    assert part.read_bytes() == prefix
+
+
+def test_download_rejects_416_without_expected_checksum(tmp_path, monkeypatch):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    data = b"already complete but not independently verified"
+    part = dest.with_name(dest.name + ".part")
+    part.write_bytes(data)
+
+    response = _FakeDownloadResponse(
+        416,
+        {"Content-Range": f"bytes */{len(data)}"},
+    )
+    row, _ = _run_fake_download(monkeypatch, ag, dest, response)
+
+    assert row["status"] == "failed", row
+    assert "without an expected SHA-256" in row["error"]
+    assert not dest.exists()
+    assert part.read_bytes() == data
+
+
+def test_download_accepts_416_only_after_size_and_checksum_match(tmp_path, monkeypatch):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    data = os.urandom(2048)
+    part = dest.with_name(dest.name + ".part")
+    part.write_bytes(data)
+
+    response = _FakeDownloadResponse(
+        416,
+        {"Content-Range": f"bytes */{len(data)}"},
+    )
+    row, _ = _run_fake_download(
+        monkeypatch,
+        ag,
+        dest,
+        response,
+        hashlib.sha256(data).hexdigest(),
+    )
+
+    assert row["status"] == "done", row
+    assert dest.read_bytes() == data
+    assert not part.exists()
+
+
+def test_download_rejects_symlinked_partial_file(tmp_path, monkeypatch):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    part = dest.with_name(dest.name + ".part")
+    sentinel = tmp_path / "do-not-modify.bin"
+    sentinel.write_bytes(b"protected data")
+    part.symlink_to(sentinel)
+
+    response = _FakeDownloadResponse(200, {"Content-Length": "4"}, b"evil")
+    row, _ = _run_fake_download(monkeypatch, ag, dest, response)
+
+    assert row["status"] == "failed", row
+    assert "symlink" in row["error"]
+    assert part.is_symlink()
+    assert sentinel.read_bytes() == b"protected data"
+    assert not dest.exists()
+
+
+def test_download_restarts_when_server_ignores_range(tmp_path, monkeypatch):
+    ag = nsr.Agent(tmp_path / "host")
+    dest = ag.incoming() / "model.gguf"
+    data = b"complete fresh response"
+    part = dest.with_name(dest.name + ".part")
+    part.write_bytes(b"stale partial data")
+
+    response = _FakeDownloadResponse(
+        200,
+        {"Content-Length": str(len(data))},
+        data,
+    )
+    row, conn = _run_fake_download(
+        monkeypatch,
+        ag,
+        dest,
+        response,
+        hashlib.sha256(data).hexdigest(),
+    )
+
+    assert row["status"] == "done", row
+    assert dest.read_bytes() == data
+    assert not part.exists()
+    assert "Range" in conn.request_args[2]
+
+
+def test_put_upload_reservations_prevent_transfer_collisions(tmp_path, backend):
+    ag, rt, url = make_agent(tmp_path, backend)
+    try:
+        code = nsr.norm_code(ag.pairing.open()["code"])
+        first = nsr.pair_direct(url, code, "studio-one")
+        first_token = first["token"]
+
+        def put(token, path, body):
+            conn = nsr.open_conn(url, None, 10)
+            try:
+                conn.request(
+                    "PUT",
+                    path,
+                    body=body,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                response = conn.getresponse()
+                payload = json.loads(response.read())
+                return response.status, payload
+            finally:
+                conn.close()
+
+        # A PUT must not write a filename currently owned by a download.
+        ag.active_download_names.add("collision.gguf")
+        try:
+            status, payload = put(
+                first_token,
+                "/upload/collision.gguf?offset=0",
+                b"blocked",
+            )
+            assert status == 409, payload
+            assert not (ag.incoming() / "collision.gguf.part").exists()
+        finally:
+            ag.active_download_names.discard("collision.gguf")
+
+        # The first controller owns a partial upload until it completes.
+        status, payload = put(
+            first_token,
+            "/upload/owned.gguf?offset=0",
+            b"part",
+        )
+        assert status == 200, payload
+        partial = ag.incoming() / "owned.gguf.part"
+        assert partial.read_bytes() == b"part"
+
+        # A different paired controller cannot append to that partial.
+        code2 = nsr.norm_code(ag.pairing.open()["code"])
+        second = nsr.pair_direct(url, code2, "studio-two")
+        status, payload = put(
+            second["token"],
+            "/upload/owned.gguf?offset=4",
+            b"tamper",
+        )
+        assert status == 409, payload
+        assert partial.read_bytes() == b"part"
+
+        # The owner can resume and complete it with the expected digest.
+        complete = b"part" + b"-complete"
+        digest = hashlib.sha256(complete).hexdigest()
+        status, payload = put(
+            first_token,
+            f"/upload/owned.gguf?offset=4&final=1&sha256={digest}",
+            b"-complete",
+        )
+        assert status == 200 and payload["complete"], payload
+        assert (ag.incoming() / "owned.gguf").read_bytes() == complete
+        assert not partial.exists()
+        assert "owned.gguf" not in ag.upload_owners
+
+        # A symlinked upload partial must not be followed.
+        outside = tmp_path / "outside-upload-target.bin"
+        outside.write_bytes(b"protected")
+        symlink_part = ag.incoming() / "symlink.gguf.part"
+        symlink_part.symlink_to(outside)
+
+        status, payload = put(
+            first_token,
+            "/upload/symlink.gguf?offset=0",
+            b"overwrite",
+        )
+        assert status == 400, payload
+        assert symlink_part.is_symlink()
+        assert outside.read_bytes() == b"protected"
     finally:
         rt.close_api()

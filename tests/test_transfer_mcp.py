@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 pytest.importorskip("mcp")
 pytest.importorskip("uvicorn")
 import mcp_client  # noqa: E402
+import oc_transfer_mcp as transfer_mcp  # noqa: E402
 
 TOKEN = "t" * 48
 
@@ -136,3 +137,153 @@ def test_http_mode_refuses_unsafe_setups(tmp_path):
     r = subprocess.run([sys.executable, script, "--http", "--host", "0.0.0.0", "--port", str(_port()),
                         "--token-file", str(good)], capture_output=True, text=True, timeout=60)
     assert r.returncode != 0 and "plaintext" in (r.stderr + r.stdout)
+
+
+
+def test_mcp_rejects_unsafe_target_names(tmp_path, monkeypatch):
+    monkeypatch.setattr(transfer_mcp, "SECRETS", tmp_path / "secrets")
+    monkeypatch.setattr(transfer_mcp, "_keyring", lambda: None)
+
+    victim = tmp_path / "victim.token"
+    victim.write_text("protected-token")
+
+    invalid_names = (
+        "../victim",
+        "..",
+        ".",
+        "/tmp/victim",
+        "nested/name",
+        "nested\\\\name",
+        "",
+    )
+
+    for name in invalid_names:
+        with pytest.raises(ValueError):
+            transfer_mcp.validate_target_name(name)
+        with pytest.raises(ValueError):
+            transfer_mcp.store_token(name, TOKEN)
+        with pytest.raises(ValueError):
+            transfer_mcp.load_token(name)
+        with pytest.raises(ValueError):
+            transfer_mcp.delete_token(name)
+        with pytest.raises(ValueError):
+            transfer_mcp.get_target(name)
+
+    assert victim.read_text() == "protected-token"
+    assert not (tmp_path / "secrets").exists()
+
+
+def test_mcp_state_save_does_not_follow_predictable_tmp_symlink(tmp_path, monkeypatch):
+    state = tmp_path / "config" / "transfer-mcp.json"
+    monkeypatch.setattr(transfer_mcp, "STATE", state)
+
+    state.parent.mkdir(parents=True)
+    victim = tmp_path / "victim.json"
+    victim.write_text("protected-state")
+
+    # This was the old predictable temporary filename.
+    predictable_tmp = state.with_suffix(".tmp")
+    try:
+        predictable_tmp.symlink_to(victim)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+
+    transfer_mcp.save({
+        "targets": {
+            "box": {
+                "url": "https://example.invalid",
+                "cafile": "",
+                "destination_hint": "",
+            }
+        }
+    })
+
+    assert json.loads(state.read_text())["targets"]["box"]["url"] == "https://example.invalid"
+    assert predictable_tmp.is_symlink()
+    assert victim.read_text() == "protected-state"
+
+    if os.name == "posix":
+        assert state.stat().st_mode & 0o777 == 0o600
+        assert state.parent.stat().st_mode & 0o777 == 0o700
+
+
+def test_mcp_state_save_replaces_state_symlink_safely(tmp_path, monkeypatch):
+    state = tmp_path / "transfer-mcp.json"
+    monkeypatch.setattr(transfer_mcp, "STATE", state)
+
+    victim = tmp_path / "victim.json"
+    victim.write_text("do not overwrite")
+    try:
+        state.symlink_to(victim)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+
+    transfer_mcp.save({"targets": {}})
+
+    assert not state.is_symlink()
+    assert json.loads(state.read_text()) == {"targets": {}}
+    assert victim.read_text() == "do not overwrite"
+
+
+@pytest.mark.parametrize(
+    "contents",
+    [
+        "{malformed json",
+        "[]",
+        '{"targets": []}',
+        '{"targets": null}',
+    ],
+)
+def test_mcp_load_fails_closed_on_malformed_state(tmp_path, monkeypatch, contents):
+    state = tmp_path / "transfer-mcp.json"
+    monkeypatch.setattr(transfer_mcp, "STATE", state)
+    state.write_text(contents)
+
+    assert transfer_mcp.load() == {"targets": {}}
+
+
+def test_mcp_load_removes_unsafe_legacy_target_names(tmp_path, monkeypatch):
+    state = tmp_path / "transfer-mcp.json"
+    secrets = tmp_path / "secrets"
+    monkeypatch.setattr(transfer_mcp, "STATE", state)
+    monkeypatch.setattr(transfer_mcp, "SECRETS", secrets)
+    monkeypatch.setattr(transfer_mcp, "_keyring", lambda: None)
+
+    victim = tmp_path / "victim.token"
+    victim.write_text("protected-token")
+
+    state.write_text(json.dumps({
+        "targets": {
+            "../victim": {"url": "https://invalid.example", "token": TOKEN},
+            "box": {"url": "https://example.invalid", "cafile": ""},
+        }
+    }))
+
+    loaded = transfer_mcp.load()
+
+    assert set(loaded["targets"]) == {"box"}
+    assert "token" not in loaded["targets"]["box"]
+    assert victim.read_text() == "protected-token"
+    assert json.loads(state.read_text())["targets"].keys() == {"box"}
+
+
+def test_secret_writer_does_not_follow_predictable_tmp_symlink(tmp_path):
+    target = tmp_path / "secret.token"
+    victim = tmp_path / "victim.txt"
+    victim.write_text("protected")
+
+    predictable_tmp = target.with_name(target.name + ".tmp")
+    try:
+        predictable_tmp.symlink_to(victim)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+
+    transfer_mcp.sec.write_secret_file(target, TOKEN)
+
+    assert target.read_text().strip() == TOKEN
+    assert predictable_tmp.is_symlink()
+    assert victim.read_text() == "protected"
+
+    if os.name == "posix":
+        assert target.stat().st_mode & 0o777 == 0o600
+        assert target.parent.stat().st_mode & 0o777 == 0o700

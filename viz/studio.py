@@ -45,6 +45,7 @@ import queue
 import re
 import secrets
 import shutil
+import stat
 import socket
 import subprocess
 import sys
@@ -5202,28 +5203,63 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, hub.progress(str(req.get("id", "")), pieces[:4096], rec["name"]))
         m = re.fullmatch(r"/api/remote/file/([A-Za-z0-9_-]+)", path)
         if method == "GET" and m:
-            fp = hub.ticket_path(m.group(1))
-            if not fp or not os.path.isfile(fp):
+            ticket = m.group(1)
+            fp = hub.ticket_acquire(ticket)
+            if fp is None:
                 THROTTLE.fail(ip)
                 return self._json(404, {"error": "no such file, or the link expired"})
-            return self._send_file(fp)
+            if not os.path.isfile(fp):
+                hub.ticket_release(ticket, completed=True)
+                THROTTLE.fail(ip)
+                return self._json(404, {"error": "no such file, or the link expired"})
+
+            try:
+                self._send_file(fp)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError):
+                # A disconnected client may retry with Range using the same ticket.
+                return
+            finally:
+                # HTTP delivery is not proof of host-side hash verification or publish.
+                # The controller revokes this capability when the host reports terminal status.
+                hub.ticket_release(ticket, completed=False)
+            return
         return self._json(404, {"error": "not found"})
 
     def _send_file(self, fp):
-        size = os.path.getsize(fp)
-        start = 0
-        rng = re.fullmatch(r"bytes=(\d+)-", self.headers.get("Range", "").strip())
-        if rng:
-            start = min(int(rng.group(1)), size)
-        self.send_response(206 if rng else 200)
-        self.send_header("Content-Type", "application/octet-stream")
-        self.send_header("Content-Length", str(size - start))
-        if rng:
-            self.send_header("Content-Range", f"bytes {start}-{size - 1}/{size}")
-        self.end_headers()
-        with open(fp, "rb") as f:
-            f.seek(start)
-            shutil.copyfileobj(f, self.wfile, 1 << 20)
+        with open(fp, "rb") as source:
+            file_stat = os.fstat(source.fileno())
+            if not stat.S_ISREG(file_stat.st_mode):
+                raise OSError("remote send source is not a regular file")
+
+            size = file_stat.st_size
+            range_header = self.headers.get("Range", "").strip()
+            match = re.fullmatch(r"bytes=(\d+)-", range_header)
+            start = int(match.group(1)) if match else 0
+
+            if match and start >= size:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.send_header("Content-Length", "0")
+                self.send_header("Accept-Ranges", "bytes")
+                self.end_headers()
+                return
+
+            self.send_response(206 if match else 200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(size - start))
+            self.send_header("Accept-Ranges", "bytes")
+            if match:
+                self.send_header("Content-Range", f"bytes {start}-{size - 1}/{size}")
+            self.end_headers()
+
+            source.seek(start)
+            remaining = size - start
+            while remaining:
+                chunk = source.read(min(1 << 20, remaining))
+                if not chunk:
+                    raise OSError("remote send source changed or shortened while streaming")
+                self.wfile.write(chunk)
+                remaining -= len(chunk)
 
     def _remote_state(self):
         import remote_hosts
@@ -5237,7 +5273,7 @@ class Handler(BaseHTTPRequestHandler):
             st["error"] = hit[2] if hit else None
             hosts.append(st)
         bind = STATE.get("bind_host") or "127.0.0.1"
-        return {"role": "controller", "hosts": hosts, "sends": list(r.sends.values())[-20:],
+        return {"role": "controller", "hosts": hosts, "sends": r.send_snapshot(20),
                 "studio": {"bind": bind, "network": not sec.is_loopback(bind), "tls": bool(STATE.get("tls")),
                            "token": bool(STATE.get("token")),
                            "short_fingerprint": remote_hosts.nsr.short_fp(STATE.get("fingerprint") or ""),

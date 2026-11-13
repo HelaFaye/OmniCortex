@@ -22,6 +22,7 @@ Secrets handling:
 """
 from __future__ import annotations
 
+import collections
 import json
 import os
 import re
@@ -52,7 +53,15 @@ CONFIG = Path(os.environ.get("OC_CONFIG_DIR", str(Path.home() / ".config" / "omn
 STATE = Path(os.environ.get("OC_TRANSFER_MCP_STATE", str(CONFIG / "transfer-mcp.json")))
 SECRETS = CONFIG / "secrets"
 KEYRING_SERVICE = "omnicortex-transfer"
-NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+NAME_RE = re.compile(r"[A-Za-z0-9_.-]{1,64}")
+
+def validate_target_name(name: str) -> str:
+    """Validate names before using them as state keys or secret filenames."""
+    if not isinstance(name, str) or not NAME_RE.fullmatch(name):
+        raise ValueError("target name must contain 1..64 ASCII letters, digits, dots, underscores, or hyphens")
+    if name in {".", ".."}:
+        raise ValueError("invalid target name")
+    return name
 
 
 def mcp_version_ok() -> tuple[bool, str]:
@@ -77,6 +86,9 @@ def _keyring():
 
 
 def store_token(name: str, token: str) -> str:
+    name = validate_target_name(name)
+    if not isinstance(token, str) or not token:
+        raise ValueError("token must be a non-empty string")
     kr = _keyring()
     if kr is not None:
         try:
@@ -89,6 +101,7 @@ def store_token(name: str, token: str) -> str:
 
 
 def load_token(name: str) -> str:
+    name = validate_target_name(name)
     kr = _keyring()
     if kr is not None:
         try:
@@ -102,6 +115,7 @@ def load_token(name: str) -> str:
 
 
 def delete_token(name: str) -> None:
+    name = validate_target_name(name)
     kr = _keyring()
     if kr is not None:
         try:
@@ -114,33 +128,103 @@ def delete_token(name: str) -> None:
 # ---------------------------------------------------------------- state
 
 def load() -> dict:
-    if STATE.exists():
-        try:
-            d = json.loads(STATE.read_text())
-            # Migrate state written by older versions that stored tokens inline.
-            changed = False
-            for name, t in d.get("targets", {}).items():
-                if t.get("token"):
-                    store_token(name, t.pop("token"))
-                    changed = True
-            if changed:
-                save(d)
-            return d
-        except Exception:
-            pass
-    return {"targets": {}}
+    # Do not read state through a symlink or accept malformed target maps.
+    if STATE.is_symlink() or not STATE.is_file():
+        return {"targets": {}}
+
+    try:
+        d = json.loads(STATE.read_text(encoding="utf-8"))
+        if not isinstance(d, dict):
+            return {"targets": {}}
+
+        targets = d.get("targets", {})
+        if not isinstance(targets, dict):
+            return {"targets": {}}
+
+        clean = {}
+        changed = False
+        for name, value in targets.items():
+            try:
+                validate_target_name(name)
+            except ValueError:
+                changed = True
+                continue
+
+            if not isinstance(value, dict):
+                changed = True
+                continue
+
+            target = dict(value)
+            legacy_token = target.pop("token", None)
+            if legacy_token is not None:
+                changed = True
+                if isinstance(legacy_token, str) and legacy_token:
+                    store_token(name, legacy_token)
+
+            clean[name] = target
+
+        if changed or clean != targets:
+            d = {**d, "targets": clean}
+            save(d)
+        else:
+            d["targets"] = clean
+        return d
+    except Exception:
+        return {"targets": {}}
 
 
 def save(d: dict) -> None:
+    import tempfile
+
+    if not isinstance(d, dict) or not isinstance(d.get("targets"), dict):
+        raise ValueError("invalid transfer MCP state")
+    for name in d["targets"]:
+        validate_target_name(name)
+
     STATE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = STATE.with_suffix(".tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as f:
-        json.dump(d, f, indent=2)
-    os.replace(tmp, STATE)
+    try:
+        os.chmod(STATE.parent, 0o700)
+    except OSError:
+        pass
+
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{STATE.name}.",
+        suffix=".tmp",
+        dir=str(STATE.parent),
+    )
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            if hasattr(os, "fchmod"):
+                os.fchmod(stream.fileno(), 0o600)
+            json.dump(d, stream, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        os.replace(tmp, STATE)
+        try:
+            os.chmod(STATE, 0o600)
+        except OSError:
+            pass
+
+        try:
+            directory_fd = os.open(
+                STATE.parent,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except OSError:
+            pass
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def get_target(name: str) -> dict:
+    name = validate_target_name(name)
     t = load()["targets"].get(name)
     if t is None:
         raise KeyError(f"unknown target {name!r}; call register_target first")
@@ -202,8 +286,7 @@ if FastMCP:
                         destination_hint: str = "") -> dict:
         """Register a remote OmniCortex transfer receiver. The token is moved to
         the OS keyring (or a 0600 file) and is never echoed back."""
-        if not NAME_RE.match(name):
-            raise ValueError("name must match [A-Za-z0-9_.-]{1,64}")
+        name = validate_target_name(name)
         if not url.startswith(("https://", "http://")):
             raise ValueError("url must be http(s)://")
         d = load()
@@ -219,6 +302,7 @@ if FastMCP:
     @mcp.tool(annotations=_ann(**DESTROY))
     def remove_target(name: str) -> dict:
         """Forget a target and delete its stored token."""
+        name = validate_target_name(name)
         d = load()
         d["targets"].pop(name, None)
         save(d)
@@ -288,7 +372,8 @@ class Guard:
         self.app, self.token, self.path = app, token, path
         self.origins = {o.rstrip("/") for o in allowed_origins}
         self.max_failures, self.window = max_failures, window
-        self.failures: dict = {}
+        self.failures: collections.OrderedDict = collections.OrderedDict()
+        self.last_prune = 0.0
 
     async def _deny(self, send, code: int, msg: str):
         body = json.dumps({"error": msg}).encode()
@@ -305,8 +390,20 @@ class Guard:
         h = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers") or []}
         ip = (scope.get("client") or ("?",))[0]
         now = _t.time()
+        if now - self.last_prune >= 30:
+            for peer, values in list(self.failures.items()):
+                keep = [t for t in values if now - t < self.window]
+                if keep:
+                    self.failures[peer] = keep
+                else:
+                    self.failures.pop(peer, None)
+            self.last_prune = now
         recent = [t for t in self.failures.get(ip, []) if now - t < self.window]
-        self.failures[ip] = recent
+        if recent:
+            self.failures[ip] = recent
+            self.failures.move_to_end(ip)
+        else:
+            self.failures.pop(ip, None)
         if len(recent) >= self.max_failures:
             return await self._deny(send, 429, "too many wrong tokens from this address; wait a few minutes")
         if scope.get("path") == "/health":
@@ -317,7 +414,10 @@ class Guard:
         auth = h.get("authorization", "")
         given = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
         if not given or not hmac.compare_digest(given.encode(), self.token.encode()):
-            self.failures[ip].append(now)
+            if ip not in self.failures and len(self.failures) >= 4096:
+                self.failures.popitem(last=False)
+            self.failures.setdefault(ip, []).append(now)
+            self.failures.move_to_end(ip)
             return await self._deny(send, 401, "a valid bearer token is required")
         return await self.app(scope, receive, send)
 

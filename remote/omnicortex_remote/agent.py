@@ -65,12 +65,18 @@ import socket
 import ssl
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.parse
 import webbrowser
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+
+try:
+    from .http_utils import BoundedThreadingHTTPServer, HeaderDeadlineMixin, read_body
+except ImportError:                     # direct execution: python agent.py
+    from http_utils import BoundedThreadingHTTPServer, HeaderDeadlineMixin, read_body
 
 try:
     from . import __version__ as VERSION
@@ -146,7 +152,11 @@ class Store:
 
     def __init__(self, home: Path):
         self.home = Path(home)
-        self.home.mkdir(parents=True, exist_ok=True)
+        self.home.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            os.chmod(self.home, 0o700)
+        except OSError:
+            pass                         # Windows ACLs do not map cleanly to POSIX modes
         self.lock = threading.RLock()
 
     def read(self, name: str, default):
@@ -157,11 +167,29 @@ class Store:
 
     def write(self, name: str, obj) -> None:
         path = self.home / name
-        tmp = path.with_name(path.name + ".tmp")
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(obj, f, indent=1)
-        os.replace(tmp, path)
+        fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=self.home)
+        try:
+            if hasattr(os, "fchmod"):
+                os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(obj, f, indent=1)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_name, path)
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+        except Exception:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            try:
+                os.unlink(tmp_name)
+            except FileNotFoundError:
+                pass
+            raise
 
     def remove(self, name: str) -> None:
         try:
@@ -900,6 +928,10 @@ class Agent:
         self.controllers = Controllers(self.store)
         self.activity = collections.deque(maxlen=200)
         self.transfers: dict = {}
+        self.transfer_lock = threading.RLock()
+        self.download_slots = threading.BoundedSemaphore(4)
+        self.active_download_names: set[str] = set()
+        self.upload_owners: dict[str, tuple[str, float]] = {}
         self.lock = threading.RLock()
         self.fingerprint = ""            # of the certificate the API serves, "" without TLS
         self.link = {"mode": "stdio", "urls": []}
@@ -1298,58 +1330,312 @@ class Agent:
 
     def t_receive_file(self, a):
         self.need("receive")
-        name = safe_name(a.get("name") or urllib.parse.urlsplit(a["url"]).path.split("/")[-1])
-        tid = secrets.token_hex(4)
-        self.transfers[tid] = {"id": tid, "file": name, "url": re.sub(r"[?#].*", "", a["url"]), "status": "running",
-                               "done": 0, "size": None, "started": time.time()}
-        threading.Thread(target=self._download, daemon=True,
-                         args=(tid, a["url"], self.incoming() / name, a.get("sha256"), a.get("token", ""),
-                               a.get("fingerprint"))).start()
-        return {"transfer": tid, "file": name, "note": "runs in the background; the transfers tool shows progress"}
+        url = str(a.get("url") or "")
+        u = urllib.parse.urlsplit(url)
+        if u.scheme not in ("http", "https") or not u.hostname or u.username or u.password:
+            raise ToolError("receive_file requires an http(s) URL with a host and no embedded credentials")
+        try:
+            _ = u.port
+        except ValueError as exc:
+            raise ToolError("invalid receive_file URL port") from exc
+
+        sha = str(a.get("sha256") or "").lower()
+        if sha and not re.fullmatch(r"[0-9a-f]{64}", sha):
+            raise ToolError("receive_file SHA-256 digest must be 64 hexadecimal characters")
+
+        name = safe_name(a.get("name") or u.path.split("/")[-1])
+        if not name or name in (".", ".."):
+            raise ToolError("invalid receive_file filename")
+        if not self.download_slots.acquire(blocking=False):
+            raise ToolError("too many active downloads (maximum 4); wait for one to finish")
+
+        tid = secrets.token_hex(8)
+        now = time.time()
+        try:
+            with self.transfer_lock:
+                # Expire upload reservations after 24 hours without activity.
+                for key, (_, updated) in list(self.upload_owners.items()):
+                    if now - float(updated) > 86400:
+                        self.upload_owners.pop(key, None)
+
+                if name in self.active_download_names or name in self.upload_owners:
+                    raise ToolError(f"a transfer for {name!r} is already running")
+                if any(
+                    row.get("file") == name and row.get("status") in ("running", "checking")
+                    for row in self.transfers.values()
+                ):
+                    raise ToolError(f"a transfer for {name!r} is already running")
+
+                for key, row in list(self.transfers.items()):
+                    finished = float(row.get("finished", row.get("started", now)))
+                    if row.get("status") not in ("running", "checking") and now - finished > 7 * 86400:
+                        self.transfers.pop(key, None)
+
+                if len(self.transfers) >= 200:
+                    done = sorted(
+                        (
+                            row for row in self.transfers.values()
+                            if row.get("status") not in ("running", "checking")
+                        ),
+                        key=lambda row: float(row.get("finished", row.get("started", 0))),
+                    )
+                    for row in done[:max(0, len(self.transfers) - 199)]:
+                        self.transfers.pop(row["id"], None)
+
+                self.active_download_names.add(name)
+                self.transfers[tid] = {
+                    "id": tid,
+                    "file": name,
+                    "url": re.sub(r"[?#].*", "", url),
+                    "status": "running",
+                    "done": 0,
+                    "size": None,
+                    "started": now,
+                }
+        except Exception:
+            self.download_slots.release()
+            raise
+
+        try:
+            threading.Thread(
+                target=self._download,
+                daemon=True,
+                args=(
+                    tid,
+                    url,
+                    self.incoming() / name,
+                    sha,
+                    a.get("token", ""),
+                    a.get("fingerprint"),
+                ),
+            ).start()
+        except Exception:
+            with self.transfer_lock:
+                self.transfers.pop(tid, None)
+                self.active_download_names.discard(name)
+            self.download_slots.release()
+            raise
+
+        return {
+            "transfer": tid,
+            "file": name,
+            "note": "runs in the background; the transfers tool shows progress",
+        }
 
     def _download(self, tid, url, dest: Path, sha, token, fingerprint):
         t = self.transfers[tid]
         part = dest.with_name(dest.name + ".part")
+        conn = None
+        limit = 100 << 30
+
+        def partial_size():
+            # Do not follow a symlink or use a non-regular partial file.
+            if part.is_symlink():
+                raise ToolError("partial download path is a symlink; refusing to use it")
+            if not part.exists():
+                return 0
+            if not part.is_file():
+                raise ToolError("partial download path is not a regular file")
+            return part.stat().st_size
+
+        def response_header(response, name):
+            getheaders = getattr(response, "getheaders", None)
+            if callable(getheaders):
+                values = [
+                    str(value).strip()
+                    for key, value in getheaders()
+                    if str(key).lower() == name.lower()
+                ]
+                if len(values) > 1:
+                    raise ToolError(f"server returned duplicate {name} headers")
+                return values[0] if values else None
+            value = response.getheader(name)
+            return str(value).strip() if value is not None else None
+
         try:
-            have = part.stat().st_size if part.exists() else 0
+            have = partial_size()
+            if have > limit:
+                raise ToolError("partial download exceeds the 100 GiB transfer limit")
+
             u = urllib.parse.urlsplit(url)
-            conn = open_conn(url, fingerprint if fingerprint is not None else (None if u.scheme == "https" else ""),
-                             600)
-            headers = {"Range": f"bytes={have}-"} if have else {}
+            conn = open_conn(
+                url,
+                fingerprint if fingerprint is not None else (None if u.scheme == "https" else ""),
+                600,
+            )
+            headers = {"Accept-Encoding": "identity"}
+            if have:
+                headers["Range"] = f"bytes={have}-"
             if token:
                 headers["Authorization"] = f"Bearer {token}"
+
             conn.request("GET", u.path + (f"?{u.query}" if u.query else ""), headers=headers)
             r = conn.getresponse()
+
             if r.status == 416:
-                r.read()
-            elif r.status in (200, 206):
-                if r.status == 200:
-                    have = 0
-                total = r.getheader("Content-Length")
-                t["size"] = have + int(total) if total else None
-                with open(part, "ab" if have else "wb") as f:
-                    t["done"] = have
+                # Only accept a 416 as complete if the server size and
+                # the caller-provided checksum both verify the partial file.
+                content_range = response_header(r, "Content-Range")
+                match = re.fullmatch(r"bytes \*/([0-9]+)", content_range or "", re.I)
+                if not have or not match:
+                    raise ToolError("server returned an invalid 416 response for the resumed download")
+
+                total_size = int(match.group(1))
+                if total_size > limit or total_size != have:
+                    raise ToolError("server's 416 size does not match the saved partial file")
+                if not sha:
+                    raise ToolError("cannot accept HTTP 416 as complete without an expected SHA-256 checksum")
+                if partial_size() != total_size:
+                    raise ToolError("saved partial file changed during 416 validation")
+
+                t.update(status="checking", size=total_size, done=have)
+                if file_sha256(part) != sha:
+                    part.unlink(missing_ok=True)
+                    raise ToolError("the saved partial file failed SHA-256 verification; it was removed")
+
+                os.replace(part, dest)
+                with self.transfer_lock:
+                    t.update(
+                        status="done",
+                        size=dest.stat().st_size,
+                        done=dest.stat().st_size,
+                        finished=time.time(),
+                    )
+                return
+
+            if r.status not in (200, 206):
+                detail = r.read(200).decode(errors="replace")
+                raise ToolError(f"HTTP {r.status}: {detail}")
+
+            raw_length = response_header(r, "Content-Length")
+            content_length = None
+            if raw_length is not None:
+                if not raw_length.isdecimal():
+                    raise ToolError("server returned an invalid Content-Length")
+                content_length = int(raw_length)
+                if content_length > limit:
+                    raise ToolError("download exceeds the 100 GiB transfer limit")
+
+            if r.status == 200:
+                # The server ignored Range. Start over rather than append
+                # a complete response to an existing partial file.
+                have = 0
+                total_size = content_length
+                expected_bytes = content_length
+            else:
+                if have <= 0:
+                    raise ToolError("server returned 206 without a requested partial download")
+
+                content_range = response_header(r, "Content-Range")
+                match = re.fullmatch(
+                    r"bytes ([0-9]+)-([0-9]+)/([0-9]+)",
+                    content_range or "",
+                    re.I,
+                )
+                if not match:
+                    raise ToolError("server returned an invalid Content-Range")
+
+                range_start, range_end, total_size = map(int, match.groups())
+                if range_start != have:
+                    raise ToolError("server resumed at the wrong byte offset")
+                if range_end < range_start or range_end != total_size - 1:
+                    raise ToolError("server returned an incomplete or invalid byte range")
+                if total_size > limit or total_size < have:
+                    raise ToolError("resumed download exceeds the 100 GiB transfer limit")
+
+                expected_bytes = range_end - range_start + 1
+                if content_length is not None and content_length != expected_bytes:
+                    raise ToolError("Content-Length does not match Content-Range")
+
+            if total_size is not None and total_size > limit:
+                raise ToolError("download exceeds the 100 GiB transfer limit")
+
+            t.update(size=total_size, done=have)
+
+            # O_NOFOLLOW prevents a symlink swap between the checks above
+            # and opening the partial file on platforms that support it.
+            flags = os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+            if have:
+                flags |= os.O_APPEND
+            elif part.exists():
+                flags |= os.O_TRUNC
+            else:
+                flags |= os.O_CREAT | os.O_EXCL
+
+            fd = os.open(part, flags, 0o600)
+            received = 0
+            try:
+                if hasattr(os, "fchmod"):
+                    os.fchmod(fd, 0o600)
+                with os.fdopen(fd, "ab" if have else "wb") as f:
+                    fd = -1
                     while True:
                         chunk = r.read(1 << 20)
                         if not chunk:
                             break
+                        if expected_bytes is not None and received + len(chunk) > expected_bytes:
+                            raise ToolError("server sent more bytes than its declared response length")
+                        if t["done"] + len(chunk) > limit:
+                            raise ToolError("download exceeds the 100 GiB transfer limit")
+                        if shutil.disk_usage(dest.parent).free < len(chunk) + (256 << 20):
+                            raise ToolError("insufficient free disk space for download")
+
                         f.write(chunk)
                         t["done"] += len(chunk)
-            else:
-                raise ToolError(f"HTTP {r.status}: {r.read()[:200].decode(errors='replace')}")
-            conn.close()
+                        received += len(chunk)
+
+                    f.flush()
+                    os.fsync(f.fileno())
+            finally:
+                if fd >= 0:
+                    os.close(fd)
+
+            if expected_bytes is not None and received != expected_bytes:
+                raise ToolError("server ended the response before the declared byte range was complete")
+            if part.is_symlink() or not part.is_file():
+                raise ToolError("downloaded partial file is not a regular file")
+
+            actual_size = part.stat().st_size
+            if total_size is not None and actual_size != total_size:
+                raise ToolError("downloaded file size does not match the server's declared total size")
+            if actual_size > limit:
+                raise ToolError("download exceeds the 100 GiB transfer limit")
+
             if sha:
                 t["status"] = "checking"
-                if file_sha256(part) != sha.lower():
+                if file_sha256(part) != sha:
                     part.unlink()
                     raise ToolError("the file arrived damaged (SHA-256 differs); it was removed, send it again")
+
             os.replace(part, dest)
-            t.update(status="done", size=dest.stat().st_size, done=dest.stat().st_size, finished=time.time())
+            with self.transfer_lock:
+                t.update(
+                    status="done",
+                    size=dest.stat().st_size,
+                    done=dest.stat().st_size,
+                    finished=time.time(),
+                )
+
         except Exception as e:
-            t.update(status="failed", error=f"{type(e).__name__}: {e}"[:300])
+            with self.transfer_lock:
+                t.update(
+                    status="failed",
+                    error=f"{type(e).__name__}: {e}"[:300],
+                    finished=time.time(),
+                )
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            with self.transfer_lock:
+                self.active_download_names.discard(dest.name)
+            self.download_slots.release()
 
     def t_transfers(self, a):
-        return {"transfers": list(self.transfers.values())}
+        with self.transfer_lock:
+            return {"transfers": [dict(row) for row in self.transfers.values()]}
 
     def t_install_model(self, a):
         self.need("install")
@@ -1571,20 +1857,46 @@ def file_sha256(p: Path) -> str:
 class Throttle:
     def __init__(self, limit=10, window=60.0):
         self.limit, self.window, self.hits = limit, window, {}
+        self.lock = threading.Lock()
+        self.last_prune = 0.0
 
     def blocked(self, ip: str) -> bool:
-        now = time.time()
-        self.hits[ip] = [t for t in self.hits.get(ip, []) if now - t < self.window]
-        return len(self.hits[ip]) >= self.limit
+        with self.lock:
+            now = time.time()
+            self._prune(now)
+            rows = [t for t in self.hits.get(ip, []) if now - t < self.window]
+            if rows:
+                self.hits[ip] = rows
+            else:
+                self.hits.pop(ip, None)
+            return len(rows) >= self.limit
 
     def fail(self, ip: str) -> None:
-        self.hits.setdefault(ip, []).append(time.time())
+        with self.lock:
+            now = time.time()
+            self._prune(now)
+            if ip not in self.hits and len(self.hits) >= 4096:
+                self.hits.pop(next(iter(self.hits)))
+            self.hits.setdefault(ip, []).append(now)
+
+    def _prune(self, now: float) -> None:
+        if now - self.last_prune < 30:
+            return
+        cutoff = now - self.window
+        for ip, rows in list(self.hits.items()):
+            keep = [t for t in rows if t >= cutoff]
+            if keep:
+                self.hits[ip] = keep
+            else:
+                self.hits.pop(ip, None)
+        self.last_prune = now
 
 
-class ApiHandler(BaseHTTPRequestHandler):
+class ApiHandler(HeaderDeadlineMixin, BaseHTTPRequestHandler):
     server_version = "omnicortex-remote"
     agent: Agent = None
     throttle = Throttle()
+    timeout = 120
 
     def log_message(self, *a):
         pass
@@ -1601,19 +1913,18 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _body(self, limit=MAX_JSON) -> bytes:
-        n = int(self.headers.get("Content-Length") or 0)
-        if n < 0 or n > limit:
-            raise ValueError("request too large")
-        return self.rfile.read(n)
+        return read_body(self, limit, total_timeout=120)
 
     def _controller(self):
         ip = self.client_address[0]
         if self.throttle.blocked(ip):
+            self.close_connection = True
             self._send(429, {"error": "too many failed attempts; wait a minute"})
             return None
         auth = self.headers.get("Authorization", "")
         c = self.agent.controllers.check(auth[7:].strip() if auth.lower().startswith("bearer ") else "")
         if c is None:
+            self.close_connection = True
             self.throttle.fail(ip)
             self._send(401, {"error": "not paired with this host: pair with the code shown in the host's "
                                       "OmniCortex Remote console"})
@@ -1666,8 +1977,10 @@ class ApiHandler(BaseHTTPRequestHandler):
                 return self._send(200, out, headers)
             if path in ("/v1/chat/completions", "/v1/completions", "/v1/embeddings"):
                 return self._v1(path, who)
+            self.close_connection = True
             self._send(404, {"error": "not found"})
         except ValueError as e:
+            self.close_connection = True
             self._send(400, {"error": str(e)})
 
     def _pair(self):
@@ -1689,39 +2002,112 @@ class ApiHandler(BaseHTTPRequestHandler):
     def do_PUT(self):
         path = self.path.split("?")[0]
         if not path.startswith("/upload/"):
+            self.close_connection = True
             return self._send(404, {"error": "not found"})
+
         c = self._controller()
         if c is None:
             return
+
         try:
             self.agent.need("receive")
             name = safe_name(urllib.parse.unquote(path[8:]))
+            if not name or name in (".", ".."):
+                return self._send(400, {"error": "invalid upload filename"})
+
             q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
             inc = self.agent.incoming()
             part = inc / (name + ".part")
-            have = part.stat().st_size if part.exists() else 0
-            off = int(q.get("offset", 0))
-            if off != have:
-                self.rfile.read(int(self.headers.get("Content-Length") or 0))
-                return self._send(409, {"error": "offset mismatch; resume from size", "size": have})
             data = self._body(MAX_CHUNK)
-            if data:
-                if shutil.disk_usage(inc).free < len(data) + (256 << 20):
-                    return self._send(507, {"error": "the host's disk is nearly full"})
-                with open(part, "ab" if have else "wb") as f:
-                    f.write(data)
-            if q.get("final"):
-                if q.get("sha256") and file_sha256(part) != q["sha256"].lower():
-                    part.unlink()
-                    return self._send(422, {"error": "SHA-256 differs; the partial file was removed, send it again"})
-                os.replace(part, inc / name)
-                self.agent.note(c["name"], "sent a file", True, name)
-                return self._send(200, {"file": name, "complete": True, "size": (inc / name).stat().st_size})
-            self._send(200, {"file": name, "complete": False, "size": have + len(data)})
+            off = int(q.get("offset", 0))
+            now = time.time()
+
+            with self.agent.transfer_lock:
+                # Expire abandoned upload reservations after 24 hours.
+                for key, (_, updated) in list(self.agent.upload_owners.items()):
+                    if now - float(updated) > 86400:
+                        self.agent.upload_owners.pop(key, None)
+
+                if name in self.agent.active_download_names:
+                    return self._send(409, {"error": "a download is already writing this filename"})
+
+                owner = self.agent.upload_owners.get(name)
+                if owner is not None and owner[0] != c["id"]:
+                    return self._send(409, {"error": "this partial upload belongs to another controller"})
+
+                if part.is_symlink() or (part.exists() and not part.is_file()):
+                    return self._send(400, {"error": "partial upload path is not a regular file"})
+
+                have = part.stat().st_size if part.exists() else 0
+                if off != have:
+                    return self._send(409, {"error": "offset mismatch; resume from size", "size": have})
+
+                if data:
+                    if have + len(data) > (100 << 30):
+                        return self._send(413, {"error": "uploads are limited to 100 GiB"})
+                    if shutil.disk_usage(inc).free < len(data) + (256 << 20):
+                        return self._send(507, {"error": "the host's disk is nearly full"})
+                    if owner is None and len(self.agent.upload_owners) >= 256:
+                        return self._send(429, {"error": "too many active upload reservations"})
+
+                    self.agent.upload_owners[name] = (c["id"], now)
+
+                    flags = os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+                    if have:
+                        flags |= os.O_APPEND
+                    elif part.exists():
+                        flags |= os.O_TRUNC
+                    else:
+                        flags |= os.O_CREAT | os.O_EXCL
+
+                    fd = os.open(part, flags, 0o600)
+                    try:
+                        if hasattr(os, "fchmod"):
+                            os.fchmod(fd, 0o600)
+                        with os.fdopen(fd, "ab" if have else "wb") as f:
+                            fd = -1
+                            f.write(data)
+                            f.flush()
+                            os.fsync(f.fileno())
+                    finally:
+                        if fd >= 0:
+                            os.close(fd)
+                elif owner is not None:
+                    self.agent.upload_owners[name] = (c["id"], now)
+
+                new_size = have + len(data)
+                if q.get("final"):
+                    digest = str(q.get("sha256") or "").lower()
+                    if not re.fullmatch(r"[0-9a-f]{64}", digest):
+                        return self._send(400, {"error": "final upload requires a valid SHA-256 query parameter"})
+
+                    if part.is_symlink() or not part.is_file() or file_sha256(part) != digest:
+                        part.unlink(missing_ok=True)
+                        self.agent.upload_owners.pop(name, None)
+                        return self._send(
+                            422,
+                            {"error": "SHA-256 differs; the partial file was removed, send it again"},
+                        )
+
+                    os.replace(part, inc / name)
+                    self.agent.upload_owners.pop(name, None)
+                    self.agent.note(c["name"], "sent a file", True, name)
+                    return self._send(
+                        200,
+                        {"file": name, "complete": True, "size": (inc / name).stat().st_size},
+                    )
+
+                return self._send(200, {"file": name, "complete": False, "size": new_size})
+
         except ToolError as e:
+            self.close_connection = True
             self._send(403, {"error": str(e)})
         except ValueError as e:
+            self.close_connection = True
             self._send(400, {"error": str(e)})
+        except OSError as e:
+            self.close_connection = True
+            self._send(507, {"error": f"upload I/O failed: {str(e)[:180]}"})
 
     # the OpenAI-compatible pass-through: the data plane controllers use for chat
     def _v1_models(self):
@@ -1770,11 +2156,12 @@ class ApiHandler(BaseHTTPRequestHandler):
 
 # ------------------------------------------------------------------ the console (this computer only)
 
-class ConsoleHandler(BaseHTTPRequestHandler):
+class ConsoleHandler(HeaderDeadlineMixin, BaseHTTPRequestHandler):
     agent: Agent = None
     key = ""
     port = 0
     runtime = None
+    timeout = 120
 
     def log_message(self, *a):
         pass
@@ -2171,10 +2558,10 @@ class Runtime:
                 ag.fingerprint = cert_fingerprint(pair[0])
         family = socket.AF_INET6 if ":" in host else socket.AF_INET
         Handler = type("H", (ApiHandler,), {"agent": ag, "throttle": Throttle()})
-        Server = type("S", (ThreadingHTTPServer,), {"address_family": family, "daemon_threads": True})
-        srv = Server((host, port), Handler)
+        Server = type("S", (BoundedThreadingHTTPServer,), {"address_family": family, "daemon_threads": True})
+        srv = Server((host, port), Handler, max_threads=64)
         if ctx is not None:
-            srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
+            srv.socket = ctx.wrap_socket(srv.socket, server_side=True, do_handshake_on_connect=False)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         self.api = srv
         scheme = "https" if ctx else "http"
@@ -2233,7 +2620,7 @@ class Runtime:
     def console(self, port: int) -> str:
         key = secrets.token_urlsafe(18)
         Handler = type("C", (ConsoleHandler,), {"agent": self.agent, "key": key, "runtime": self})
-        srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+        srv = BoundedThreadingHTTPServer(("127.0.0.1", port), Handler)
         Handler.port = srv.server_address[1]
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         url = f"http://127.0.0.1:{Handler.port}/#k={key}"

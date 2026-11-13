@@ -30,6 +30,7 @@ import os
 import re
 import shlex
 import sys
+import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -40,6 +41,21 @@ ENV_RX = re.compile(r"[A-Z_][A-Z0-9_]{0,63}")
 # OmniCortex itself run rather than where things are.
 ENV_DENY = {"PATH", "PYTHONPATH", "PYTHONHOME", "LD_PRELOAD", "LD_LIBRARY_PATH", "HOME", "SHELL", "OC_STUDIO_TOKEN",
             "OC_CONFIG", "BASH_ENV", "ENV"}
+ENV_SECRET_MARKERS = ("TOKEN", "API_KEY", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL",
+                      "AUTH", "PRIVATE_KEY", "ACCESS_KEY")
+
+def _workspace_env_allowed(name: str) -> bool:
+    """Workspace env is for runtime paths/options, never for storing credentials."""
+    raw = str(name)
+    key = raw.upper()
+    return (raw == key and bool(ENV_RX.fullmatch(key)) and key not in ENV_DENY
+            and not any(marker in key for marker in ENV_SECRET_MARKERS))
+
+def _safe_workspace_env(values) -> dict:
+    if not isinstance(values, dict):
+        return {}
+    return {str(k): str(v) for k, v in values.items()
+            if _workspace_env_allowed(k) and "\n" not in str(v) and "\0" not in str(v)}
 
 # name: (kind, help). kind: dir, newdir (created when needed; its parent must exist), dirs, file, exe, env, text
 FIELDS = {
@@ -73,10 +89,30 @@ def _load(path: Path | None = None) -> dict:
 
 def _save(d: dict, path: Path | None = None) -> None:
     p = path or config_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_suffix(".tmp")
-    tmp.write_text(json.dumps(d, indent=2))
-    os.replace(tmp, p)
+    p.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{p.name}.", suffix=".tmp", dir=p.parent)
+    try:
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(d, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_name, p)
+        try:
+            os.chmod(p, 0o600)
+        except OSError:
+            pass
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 def _x(p):
@@ -131,7 +167,7 @@ def resolve(ws: dict) -> dict:
            "server": _x(ws.get("server")) or os.path.join(bin_dir, "llama-server"),
            "cett": _x(ws.get("cett")) or os.path.join(bin_dir, "llama-cett-dump"),
            "gguf": _x(ws.get("gguf")) or _x(os.environ.get("OC_GGUF")), "state_dir": state,
-           "env": {k: str(v) for k, v in (ws.get("env") or {}).items()}, "note": ws.get("note") or ""}
+           "env": _safe_workspace_env(ws.get("env") or {}), "note": ws.get("note") or ""}
     for k, sub in STATE_SUBDIRS.items():
         out[k] = os.path.join(state, sub)
     out["set"] = sorted(k for k in ws if k in FIELDS)          # what the person chose, vs defaults
@@ -196,10 +232,14 @@ def validate(values: dict, check_exists: bool = True) -> tuple[dict, dict]:
                 for ek, ev in v.items():
                     if not ENV_RX.fullmatch(str(ek)):
                         raise ValueError(f"{ek!r}: upper-case letters, digits and _ only")
-                    if ek in ENV_DENY:
+                    if str(ek).upper() in ENV_DENY:
                         raise ValueError(f"{ek} cannot be set from a workspace")
+                    if any(marker in str(ek).upper() for marker in ENV_SECRET_MARKERS):
+                        raise ValueError(f"{ek} looks like a credential; store secrets outside workspace config")
                     if "\n" in str(ev) or "\0" in str(ev):
                         raise ValueError(f"{ek}: one line")
+                    if not _workspace_env_allowed(str(ek)):
+                        raise ValueError(f"{ek} is not allowed in workspace environment settings")
                 v = {str(ek): str(ev) for ek, ev in v.items()}
             elif kind == "text":
                 v = str(v)[:500]

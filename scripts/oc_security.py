@@ -70,24 +70,52 @@ def bearer_ok(header: str | None, expected: str) -> bool:
 
 
 def write_secret_file(path: Path, value: str) -> Path:
-    """Write ``value`` to ``path`` with 0600 permissions (created atomically)."""
+    """Write a secret atomically with owner-only permissions."""
+    import tempfile
+
     path = Path(path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(path.parent, 0o700)
     except OSError:
         pass
-    tmp = path.with_name(path.name + ".tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(value.strip() + "\n")
-    os.replace(tmp, path)
-    try:
-        os.chmod(path, 0o600)
-    except OSError:
-        pass
-    return path
 
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=str(path.parent),
+    )
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            if hasattr(os, "fchmod"):
+                os.fchmod(stream.fileno(), 0o600)
+            stream.write(value.strip() + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        os.replace(tmp, path)
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+
+        try:
+            directory_fd = os.open(
+                path.parent,
+                os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+            )
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except OSError:
+            pass
+
+        return path
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
 def read_secret_file(path: Path) -> str:
     path = Path(path).expanduser()
