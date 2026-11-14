@@ -25,6 +25,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 MARK = "ns-activations"
+# The marker and the C++ names (namespace ns, g_ns_*) keep their pre-rename spelling on purpose: the patch
+# recognises a checkout it already patched by each block's first line, so renaming them would patch an
+# existing checkout twice. Only the log text says OmniCortex.
 
 GLUE = r'''#pragma once
 // ns-activations: globals and the /activations route, shared by
@@ -116,12 +119,12 @@ SETUP_BLOCK = r'''
                     }
                 }
                 if (n_ff > 0 && g_ns_stream.clf.load(p, g_ns_ctx.n_layers * n_ff)) {
-                    SRV_INF("ns activations scored by %s\n", p);
+                    SRV_INF("OmniCortex activations scored by %s\n", p);
                 } else {
-                    SRV_WRN("ns activations: classifier %s not loaded (n_ff=%d); frames will be unscored\n", p, n_ff);
+                    SRV_WRN("OmniCortex activations: classifier %s not loaded (n_ff=%d); frames will be unscored\n", p, n_ff);
                 }
             }
-            SRV_INF("ns activations on: %d layers, GET /activations\n", g_ns_ctx.n_layers);
+            SRV_INF("OmniCortex activations on: %d layers, GET /activations\n", g_ns_ctx.n_layers);
         }
 '''
 

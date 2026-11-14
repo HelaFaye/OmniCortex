@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Security
+
+- PyTorch files from elsewhere can no longer run code when loaded. These now load with PyTorch's weights-only
+  loader (`scripts/safe_load.py`):
+  - feature dictionaries (`sae.py`);
+  - steering vectors (`decode_lab.py`, `rp_steer.py`);
+  - emotion vectors (`emotions.py`).
+
+  OmniCortex's own files are unaffected. `OC_TRUST_PICKLE=1` allows the full loader for a file you made.
+
 ### Added (Kivy client, first part)
 
 - `clients/kivy/omnicortex_client/api.py`: the Studio client the Kivy app will use, plain Python. It covers pairing

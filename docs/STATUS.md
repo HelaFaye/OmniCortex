@@ -4,8 +4,9 @@ Where OmniCortex stands, what has and hasn't been checked, and what comes next. 
 
 ## Where things stand
 
-Everything below is on the branch behind pull request #3 (`claude/determined-ritchie-xlemxv`), which is being
-prepared for merging into `main`. Each area has its own document.
+Everything below is on `main`. It came in through pull request #3, merged 2026-11-13, together with the hardening
+of execution permissions, network services, remote transfers, tool rules and the tuning worker. Each area has its
+own document.
 
 The **Checked** column says how far each piece has been verified:
 - **CI**: the GitHub Actions test or build runs it on every push;
@@ -31,6 +32,26 @@ The **Checked** column says how far each piece has been verified:
 Companion repositories, both merged:
 - **mi50-arm #1:** a VBIOS check in `check-mi50.sh`, and which MI50 VBIOSes can shrink BAR0 on RK3588.
 - **m10-arm #1:** a Proxmox guide for sharing the Tesla M10 with an LXC container.
+
+## Audit, 2026-11-14
+
+An audit of `main` (bfad43d) plus the commits after it found no problem that blocks the next stage. What was
+checked:
+
+| Check | Result |
+|---|---|
+| Full test suite, CPU-only container with PyTorch and a llama.cpp build with cett-dump | 797 passed, 0 failed. The 19 skips need a GPU, Docker, Godot, `clip_benchmark`, IPv6 loopback, or a `llama-quantize` build |
+| CI on `main` | tests green; binaries green except best-effort 32-bit Windows |
+| Every Python file compiles; pyflakes undefined names | Clean; the 2 hits are false positives (a string annotation, Blender's property syntax) |
+| Every Studio job's fields against its script's flags | All 102 Python jobs match (`tests/test_job_specs.py` checks this on every run) |
+| Markdown links; paths named in the docs | No broken links. Missing paths appear only in historical CHANGELOG entries, or belong to a review board's repository |
+| Secrets, large files | None. The only key-like strings are the sanitizer's own detection patterns |
+| Unsafe loading, shell, archives | **Fixed:** five `torch.load(..., weights_only=False)` calls could run code from a `.pt` file from elsewhere (a downloaded feature dictionary, shared steering or emotion vectors). They now go through `scripts/safe_load.py` (weights only; `OC_TRUST_PICKLE=1` for a file you made). The `shell=True` evaluator commands come from the operator's command line, never the API. The one zip extraction relies on Python's own path sanitising |
+| Old names | One user-visible log line in the llama-server activations patch now says OmniCortex. Its marker and C++ names keep the old spelling on purpose: renaming them would make the patch apply twice to an existing checkout |
+
+Minor, not fixed: two of the three tuning scripts substitute file paths into the evaluator command unquoted (the
+third quotes `{profile}`), so a path containing a space breaks that command. Passing paths through the
+`OC_MODEL`/`OC_PROFILE` environment variables, which all three already set, avoids it.
 
 ## Still to check on real hardware
 

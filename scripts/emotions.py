@@ -415,7 +415,8 @@ class Vectors:
     def __init__(self, path: str | Path, device="cpu"):
         import torch
         p = Path(path)
-        d = torch.load(p / "emotions.pt" if p.is_dir() else p, map_location="cpu", weights_only=False)
+        from safe_load import torch_load      # weights only: no code from the file
+        d = torch_load(p / "emotions.pt" if p.is_dir() else p)
         self.names, self.layers = d["names"], d["layers"]
         self.V = d["vectors"].float()                                               # [L, E, d]
         self.U = self.V / self.V.norm(dim=-1, keepdim=True).clamp(min=1e-8)
