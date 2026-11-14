@@ -111,3 +111,43 @@ def test_studio_api(tmp_path):
             next(gen)
         except StopIteration:
             pass
+
+
+def test_fork_profiles_build_in_their_own_checkout(tmp_path, monkeypatch):
+    """A profile may build a llama.cpp fork (mx-llama.cpp for gfx906): only from GitHub, into its own directory,
+    with a note that the code comes from that repository."""
+    monkeypatch.setattr(HP.Path, "home", classmethod(lambda cls: tmp_path))
+    pl = HP.plan(HP.get("amd-gfx906-mx"))
+    cmd = pl["steps"][0]["cmd"]
+    assert cmd[cmd.index("--repo") + 1] == "https://github.com/mxxm-t/mx-llama.cpp"
+    assert cmd[cmd.index("--dir") + 1] == str(tmp_path / "mx-llama.cpp")
+    assert cmd[cmd.index("--backend") + 1] == "hip" and "-DAMDGPU_TARGETS=gfx906" in cmd[cmd.index("--cmake") + 1]
+    assert "fork" in pl["steps"][0]["title"] and "trust" in pl["notes"][-1]
+    assert pl["engine"] == {"load_mode": "dio", "split_mode": "tensor", "tensor_parallel": 0}
+    assert pl["env"] == {"GGML_ENABLE_CUSTOM_AR": "0"}
+    # an explicit --dir wins; upstream llama.cpp named as the repo is not a fork; a ref is passed through
+    assert HP.plan(HP.get("amd-gfx906-mx"), llama_dir="/opt/mx")["steps"][0]["cmd"].count("--dir") == 1
+    good = {"schema": HP.SCHEMA, "id": "x-y", "title": "X",
+            "purposes": {"general": {"summary": "s", "llama": {"backend": "cpu", "repo": HP.UPSTREAM + ".git",
+                                                                "ref": "b6500"}}}}
+    cmd = HP.plan(HP.validate(good))["steps"][0]["cmd"]
+    assert "--repo" not in cmd and "--dir" not in cmd and cmd[cmd.index("--ref") + 1] == "b6500"
+    for bad, why in (({"repo": "https://evil.example/llama.cpp"}, "repo"), ({"repo": "https://github.com/a/b;rm -rf"}, "repo"),
+                     ({"repo": "git@github.com:a/b.git"}, "repo"), ({"ref": "--upload-pack=x"}, "ref"),
+                     ({"ref": "a b"}, "ref")):
+        p = json.loads(json.dumps(good))
+        p["purposes"]["general"]["llama"].update(bad)
+        with pytest.raises(HP.ProfileError, match=why):
+            HP.validate(p)
+
+
+def test_build_script_refuses_a_fork_inside_another_clone(tmp_path):
+    """build_llama_tools.sh --repo with a --dir that holds another repository's clone stops before building."""
+    import subprocess
+    d = tmp_path / "llama.cpp"
+    subprocess.run(["git", "init", "-q", str(d)], check=True)
+    subprocess.run(["git", "-C", str(d), "remote", "add", "origin", "https://github.com/ggml-org/llama.cpp"], check=True)
+    r = subprocess.run(["bash", str(ROOT / "scripts" / "build_llama_tools.sh"), "--dir", str(d),
+                        "--repo", "https://github.com/mxxm-t/mx-llama.cpp"], capture_output=True, text=True)
+    assert r.returncode == 1 and "not https://github.com/mxxm-t/mx-llama.cpp" in r.stderr and "--dir ~/mx-llama.cpp" in r.stderr
+    assert not (d / "tools").exists()                       # nothing copied, nothing built

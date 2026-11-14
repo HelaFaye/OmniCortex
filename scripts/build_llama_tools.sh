@@ -11,6 +11,8 @@
 #   scripts/build_llama_tools.sh --cmake "-DGGML_AVX=OFF"  # extra CMake flags (CI: 32-bit targets)
 #   scripts/build_llama_tools.sh --rpc                 # also rpc-server, for layer streaming across computers
 #   scripts/build_llama_tools.sh --repo URL --ref SHA  # a fork, e.g. one with a model llama.cpp has not merged yet
+#   scripts/build_llama_tools.sh --repo https://github.com/mxxm-t/mx-llama.cpp --dir ~/mx-llama.cpp --backend hip \
+#       --cmake "-DAMDGPU_TARGETS=gfx906 -DGGML_HIP_GRAPHS=ON -DGGML_HIP_RCCL=OFF"   # MI50-tuned (docs/MX_LLAMA.md)
 #
 # Clones (or updates) llama.cpp, copies llama-tools/cett-dump into tools/,
 # registers it, and builds llama-cett-dump, llama-server, llama-quantize and
@@ -19,20 +21,20 @@
 # Prints the env exports for env.local.sh at the end.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DIR="${HOME}/llama.cpp"; BACKEND="cpu"; REF=""; REPO="https://github.com/ggml-org/llama.cpp"; NATIVE=ON; ACTS=0; RPC=0; CUDA_ARCH=""; EXTRA=""; JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+DIR="${HOME}/llama.cpp"; REPO_SET=0; BACKEND="cpu"; REF=""; REPO="https://github.com/ggml-org/llama.cpp"; NATIVE=ON; ACTS=0; RPC=0; CUDA_ARCH=""; EXTRA=""; JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dir) DIR="$2"; shift 2 ;;
     --backend) BACKEND="$2"; shift 2 ;;
     --ref) REF="$2"; shift 2 ;;
-    --repo) REPO="$2"; shift 2 ;;
+    --repo) REPO="$2"; REPO_SET=1; shift 2 ;;
     -j) JOBS="$2"; shift 2 ;;
     --portable) NATIVE=OFF; shift ;;
     --server-activations) ACTS=1; shift ;;
     --rpc) RPC=1; shift ;;
     --cuda-arch) CUDA_ARCH="$2"; shift 2 ;;
     --cmake) EXTRA="$2"; shift 2 ;;
-    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
     *) echo "unknown option $1" >&2; exit 1 ;;
   esac
 done
@@ -77,6 +79,15 @@ if [[ "$RPC" == 1 ]]; then FLAGS+=(-DGGML_RPC=ON); TARGETS+=(rpc-server); fi
 if [[ ! -d "$DIR/.git" ]]; then
   # Shallow: the history is ~1 GB and nothing here needs it (--ref fetches a pinned commit).
   git clone --depth 1 "$REPO" "$DIR"
+elif [[ "$REPO_SET" == 1 ]]; then
+  # A fork must not be built inside a clone of another repository (or the reverse): the result would be neither.
+  have="$(git -C "$DIR" remote get-url origin 2>/dev/null || true)"
+  norm() { local u="${1%/}"; u="${u%.git}"; echo "${u,,}"; }
+  if [[ "$(norm "$have")" != "$(norm "$REPO")" ]]; then
+    echo "$DIR is a clone of ${have:-an unknown repository}, not $REPO." >&2
+    echo "Build the fork in its own directory: --dir ~/$(basename "${REPO%.git}")" >&2
+    exit 1
+  fi
 fi
 if [[ -n "$REF" ]]; then git -C "$DIR" fetch --depth 1 "$REPO" "$REF" && git -C "$DIR" checkout FETCH_HEAD; fi
 rm -rf "$DIR/tools/cett-dump"

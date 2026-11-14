@@ -24,11 +24,19 @@ Each purpose has a one-line `summary` and optional `notes`. The validator refuse
 shell metacharacters in build flags and any PyTorch index that is not
 `download.pytorch.org`, so a shared profile cannot run arbitrary commands.
 
+A purpose can build a llama.cpp fork instead of llama.cpp: `llama.repo` names it
+(`https://github.com/OWNER/NAME`; nothing but GitHub is accepted) and `llama.ref`
+pins a tag, branch or commit. The fork builds in its own directory (`~/NAME`), and
+the plan says plainly that the code comes from that repository. A fork runs code
+nobody here reviewed, so apply such a profile only if you trust the repository.
+The built-in `amd-gfx906-mx` builds mx-llama.cpp for the MI50
+([MX_LLAMA.md](MX_LLAMA.md)).
+
 ## Where they come from
 
 | Source | Location | Shown as |
 |---|---|---|
-| Built-in | `profiles/hardware/` (legacy and modern NVIDIA, AMD ROCm and legacy GCN, Intel, Apple, iGPU/APU, x86 CPU, ARM, and MI50 and Maxwell cards on ARM hosts (docs/PROXMOX.md)) | built-in |
+| Built-in | `profiles/hardware/` (legacy and modern NVIDIA, AMD ROCm and legacy GCN, Intel, Apple, iGPU/APU, x86 CPU, ARM, MI50 and Maxwell cards on ARM hosts (docs/PROXMOX.md), and the MI50 with mx-llama.cpp) | built-in |
 | Yours | `~/.omnicortex/hw-profiles/` | yours |
 | Community | an accepted board's `profiles/accepted/` | community |
 

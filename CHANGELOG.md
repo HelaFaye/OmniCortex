@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added (mx-llama.cpp)
+
+- [mx-llama.cpp](docs/MX_LLAMA.md), a llama.cpp fork tuned for the MI50 (gfx906), builds and serves like llama.cpp:
+  - the hardware profile `amd-gfx906-mx` builds it with HIP for gfx906 in `~/mx-llama.cpp`;
+  - profiles can name a fork (`llama.repo`, GitHub only) and pin it (`llama.ref`);
+  - `build_llama_tools.sh` refuses to build a fork inside a clone of another repository;
+  - Studio has split mode `tensor` in the load panel, **Tensor parallel GPUs** (`-tps`, refused without split
+    mode `tensor`), loading mode `dio`, and the documented environment settings `GGML_ENABLE_CUSTOM_AR`,
+    `HSA_FORCE_FINE_GRAIN_PCIE` and `GOMP_SPINCOUNT`.
+- cett-dump and the server activations patch build into the fork unchanged. Its binaries pass the llama.cpp
+  integration tests against PyTorch (CPU backend; the HIP build is untested without a card).
+
 ### Security
 
 - PyTorch files from elsewhere can no longer run code when loaded. These now load with PyTorch's weights-only

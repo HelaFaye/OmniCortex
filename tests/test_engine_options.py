@@ -127,3 +127,15 @@ def test_studio_api_and_load(tmp_path):
         assert st == 500 and "vLLM" in r["message"]
     finally:
         next(gen, None)
+
+
+def test_mx_llama_options():
+    """mx-llama.cpp: tensor parallel groups (-tps) and direct-I/O loading (-lm dio); a build without -tps leaves it
+    out with a note rather than failing to start."""
+    mx = NEW | {"-tps"}
+    assert eo.build_args({"tensor_parallel": 2, "load_mode": "dio"}, "llama", mx)[0] == ["-lm", "dio", "-tps", "2"]
+    assert eo.build_args({"tensor_parallel": 0}, "llama", mx)[0] == ["-tps", "0"]
+    args, notes = eo.build_args({"tensor_parallel": 2}, "llama", NEW)
+    assert args == [] and "no such option" in notes[0]
+    assert eo.build_args({"tensor_parallel": 2}, "vllm", None)[0] == ["--tensor-parallel-size", "2"]
+    assert eo.build_env({"env": {"GGML_ENABLE_CUSTOM_AR": "0"}}) == {"GGML_ENABLE_CUSTOM_AR": "0"}

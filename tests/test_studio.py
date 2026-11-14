@@ -640,7 +640,11 @@ def test_multi_gpu_flags_and_vram_fit(studio_srv, monkeypatch):
     assert ok and seen["env"]["CUDA_VISIBLE_DEVICES"] == "0,1,2,3"
     c = seen["cmd"]
     assert c[c.index("-sm") + 1] == "layer" and c[c.index("-ts") + 1] == "1,1,1,1" and c[c.index("-mg") + 1] == "0"
-    for bad in ({"gpus": "0;rm"}, {"split_mode": "fast"}, {"tensor_split": "1,a"}):
+    ok, _ = studio.start_server(m, {**studio.DEFAULTS, "split_mode": "tensor", "tensor_parallel": 2}, 9999)
+    c = seen["cmd"]
+    assert ok and c[c.index("-sm") + 1] == "tensor"         # -tps itself depends on the build (engine options)
+    for bad in ({"gpus": "0;rm"}, {"split_mode": "fast"}, {"tensor_split": "1,a"},
+                {"split_mode": "layer", "tensor_parallel": 2}):
         ok, why = studio.start_server(m, {**studio.DEFAULTS, **bad}, 9999)
         assert not ok, bad
     studio.PROC.update({"proc": None, "model": None, "port": None})

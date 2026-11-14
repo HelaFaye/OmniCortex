@@ -34,6 +34,8 @@ SCHEMA = "omnicortex-hw-profile/1"
 PURPOSES = ("general", "inference", "retraining")
 BACKENDS = ("cpu", "cuda", "hip", "vulkan", "metal", "sycl")
 ID_RE = re.compile(r"[a-z0-9][a-z0-9._-]{1,63}")
+UPSTREAM = "https://github.com/ggml-org/llama.cpp"
+REPO_RE = re.compile(r"https://github\.com/[A-Za-z0-9][\w.-]{0,38}/[\w.-]{1,100}?(\.git)?")
 USER_DIR = Path(os.environ.get("OC_HOME") or Path.home() / ".omnicortex").expanduser() / "hw-profiles"
 
 
@@ -67,6 +69,10 @@ def validate(p: dict) -> dict:
             raise ProfileError(f"{name}: llama.backend must be one of {', '.join(BACKENDS)}")
         if ll.get("cmake") and not re.fullmatch(r"(-D[A-Za-z0-9_]+=[\w.;:/+-]*\s*)*", ll["cmake"]):
             raise ProfileError(f"{name}: llama.cmake may only hold -DNAME=value flags")
+        if ll.get("repo") and not REPO_RE.fullmatch(str(ll["repo"])):
+            raise ProfileError(f"{name}: llama.repo must be a GitHub repository, https://github.com/OWNER/NAME")
+        if ll.get("ref") and not re.fullmatch(r"[\w][\w.\-/]{0,99}", str(ll["ref"])):
+            raise ProfileError(f"{name}: llama.ref is a tag, branch or commit")
         if ll.get("cuda_arch") and not re.fullmatch(r"[0-9]+(-real|-virtual)?(;[0-9]+(-real|-virtual)?)*", ll["cuda_arch"]):
             raise ProfileError(f"{name}: llama.cuda_arch looks like 61-real;70-real")
         t = spec.get("torch") or {}
@@ -193,17 +199,28 @@ def plan(p: dict, purpose: str | None = None, python: str | None = None, llama_d
     name, spec = purpose_of(p, purpose)
     steps = []
     ll = spec.get("llama") or {}
+    repo, fork = "", False
     if ll:
         cmd = ["bash", str(HERE / "build_llama_tools.sh"), "--backend", ll["backend"]]
+        repo = str(ll.get("repo") or "").removesuffix(".git")
+        fork = bool(repo) and repo.lower() != UPSTREAM.lower()
+        if fork:
+            cmd += ["--repo", repo]
+        if ll.get("ref"):
+            cmd += ["--ref", ll["ref"]]
         if llama_dir:
             cmd += ["--dir", llama_dir]
+        elif fork:
+            # a fork gets its own checkout, so it never replaces (or is built inside) a clone of llama.cpp itself
+            cmd += ["--dir", str(Path.home() / repo.rsplit("/", 1)[-1])]
         if ll.get("cuda_arch"):
             cmd += ["--cuda-arch", ll["cuda_arch"]]
         if not ll.get("native", False):
             cmd += ["--portable"]
         if ll.get("cmake"):
             cmd += ["--cmake", ll["cmake"]]
-        steps.append({"id": "llama", "title": f"Build llama.cpp for {ll['backend']}" +
+        what = f"{repo.split('github.com/', 1)[-1]} (a llama.cpp fork)" if fork else "llama.cpp"
+        steps.append({"id": "llama", "title": f"Build {what} for {ll['backend']}" +
                       (f" ({ll['toolkit']})" if ll.get("toolkit") else ""), "cmd": cmd})
     t = spec.get("torch") or {}
     if t:
@@ -213,7 +230,9 @@ def plan(p: dict, purpose: str | None = None, python: str | None = None, llama_d
                       "cmd": cmd})
     return {"profile": p["id"], "title": p["title"], "purpose": name, "summary": spec["summary"], "steps": steps,
             "engine": spec.get("engine") or {}, "training": spec.get("training") or {}, "env": spec.get("env") or {},
-            "notes": [x for x in (spec.get("notes"), p.get("notes")) if x]}
+            "notes": [x for x in (spec.get("notes"), p.get("notes")) if x] +
+                     ([f"This builds code from {repo}, not from llama.cpp itself: use a profile like this only if you "
+                       "trust that repository."] if fork else [])}
 
 
 def apply(pl: dict, dry_run: bool = False, log=print) -> int:

@@ -66,9 +66,10 @@ OPTIONS = [
     ("no_kv_offload", "Memory and KV cache", "Keep the KV cache in system RAM", "bool", False, None,
      "Frees GPU memory for layers at the cost of speed.", {"llama": ["-nkvo", "--no-kv-offload"]}),
     ("load_mode", "Memory and KV cache", "Loading mode", "choice", None,
-     ["auto", "mmap", "mlock", "mmap+mlock", "none"],
+     ["auto", "mmap", "mlock", "mmap+mlock", "none", "dio"],
      "mmap maps the file (fast start, pages can be evicted); mlock keeps the model resident in RAM; none reads it "
-     "in. Newer llama.cpp; older builds have the two options below instead.", {"llama": ["-lm", "--load-mode"]}),
+     "in; dio reads it with direct I/O, past the page cache (mx-llama.cpp on gfx906 needs it: mmap hangs there). "
+     "Newer llama.cpp; older builds have the two options below instead.", {"llama": ["-lm", "--load-mode"]}),
     ("mlock", "Memory and KV cache", "Lock the model in RAM", "bool", False, None,
      "Prevents the OS from paging weights out (needs enough RAM and permission).", {"llama": ["--mlock"]}),
     ("no_mmap", "Memory and KV cache", "Load into memory instead of mapping the file", "bool", False, None,
@@ -130,8 +131,10 @@ OPTIONS = [
      "devices then hold layers like local ones. Use only on a trusted network or a VPN; rpc-server has no "
      "authentication.", {"llama": ["--rpc"]}),
     ("tensor_parallel", "Devices", "Tensor parallel GPUs", "int", None, None,
-     "vLLM: shard every layer across N GPUs (needs fast links; do not use across vendors).",
-     {"vllm": ["--tensor-parallel-size", "-tp"]}),
+     "Shard every layer across N GPUs (needs fast links; do not use across vendors). vLLM: -tp N. llama.cpp: only "
+     "builds with -tps (mx-llama.cpp), together with split mode 'tensor'; N GPUs form each tensor-parallel group "
+     "and the groups become pipeline stages. N must divide the GPU count; 0 puts every GPU in one group.",
+     {"vllm": ["--tensor-parallel-size", "-tp"], "llama": ["-tps", "--tensor-parallel-size"]}),
     ("pipeline_parallel", "Devices", "Pipeline parallel stages", "int", None, None,
      "vLLM: split the layers into N consecutive stages, one handoff per token. The better choice when devices "
      "differ in speed or are linked by a slow bus.", {"vllm": ["--pipeline-parallel-size", "-pp"]}),
@@ -175,6 +178,12 @@ ENV_OPTIONS = {
     "GGML_VK_PREFER_HOST_MEMORY": "Vulkan: 1 places buffers in host memory (iGPUs).",
     "GGML_CUDA_ENABLE_UNIFIED_MEMORY": "CUDA: 1 lets the model spill into system RAM instead of failing.",
     "OMP_NUM_THREADS": "CPU threads for OpenMP builds.",
+    "GOMP_SPINCOUNT": "OpenMP builds: how long idle threads spin before sleeping (libgomp's default is 300000). "
+                      "Higher can speed up generation when several CPU jobs run per token; measure it first.",
+    "GGML_ENABLE_CUSTOM_AR": "mx-llama.cpp multi-GPU: 0 turns off its peer-write AllReduce. Keep it off on hosts "
+                             "without coherent peer-to-peer PCIe (RK3588) until a parity check passes.",
+    "HSA_FORCE_FINE_GRAIN_PCIE": "ROCm: 1 makes host memory fine-grained over PCIe. Needs cache-coherent PCIe: "
+                                 "never on RK3588.",
 }
 ENV_NAME = re.compile(r"[A-Z][A-Z0-9_]{1,63}")
 
