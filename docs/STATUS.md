@@ -91,27 +91,55 @@ In this order unless you reorder it.
    - H-neuron activity;
    - whether the truth probe still works.
 
-   Together these say whether a quant kept what the model knows.
+   Together these say whether a quant kept what the model knows. Also: does greedy output match across backends
+   (CPU, Vulkan, ROCm, CUDA)? Llaminar gets identical text from Qwen3-0.6B Q8_0 on ARM NEON and x86, so a
+   mismatch is worth a look rather than being assumed normal.
 3. **A size budget per layer (from IST-DASLab's RCO):** pick each layer's quantization type to hit an exact size,
    protecting the layers OmniCortex measures as important. The output is llama.cpp `--tensor-type` overrides.
    Item 2 measures the result.
-4. **fp16 headroom check (from mi50-vllm-lab):**
-   - **The risk:** on cards without bf16 (MI50, Maxwell), a bf16-trained model's hidden state can pass fp16's
-     maximum and turn into inf/NaN.
-   - **The check:** reports each layer's peak against that limit.
-   - **The fix:** scaling by a power of two at load time, which leaves the output unchanged.
-   - Tied into the gfx906 and Maxwell profiles.
-5. **A/B tests of settings with an output check (from the Strata MI50 fork):** a fixed greedy prompt set, answer
-   hashes and timing, so a setting is kept only if it's faster and changes no answer, or if the changed answers are
-   shown.
-6. **A benchmark shaped like coding agents (from Maya's agent benchmark and Strata's protocol):** concurrent
-   conversations, shared system prompts, cold restarts and frozen prompts with a checksum, so community speed reports
-   compare like with like.
+4. **fp16 range check, for every card without bf16 (from mi50-vllm-lab and Llaminar):**
+   - **Which cards:** every hardware profile whose card has no bfloat16 arithmetic:
+     - AMD gfx906 (MI50, MI60, Radeon VII) and older GCN;
+     - NVIDIA before Ampere (Maxwell, including the Tesla M10; Pascal; Volta; Turing);
+     - Apple M1.
+
+     Each of those profiles gets a field saying so, and the check runs by default for them.
+   - **The risk:** a model trained in bf16 can hold values outside fp16's range:
+     - **Too large:** above 65504 a value becomes inf, and then NaN.
+     - **Too small:** below about 6.1e-5 a value loses precision, and below about 6e-8 it becomes zero.
+
+     A model can also be fine in one tensor and broken in the next.
+   - **The check:** for each tensor and each layer's activations, on a short calibration text, it reports:
+     - the peak against fp16's maximum;
+     - the share of values that would lose precision or become zero.
+   - **One rounding rule:** wherever OmniCortex narrows a value to fp16, it uses one rule (round to nearest, ties
+     to even, keeping the small values fp16 can still hold), the same on CPU and GPU. Llaminar converts fp16 in
+     software for this reason: the hardware instruction rounds the smallest values by a different rule from the
+     one its other devices use, which would break their agreement.
+   - **The fix:**
+     - **Scaling** by a power of two at load time, which leaves the output unchanged. It has to be chosen against
+       both limits, because scaling down to avoid overflow pushes small values toward zero.
+     - **Per-tensor choice** when one scale can't fit a tensor: keep that tensor in bf16 or fp32 and make the rest
+       fp16, as llama.cpp `--tensor-type` overrides (the same output as item 3).
+   - **The proof:** item 2's KL divergence and top-1 agreement against the original model decide each choice. Llaminar
+     chose fp16 over bf16 for one model's sensitive values the same way, by measuring how much the output changed.
+5. **A/B tests of settings with an output check (from the Strata MI50 fork and Llaminar's ARM performance
+   review):** a fixed greedy prompt set, answer hashes and timing. A setting is kept only if it's faster and changes
+   no answer, or if the changed answers are shown. Llaminar's method, adopted as the rules:
+   - **Alternate:** run A B B A, at least two fresh processes per side, and average, so warm-up and heat don't
+     favour whichever ran first.
+   - **Check the setting took effect** in each run (the run records it), rather than trusting the command line.
+   - **Judge on the whole model only.** Llaminar's per-shape kernel tables won 20–25% in isolated benchmarks but
+     lost 4–7% inside the model. Removing them gave +4% generation and +9–11% prompt processing.
+   - **Report noise:** the spread across repeats goes beside every difference, and a difference smaller than the
+     spread isn't reported as a win.
 7. **gfx906 profile updates:**
    - optional MI50-tuned llama.cpp forks (Castagna Veloce, mx-llama.cpp), built with `--repo`, with a check that
      cett-dump still builds into them;
    - a note that official ROCm 7 images no longer include gfx906 rocBLAS kernels.
-8. **Llaminar ARM64 backports to mi50-arm and m10-arm.** Those are separate repositories; see their own docs.
+8. **Llaminar ARM64 backports to mi50-arm and m10-arm.** Those are separate repositories; see their own docs. Open
+   there: `arm-cpu.sh` (what the CPU can run), `gpu-parity.sh` (GPU against CPU) and `cpu-threads-bench.sh`
+   (fast cores against every core, and a longer thread spin, measured on a model).
 
 ## Decisions on record
 
@@ -119,4 +147,10 @@ In this order unless you reorder it.
   intrinsic; the job no longer fails the run.
 - **The Claude GitHub App isn't installed** on the repositories, so CI and review events don't reach the assistant.
   It checks pull requests itself.
+- **The fp16 range check applies to every card without bf16**, not only the MI50 (item 4).
+- **Not taken from Llaminar:**
+  - its NEON and gfx906 kernels: llama.cpp already uses the same nibble lookups (`vqtbl1q_s8` on ARM, `v_perm_b32`
+    on AMD), for MXFP4 too;
+  - running Llaminar as an engine: on GB10, llama.cpp's CUDA backend is ahead at prompt processing (1063 against
+    319 tokens/s) and generation (28.8 against 22.8).
 - **No refusal-removal weight edits** (like Project Maya's "Derisked" quant) are planned.
