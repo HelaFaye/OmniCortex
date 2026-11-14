@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added (Kivy client, first part)
+
+- `clients/kivy/omnicortex_client/api.py`: the Studio client the Kivy app will use, plain Python. It covers pairing
+  from a Studio link (device token, certificate pinned by fingerprint, the same rules as `scripts/oc_pairing.py`),
+  models, chat and streaming chat, the reply checks (`/api/trace`, `/api/truth`), the review lookup, and a saved
+  pairing (0600). Tested against a fake Studio over TLS. The interface comes next.
+- docs/STATUS.md: progress, what is checked on real hardware, and the plan.
+
 ### Added (Proxmox backend)
 
 - `scripts/proxmox_lxc.py` runs OmniCortex (the remote agent or Studio) in an LXC container on a Proxmox VE host,
