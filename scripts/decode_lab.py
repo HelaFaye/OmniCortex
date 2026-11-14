@@ -124,7 +124,8 @@ def load_vector(path: str, direction: int = 0, layer: int | None = None):
         import numpy as np
         v = torch.tensor(np.load(p)).float()
     else:
-        obj = torch.load(p, map_location="cpu", weights_only=False)
+        from safe_load import torch_load      # weights only: no code from the file
+        obj = torch_load(p)
         if isinstance(obj, dict):
             obj = obj.get("basis", obj.get("directions", next(iter(obj.values()))))
         v = torch.as_tensor(obj).float()

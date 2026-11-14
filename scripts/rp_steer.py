@@ -224,7 +224,8 @@ class Steerer:
 
     def __init__(self, path: str, alpha: float = 1.0, mode: str = "direction", layers=None, device=None):
         import torch
-        obj = torch.load(path, map_location="cpu", weights_only=False)
+        from safe_load import torch_load      # weights only: no code from the file
+        obj = torch_load(path)
         self.alpha, self.mode = float(alpha), mode
         if mode not in ("direction", "subspace"):
             raise ValueError("rp mode: direction or subspace")
@@ -326,7 +327,8 @@ def cmd_export(a) -> int:
         import gguf
     except ImportError:
         raise SystemExit("pip install gguf (the package that ships with llama.cpp)")
-    obj = torch.load(a.file, map_location="cpu", weights_only=False)
+    from safe_load import torch_load      # weights only: no code from the file
+    obj = torch_load(a.file)
     w = gguf.GGUFWriter(a.out, "controlvector")
     w.add_string("controlvector.model_hint", str(obj.get("arch") or "llama"))
     w.add_uint32("controlvector.layer_count", len(obj["layers"]))
