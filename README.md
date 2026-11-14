@@ -33,6 +33,8 @@ name. For an existing install:
 
 Prebuilt binaries for Windows, macOS and Linux (x64, x86, ARM64, ARM): [docs/BINARIES.md](docs/BINARIES.md).
 
+Progress, what has been checked on real hardware, and the plan: [docs/STATUS.md](docs/STATUS.md).
+
 ## What's in the box
 
 | Area | What it does | Guide |

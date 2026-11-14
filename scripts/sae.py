@@ -421,7 +421,8 @@ def load(path: str | Path, device: str = "cpu") -> tuple[SAE, dict]:
                 raise FileNotFoundError(f"{p}: no dictionary weights found")
             p = cands[0]
     if p.suffix == ".pt":
-        obj = torch.load(p, map_location="cpu", weights_only=False)
+        from safe_load import torch_load      # weights only: no code from the file
+        obj = torch_load(p)
         if isinstance(obj, dict) and "state" in obj and "cfg" in obj:
             c = obj["cfg"]
             sae = SAE(c["d_in"], c["n_features"], c["arch"], c.get("k", 32), c.get("d_out"),

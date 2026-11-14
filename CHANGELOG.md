@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Security
+
+- PyTorch files from elsewhere can no longer run code when loaded. These now load with PyTorch's weights-only
+  loader (`scripts/safe_load.py`):
+  - feature dictionaries (`sae.py`);
+  - steering vectors (`decode_lab.py`, `rp_steer.py`);
+  - emotion vectors (`emotions.py`).
+
+  OmniCortex's own files are unaffected. `OC_TRUST_PICKLE=1` allows the full loader for a file you made.
+
+### Added (Kivy client, first part)
+
+- `clients/kivy/omnicortex_client/api.py`: the Studio client the Kivy app will use, plain Python. It covers pairing
+  from a Studio link (device token, certificate pinned by fingerprint, the same rules as `scripts/oc_pairing.py`),
+  models, chat and streaming chat, the reply checks (`/api/trace`, `/api/truth`), the review lookup, and a saved
+  pairing (0600). Tested against a fake Studio over TLS. The interface comes next.
+- docs/STATUS.md: progress, what is checked on real hardware, and the plan.
+
 ### Added (Proxmox backend)
 
 - `scripts/proxmox_lxc.py` runs OmniCortex (the remote agent or Studio) in an LXC container on a Proxmox VE host,
