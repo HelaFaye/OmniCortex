@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added (Kivy client, desktop app)
+
+- `clients/kivy`: the OmniCortex client app for the desktop (`python clients/kivy/main.py`). It has three screens:
+  - **pair** from Studio's link;
+  - **chat** with model choice and streamed replies, plus each reply's risk strip and truth-probe check;
+  - **review**: the unified review lookup for a model.
+
+  The logic lives in `omnicortex_client/controller.py`, apart from Kivy, and is tested against a fake Studio
+  over TLS. The screens are built on a virtual display when Kivy and Xvfb are present. Android (Buildozer) and
+  pairing by QR code come next.
+
 ### Added (mx-llama.cpp)
 
 - [mx-llama.cpp](docs/MX_LLAMA.md), a llama.cpp fork tuned for the MI50 (gfx906), builds and serves like llama.cpp:

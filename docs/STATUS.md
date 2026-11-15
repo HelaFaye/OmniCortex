@@ -27,7 +27,7 @@ The **Checked** column says how far each piece has been verified:
 | Faster activation capture ([PIPELINE.md](PIPELINE.md)) | `device`, `stream` and `auto` capture modes | CI on the CPU; GPU modes not on hardware |
 | Proxmox backend ([PROXMOX.md](PROXMOX.md)) | OmniCortex in an LXC container with the host's GPUs; MI50 VBIOS check | Simulated hosts |
 | CI (`.github/workflows/tests.yml`, `binaries.yml`) | Tests with cached models and a cached llama.cpp build; binaries for 10 targets | Green except 32-bit Windows (best-effort, llama.cpp's own source) |
-| Kivy client ([MOBILE_CLIENTS.md](MOBILE_CLIENTS.md)) | Python/Kivy app for Studio | The API layer only (`clients/kivy`): pairing with certificate pinning, models, streaming chat, reply checks, review lookup. CI against a fake Studio over TLS. No interface yet |
+| Kivy client ([MOBILE_CLIENTS.md](MOBILE_CLIENTS.md)) | Python/Kivy app for Studio | Desktop app (`clients/kivy`): pairing with certificate pinning, model choice, streamed chat, the risk strip, the truth probe, the review lookup. CI against a fake Studio over TLS; the real app driven on a virtual display against a fake Studio. Not yet against a real Studio, on Android, or with QR pairing |
 
 Companion repositories, both merged:
 - **mi50-arm #1:** a VBIOS check in `check-mi50.sh`, and which MI50 VBIOSes can shrink BAR0 on RK3588.
@@ -79,12 +79,9 @@ None of these can be done in a cloud container. Each turns an "untested" note in
 In this order unless you reorder it.
 
 1. **Kivy client interface:**
-   - pair by link or QR code;
-   - chat with model choice and streaming;
-   - the reply checks (risk strip, truth probe);
-   - the review lookup.
-
-   Desktop first, then Android through Buildozer.
+   - **done, desktop:** pairing by link, chat with model choice and streaming, the reply checks (risk strip,
+     truth probe), the review lookup (`clients/kivy/README.md`);
+   - **next:** the Android build through Buildozer, with pairing by QR code from the camera.
 2. **Quantization fidelity (from Project Maya's quality reports):** compare a quantized model with its original:
    - top-1 next-token agreement and KL divergence (llama.cpp's `llama-perplexity --kl-divergence`);
    - TestQA's confident mistakes;
