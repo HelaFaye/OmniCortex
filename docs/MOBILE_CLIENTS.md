@@ -31,7 +31,7 @@ It has no custom server address yet, so it cannot talk to an OmniCortex Studio.
    - Apple A- and M-series through Metal.
 
    The unified review's speed reports per hardware can then include phones.
-5. **An OmniCortex client in Kivy (M)** *(in progress: the desktop app is in `clients/kivy`, covering pairing, streamed chat, the risk strip, the truth probe and the review lookup; the Android build and QR pairing are next)*. Python and [Kivy](https://kivy.org), so the client shares code with the
+5. **An OmniCortex client in Kivy (M)** *(in progress: `clients/kivy` has pairing by link or QR code, streamed chat, the risk strip, the truth probe, the emotion jewel, Fix This Mistake and the review lookup; it runs on the desktop, and CI builds the Android APK, which nobody has run on a phone yet)*. Python and [Kivy](https://kivy.org), so the client shares code with the
    rest of OmniCortex (`scripts/plugin_api.py`, the TestQA grader, the review lookup) instead of rewriting it in
    another language:
    - desktop (Linux, Windows, macOS) runs it with `pip install kivy`;

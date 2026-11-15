@@ -72,6 +72,23 @@ def truth_summary(r: dict) -> str:
     return "\n".join(lines)
 
 
+def emotion_summary(r: dict, n: int = 4) -> str:
+    """The reply's strongest emotions by their mean z (from Studio's /api/emotions)."""
+    pairs = sorted(zip(r.get("names") or [], r.get("mean") or []), key=lambda t: -abs(t[1]))[:n]
+    if not pairs:
+        return "No emotion readings."
+    return "Emotions over the reply: " + ", ".join(f"{name} {z:+.1f}" for name, z in pairs) + \
+        " (z against the emotion stories; 0 is typical)."
+
+
+def fix_summary(r: dict) -> str:
+    n = r.get("pending", 0)
+    s = f"Kept for training: {n} pair{'' if n == 1 else 's'} waiting."
+    if r.get("auto_train"):
+        s += f" A short tune runs after {r.get('min_pairs')} pairs, when Studio's computer is idle."
+    return s
+
+
 def _fmt_value(s: dict) -> str:
     v, unit = s.get("value"), s.get("unit")
     if isinstance(v, (int, float)):
@@ -107,6 +124,7 @@ class Message:
     check: str = ""          # Kivy markup of the risk strip, once checked
     note: str = ""           # summary of the reply checks
     model: str = ""
+    emotions: dict | None = None   # Studio's /api/emotions answer, for the jewel
 
 
 @dataclass
@@ -232,6 +250,27 @@ class Client:
             on_done(reply)
         self._bg(lambda: self.studio.truth(self._context(reply), reply.content, alts, reply.model or None),
                  ok, on_error, background)
+
+    def emotions(self, reply: Message, on_done, on_error, background: bool = True):
+        """The emotion vectors over this reply, for the jewel."""
+        def ok(r):
+            reply.emotions = r
+            reply.note = emotion_summary(r)
+            on_done(reply)
+        self._bg(lambda: self.studio.emotions(self._context(reply), reply.content, reply.model or None),
+                 ok, on_error, background)
+
+    def fix(self, reply: Message, correction: str, note: str, on_done, on_error, background: bool = True):
+        """Fix This Mistake: what the reply should have said, kept in Studio as a training pair."""
+        correction = correction.strip()
+        if not correction or correction == reply.content.strip():
+            return on_error("write the reply it should have given (different from this one)")
+
+        def ok(r):
+            reply.note = fix_summary(r)
+            on_done(reply)
+        self._bg(lambda: self.studio.fix(self._context(reply), reply.content, correction, note.strip(),
+                                         reply.model or None), ok, on_error, background)
 
     def lookup(self, model: str, on_done, on_error, background: bool = True):
         model = model.strip()

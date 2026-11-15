@@ -15,12 +15,13 @@ from kivy.app import App
 from kivy.clock import Clock
 from kivy.lang import Builder
 from kivy.metrics import dp
-from kivy.properties import ObjectProperty, StringProperty
+from kivy.properties import BooleanProperty, ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import Screen
 
 from .controller import Client
+from .jewel import EmotionJewel  # noqa: F401  (registers the widget for the layout)
 
 KV = """
 #:import dp kivy.metrics.dp
@@ -31,10 +32,6 @@ KV = """
     text_size: self.width, None
     size_hint_y: None
     height: self.texture_size[1]
-
-<Btn@Button>:
-    size_hint_y: None
-    height: dp(44)
 
 <PairScreen>:
     BoxLayout:
@@ -62,9 +59,16 @@ KV = """
             multiline: False
             size_hint_y: None
             height: dp(44)
-        Btn:
-            text: 'Pair'
-            on_release: root.pair(link.text, name.text)
+        BoxLayout:
+            size_hint_y: None
+            height: dp(44)
+            spacing: dp(8)
+            Button:
+                text: 'Pair'
+                on_release: root.pair(link.text, name.text)
+            Button:
+                text: 'Scan QR code'
+                on_release: app.scan_qr()
         Small:
             id: status
             text: root.status
@@ -98,16 +102,41 @@ KV = """
         height: self.texture_size[1] if root.note else 0
     BoxLayout:
         size_hint_y: None
+        height: dp(130) if root.has_jewel else 0
+        opacity: 1 if root.has_jewel else 0
+        spacing: dp(8)
+        EmotionJewel:
+            id: jewel
+            size_hint_x: None
+            width: dp(130)
+        BoxLayout:
+            orientation: 'vertical'
+            Label:
+                text: root.legend
+                markup: True
+                font_size: '13sp'
+                text_size: self.size
+                valign: 'middle'
+            Small:
+                text: jewel.caption
+    BoxLayout:
+        size_hint_y: None
         height: dp(36) if root.role == 'assistant' else 0
         opacity: 1 if root.role == 'assistant' else 0
         disabled: root.role != 'assistant'
         spacing: dp(6)
         Button:
-            text: 'Check (risk strip)'
+            text: 'Risk'
             on_release: app.check(root)
         Button:
-            text: 'Truth probe…'
+            text: 'Truth…'
             on_release: app.ask_truth(root)
+        Button:
+            text: 'Emotions'
+            on_release: app.emotions(root)
+        Button:
+            text: 'Fix…'
+            on_release: app.ask_fix(root)
 
 <ChatScreen>:
     BoxLayout:
@@ -232,6 +261,8 @@ class MessageView(BoxLayout):
     header = StringProperty("")
     body = StringProperty("")
     note = StringProperty("")
+    legend = StringProperty("")
+    has_jewel = BooleanProperty(False)
     message = ObjectProperty(None, allownone=True)
 
     def show(self, m):
@@ -240,6 +271,14 @@ class MessageView(BoxLayout):
         self.header = "You" if m.role == "user" else (m.model if m.model and m.model != "auto" else "Model")
         self.body = m.check or escape_markup(m.content) or "…"
         self.note = m.note
+        if m.emotions and m.emotions is not getattr(self, "_shown", None):
+            self._shown = m.emotions
+            self.has_jewel = True
+            self.ids.jewel.set_data(m.emotions)
+            # ● is not in Kivy's default font: a coloured block marks each lane
+            self.legend = "\n".join(
+                f"[color={c.lstrip('#')}][b]|[/b][/color] {escape_markup(n)} {v:+.1f}"
+                for n, c, v in zip(m.emotions.get("names", []), m.emotions.get("colors", []), m.emotions.get("mean", [])))
 
 
 class OmniCortexApp(App):
@@ -248,7 +287,10 @@ class OmniCortexApp(App):
     def build(self):
         Builder.load_string(KV)
         from kivy.uix.screenmanager import ScreenManager
-        self.client = Client(data_dir=os.environ.get("OC_CLIENT_DIR"), post=lambda fn: Clock.schedule_once(lambda dt: fn()))
+        from .qr import on_android
+        # Android: the app's private folder (no other app can read the device token); desktop: ~/.config/omnicortex
+        data_dir = os.environ.get("OC_CLIENT_DIR") or (self.user_data_dir if on_android() else None)
+        self.client = Client(data_dir=data_dir, post=lambda fn: Clock.schedule_once(lambda dt: fn()))
         sm = ScreenManager()
         for s in (PairScreen(name="pair"), ChatScreen(name="chat"), LookupScreen(name="lookup")):
             sm.add_widget(s)
@@ -280,6 +322,21 @@ class OmniCortexApp(App):
             return self.say(str(e), error=True, where="pair")
         self.root.current = "chat"
         self.after_pair()
+
+    def scan_qr(self):
+        from . import qr
+        scr = self.screen("pair")
+        scr.status = "Point the camera at the QR code in Studio (Connect, then Pair a device)…"
+
+        def found(link):
+            def go():
+                scr.ids.link.text = link
+                self.pair(link, scr.ids.name.text)
+            Clock.schedule_once(lambda dt: go())
+
+        def failed(msg):
+            Clock.schedule_once(lambda dt: self.say(msg, error=True, where="pair"))
+        qr.scan(found, failed)
 
     def after_pair(self):
         w = self.client.warning()
@@ -378,6 +435,40 @@ class OmniCortexApp(App):
             self.client.truth(view.message, alts.text.splitlines(), on_done=lambda m: (self.view_for(m), self.say("")),
                               on_error=lambda e: self.say(e, error=True))
         go.bind(on_release=run)
+        pop.open()
+
+    def emotions(self, view):
+        self.say("Reading the emotion vectors…")
+        self.client.emotions(view.message, on_done=lambda m: (self.view_for(m), self.say("")),
+                             on_error=lambda e: self.say(e, error=True))
+
+    def ask_fix(self, view):
+        from kivy.uix.button import Button
+        from kivy.uix.label import Label
+        from kivy.uix.textinput import TextInput
+        box = BoxLayout(orientation="vertical", spacing=dp(6), padding=dp(6))
+        hint = Label(text="Write the reply it should have given. Studio keeps the pair for training.",
+                     size_hint_y=None, height=dp(44))
+        hint.bind(width=lambda w, v: setattr(w, "text_size", (v, None)))
+        box.add_widget(hint)
+        fixed = TextInput(text=view.message.content)
+        box.add_widget(fixed)
+        why = TextInput(hint_text="What was wrong (optional)", multiline=False, size_hint_y=None, height=dp(40))
+        box.add_widget(why)
+        row = BoxLayout(size_hint_y=None, height=dp(44), spacing=dp(6))
+        save, cancel = Button(text="Save the pair"), Button(text="Cancel")
+        row.add_widget(save)
+        row.add_widget(cancel)
+        box.add_widget(row)
+        pop = Popup(title="Fix this mistake", content=box, size_hint=(0.95, 0.8))
+
+        def run(*_):
+            pop.dismiss()
+            self.say("Saving the pair…")
+            self.client.fix(view.message, fixed.text, why.text, on_done=lambda m: (self.view_for(m), self.say("")),
+                            on_error=lambda e: self.say(e, error=True))
+        save.bind(on_release=run)
+        cancel.bind(on_release=pop.dismiss)
         pop.open()
 
     # ------------------------------------------------------------- review lookup

@@ -70,6 +70,15 @@ class FakeStudio(BaseHTTPRequestHandler):
                                     "max": 0.1, "mean": 0.1})
         if self.path == "/api/truth":
             return self._send(200, {"verdict": "consistent", "alternatives": req["alternatives"]})
+        if self.path == "/api/emotions":
+            return self._send(200, {"names": ["calm", "sad"], "colors": ["#ff6b6b", "#4dabf7"], "mean": [0.4, -1.6],
+                                    "z": [[0.2, -1.0], [0.6, -2.2]], "tokens": ["Can", "berra"], "top": [[], []],
+                                    "lanes": req.get("lanes")})
+        if self.path == "/api/harvest":
+            if req["correction"] == "refuse":
+                return self._send(403, {"error": "paired devices may add Fix This Mistake pairs only when allowed"})
+            return self._send(200, {"id": "p1", "pending": 1, "auto_train": False, "min_pairs": 20,
+                                    "echo": [req["reply"], req["correction"], req["note"], req["messages"]]})
         self._send(404, {"error": "no"})
 
 
@@ -168,6 +177,17 @@ def test_controller_pairs_chats_and_checks(studio, tmp_path):
     assert "No token flagged" in reply.note and reply.check == "Canberra."
     c.truth(reply, ["Sydney.", " ", ""], done.append, errors.append, background=False)
     assert reply.note.startswith("The model's activations agree") and not errors
+    c.emotions(reply, done.append, errors.append, background=False)
+    assert reply.emotions["names"] == ["calm", "sad"] and reply.emotions["lanes"] == 6
+    assert reply.note == "Emotions over the reply: sad -1.6, calm +0.4 (z against the emotion stories; 0 is typical)."
+    c.fix(reply, "  ", "", done.append, errors.append, background=False)
+    c.fix(reply, "Canberra.", "", done.append, errors.append, background=False)
+    assert len(errors) == 2 and "should have given" in errors[-1]                 # empty, and unchanged
+    st_fix = []
+    c.fix(reply, "Canberra, in the ACT.", " city ", done.append, errors.append, background=False)
+    assert reply.note == "Kept for training: 1 pair waiting." and len(errors) == 2
+    c.fix(reply, "refuse", "", done.append, st_fix.append, background=False)
+    assert "403" in st_fix[0] and "allowed" in st_fix[0]
     out = []
     c.lookup("acme/coder-7b", out.append, errors.append, background=False)
     assert "accuracy" in out[0] or "Nothing known" in out[0]
@@ -212,6 +232,18 @@ def test_display_text():
                                                  "sources": [{"id": "b", "ok": False, "error": "offline"}]})
 
 
+def test_jewel_colour_mix():
+    import importlib.util
+    if importlib.util.find_spec("kivy") is None:
+        pytest.skip("needs Kivy")
+    os.environ.setdefault("KIVY_NO_ARGS", "1")
+    from omnicortex_client.jewel import hex_rgb, mix
+    assert hex_rgb("#ff0000") == (1.0, 0.0, 0.0) and hex_rgb("0f0") == (0.0, 1.0, 0.0)
+    assert mix(["#ff0000", "#0000ff"], [3.0, 0.0]) == (1.0, 0.0, 0.0)            # all weight on the first lane
+    r, g, b = mix(["#ff0000", "#0000ff"], [0.0, -2.0])                               # below its mean: darker
+    assert r == 0 and b == pytest.approx(0.55) and mix(["#fff"], [0.0]) == (0.5, 0.5, 0.55)
+
+
 def test_kivy_app_screens_build():
     """The real app's layout and screens, on a virtual display (Kivy opens a window for text inputs and scroll
     views). Skipped without Kivy or Xvfb."""
@@ -234,6 +266,10 @@ for s in (A.PairScreen(name="pair"), A.ChatScreen(name="chat"), A.LookupScreen(n
 v = A.MessageView()
 v.show(Message("assistant", "a [b] c", model="acme/coder-7b"))
 assert v.header == "acme/coder-7b" and v.body == "a &bl;b&br; c", (v.header, v.body)
+v.show(Message("assistant", "x", emotions={"names": ["calm"], "colors": ["#ff6b6b"], "mean": [1.0], "z": [[1.0]]}))
+assert v.has_jewel and "calm +1.0" in v.legend and v.ids.jewel.names == ["calm"]
+v.ids.jewel._tick(0.1); v.ids.jewel._tick(0.1)
+assert v.ids.jewel.caption.startswith("the reply's mean")
 v.show(Message("user", "hi"))
 assert v.header == "You"
 print("SCREENS-OK")
@@ -241,3 +277,28 @@ print("SCREENS-OK")
     r = subprocess.run(["xvfb-run", "-a", sys.executable, "-c", code], capture_output=True, text=True, timeout=120,
                        env={**os.environ, "KIVY_NO_ARGS": "1", "KIVY_NO_CONSOLELOG": "1"})
     assert "SCREENS-OK" in r.stdout, r.stdout[-2000:] + r.stderr[-2000:]
+
+
+def test_qr_pairing_round_trip(tmp_path):
+    """Studio draws the pairing link as a QR code (segno); the desktop app reads it back from a picture (OpenCV).
+    Codes that are not Studio pairing links are refused rather than followed."""
+    from omnicortex_client import qr
+    link = "https://192.168.1.20:7870/pair#c=ABCD-EFGH-JKMN&fp=" + "ab" * 32 + "&a=p"
+    assert qr.check_link(" " + link + "\n") == link
+    for bad in ("https://example.com/login", "WIFI:S:home;T:WPA;P:secret;;", ""):
+        with pytest.raises(qr.ScanError, match="not a Studio pairing link"):
+            qr.check_link(bad)
+    segno = pytest.importorskip("segno")
+    pytest.importorskip("cv2")
+    sys.path.insert(0, str(ROOT / "viz"))
+    import studio
+    svg = studio.pair_qr_svg(link)
+    assert svg.startswith("<svg") and "</svg>" in svg
+    png = tmp_path / "qr.png"
+    segno.make(link, error="m").save(str(png), scale=6, border=4)    # what a screenshot of Studio's page holds
+    assert qr.decode_image(str(png)) == link
+    segno.make("https://example.com/").save(str(tmp_path / "other.png"), scale=6, border=4)
+    with pytest.raises(qr.ScanError, match="not a Studio pairing link"):
+        qr.decode_image(str(tmp_path / "other.png"))
+    with pytest.raises(qr.ScanError, match="cannot read"):
+        qr.decode_image(str(tmp_path / "missing.png"))

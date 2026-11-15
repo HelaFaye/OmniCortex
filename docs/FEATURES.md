@@ -301,6 +301,20 @@ accuracy reached 43% at layers 12–18 against 17% chance without
 denoising, and 29% with it. Use a capable writer model and more stories
 per emotion.
 
+### In the clients: the emotion jewel
+
+Set **Emotion vectors** in a model's settings in Studio (the folder `emotions.py build` wrote). Then
+`POST /api/emotions` `{"model", "messages", "text", "lanes"}` returns the vectors over a reply, for the emotion
+jewel ([WIDGETS.md](WIDGETS.md)):
+- `names`, `colors`: the `lanes` strongest emotions over the reply (6 by default, at most 12);
+- `z`: one row per reply token, one value per lane;
+- `mean`: each lane's mean over the reply;
+- `top`: each token's three strongest emotions among all of them.
+
+Paired devices may call it; the Kivy client's **Emotions** button does. Emotion vectors read the residual stream,
+which the GGUF path doesn't capture, so this runs the PyTorch weights the vectors were built from (the `model` in
+`emotions.pt`). Studio's computer needs PyTorch and those weights, and keeps one such model in memory.
+
 ## Steering
 
 | What | How | Units |

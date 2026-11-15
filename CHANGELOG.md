@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Added (Kivy client: emotion jewel, Fix This Mistake, QR pairing, Android)
+
+- **Emotion jewel:** the client's **Emotions** button draws the jewel (the reactor-core style) for a reply, with its
+  strongest emotions. Studio's new `POST /api/emotions` provides the data: a model's emotion vectors over a reply,
+  set as **Emotion vectors** in the model's settings. It runs the PyTorch weights the vectors were built from, and
+  paired devices may call it.
+- **Fix This Mistake from a paired device:** the client's **Fix…** button. Studio accepts such pairs only when
+  the new option *let paired devices add pairs* is on (off by default). Each pair records the device that sent it,
+  and deleting pairs stays with the owner.
+- **QR pairing:**
+  - Studio shows the pairing link as a QR code (`segno`, now in `requirements-core.txt`);
+  - on Android the client scans it with Google's code scanner, so the app needs no camera permission;
+  - on the desktop it scans with a webcam through OpenCV;
+  - a code that isn't a Studio pairing link is refused.
+- **Android:** `clients/kivy/buildozer.spec` (pinned versions), and `.github/workflows/android.yml`, which builds
+  the APK.
+
 ### Added (Kivy client, desktop app)
 
 - `clients/kivy`: the OmniCortex client app for the desktop (`python clients/kivy/main.py`). It has three screens:
