@@ -12,8 +12,9 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json
 source.exclude_dirs = bin,.buildozer,__pycache__
 version = 0.1.0
-# python3 brings OpenSSL (TLS with certificate pinning); pyjnius reaches Google's code scanner for QR pairing
-requirements = python3,kivy==2.3.1,pyjnius
+# python3 brings OpenSSL (TLS with certificate pinning); Kivy 2.3 needs filetype to load images; pyjnius
+# reaches Google's code scanner for QR pairing
+requirements = python3,kivy==2.3.1,filetype,pyjnius
 orientation = portrait
 fullscreen = 0
 

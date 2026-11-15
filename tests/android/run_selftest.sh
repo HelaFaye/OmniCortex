@@ -60,7 +60,10 @@ adb exec-out screencap -p > "$OUT/final-screen.png"
 for f in $(adb shell "run-as $PKG ls files" | tr -d '\r' | grep '^selftest-.*\.png$'); do
   adb exec-out "run-as $PKG cat files/$f" > "$OUT/$f"
 done
-grep -E "\[OC-SELFTEST|Traceback|Error|FATAL" "$OUT/logcat.txt" | grep -v "OpenGL" > "$OUT/selftest.txt" || true
+# the app's own Python log (tag "python"), and any crash of its process
+grep -E " (I|E|W)/python|FATAL EXCEPTION" "$OUT/logcat.txt" | grep -E "OC-SELFTEST|Traceback|Error|error|FATAL|^\S+ \S+ E/" \
+  > "$OUT/selftest.txt" || true
+grep -E " (I|W|E)/python" "$OUT/logcat.txt" > "$OUT/python.txt" || true
 echo "----- self-test -----"
 cat "$OUT/selftest.txt"
 [ -s "$OUT/scan-activity.txt" ] && { echo "----- screen while scanning -----"; cat "$OUT/scan-activity.txt"; }
