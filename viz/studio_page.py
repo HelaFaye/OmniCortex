@@ -272,7 +272,7 @@ section.chat{position:relative}
       <label>GPUs <span id="gpuhint" class="note"></span></label>
       <div class="row2">
         <div><label>Visible GPUs</label><input id="gpus" placeholder="all, or 0,1"></div>
-        <div><label>Split</label><select id="split_mode"><option value="">default (layer)</option><option>layer</option><option>row</option><option>none</option></select></div>
+        <div><label>Split</label><select id="split_mode"><option value="">default (layer)</option><option>layer</option><option>row</option><option>tensor</option><option>none</option></select></div>
       </div>
       <div class="row2">
         <div><label>Tensor split</label><input id="tensor_split" placeholder="1,1,1,1"></div>

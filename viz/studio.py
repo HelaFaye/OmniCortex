@@ -506,7 +506,9 @@ DEFAULTS = {"ngl": 99, "ctx": 8192, "batch": 2048, "threads": 0,
             "truth_probe": "",
             # Several GPUs (a Tesla M10 is four): which ones this model may use
             # (CUDA_VISIBLE_DEVICES), how llama-server splits it (layer | row |
-            # none), the per-GPU proportions ("1,1,1,1") and the main GPU.
+            # tensor | none), the per-GPU proportions ("1,1,1,1") and the main GPU.
+            # tensor: each layer split across the GPUs (newer llama.cpp; mx-llama.cpp
+            # adds Tensor parallel GPUs, -tps, to group them).
             "gpus": "", "split_mode": "", "tensor_split": "", "main_gpu": -1,
             # Looped models (docs/DORY.md): how many times the recurrent block runs (1-4 for Dory; more loops,
             # more computation per token) and whether each loop keeps its own KV cache (per_loop) or shares
@@ -818,6 +820,8 @@ def server_cmd(model, settings, port):
             cmd += ["-t", str(settings["threads"])]
         elif settings.get("cpu_cores"):
             cmd += ["-t", str(settings["cpu_cores"])]
+        if es.get("tensor_parallel") not in (None, "") and settings.get("split_mode") != "tensor":
+            raise ValueError("tensor parallel GPUs (-tps) need split mode 'tensor'")
         if settings.get("parallel", 1) > 1:
             es["parallel"] = settings["parallel"]
         else:

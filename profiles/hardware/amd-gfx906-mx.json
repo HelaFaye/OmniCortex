@@ -1,0 +1,39 @@
+{
+ "schema": "omnicortex-hw-profile/1",
+ "id": "amd-gfx906-mx",
+ "title": "AMD Instinct MI50/MI60 and Radeon VII (gfx906) with mx-llama.cpp",
+ "era": "legacy",
+ "examples": [
+  "Two or four MI50 32GB in an x86 server",
+  "One MI50 on an RK3588 board (single GPU: no tensor parallelism)"
+ ],
+ "match": {
+  "vendor": "amd",
+  "gfx_prefix": [
+   "gfx906"
+  ]
+ },
+ "purposes": {
+  "general": {
+   "summary": "mx-llama.cpp, a llama.cpp fork tuned for gfx906 (weight repack, tensor parallelism across GPUs), built with HIP.",
+   "llama": {
+    "backend": "hip",
+    "repo": "https://github.com/mxxm-t/mx-llama.cpp",
+    "cmake": "-DAMDGPU_TARGETS=gfx906 -DGGML_HIP_GRAPHS=ON -DGGML_HIP_RCCL=OFF",
+    "toolkit": "ROCm 6.x with gfx906 kernels"
+   },
+   "engine": {
+    "load_mode": "dio",
+    "split_mode": "tensor",
+    "tensor_parallel": 0
+   },
+   "env": {
+    "GGML_ENABLE_CUSTOM_AR": "0"
+   },
+   "notes": "Load with direct I/O (load_mode dio): mmap hangs with this fork. Several GPUs: split mode 'tensor'; Tensor parallel GPUs (-tps) sets how many form each group (0 = all in one), and must divide the GPU count. Its peer-write AllReduce stays off (GGML_ENABLE_CUSTOM_AR=0) until scripts on your host show peer-to-peer access works; turn it on to compare. Never set HSA_FORCE_FINE_GRAIN_PCIE=1 on a host without cache-coherent PCIe, such as RK3588. ROCm: official ROCm 7 images no longer ship rocBLAS kernels for gfx906; use ROCm 6.x, or build it (the mi50-arm guide on ARM). Check the build against the CPU with llama.cpp's test-backend-ops before trusting its answers (mi50-arm's gpu-parity.sh does this)."
+  }
+ },
+ "notes": "Untested on real hardware. cett-dump and the server activations patch build into the fork (checked on the CPU backend).",
+ "author": "OmniCortex",
+ "status": "built-in"
+}

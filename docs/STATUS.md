@@ -134,9 +134,9 @@ In this order unless you reorder it.
    - **Report noise:** the spread across repeats goes beside every difference, and a difference smaller than the
      spread isn't reported as a win.
 7. **gfx906 profile updates:**
-   - optional MI50-tuned llama.cpp forks (Castagna Veloce, mx-llama.cpp), built with `--repo`, with a check that
-     cett-dump still builds into them;
-   - a note that official ROCm 7 images no longer include gfx906 rocBLAS kernels.
+   - **done:** mx-llama.cpp, as the `amd-gfx906-mx` profile ([MX_LLAMA.md](MX_LLAMA.md)), with the ROCm 7 note.
+     cett-dump builds into it, and its binaries pass the llama.cpp integration tests;
+   - Castagna Veloce the same way, if wanted: a profile with its `llama.repo`.
 8. **Llaminar ARM64 backports to mi50-arm and m10-arm.** Those are separate repositories; see their own docs. Open
    there: `arm-cpu.sh` (what the CPU can run), `gpu-parity.sh` (GPU against CPU) and `cpu-threads-bench.sh`
    (fast cores against every core, and a longer thread spin, measured on a model).

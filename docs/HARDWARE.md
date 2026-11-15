@@ -88,7 +88,9 @@ docker run --rm --gpus all -v ~/models:/models -p 8080:8080 omnicortex-llama:cud
 **Several GPUs.** Layer split (`-sm layer`, llama.cpp's default) puts whole
 layers on each GPU and passes one activation between them per token, so it
 works over plain PCIe. Row split (`-sm row`) splits every matrix and needs fast
-GPU-to-GPU links. Studio's load panel has **Visible GPUs**
+GPU-to-GPU links. Tensor split (`-sm tensor`) also splits each layer; with
+several MI50s, mx-llama.cpp adds tensor-parallel groups (`-tps`,
+[MX_LLAMA.md](MX_LLAMA.md)). Studio's load panel has **Visible GPUs**
 (`CUDA_VISIBLE_DEVICES`), **Split**, **Tensor split** and **Main GPU**, and
 its fit estimate counts free VRAM across all of them. `vram_budget.py`,
 `hostcheck.py` and host profiles sum VRAM over every GPU too. Training spreads
