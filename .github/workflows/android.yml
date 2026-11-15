@@ -26,7 +26,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends git zip unzip autoconf automake libtool pkg-config \
-            zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev
+            zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev libltdl-dev ccache
           pip install buildozer==1.5.0 cython==3.0.11
       - name: Cache the Android SDK, NDK and python-for-android
         uses: actions/cache@v4
