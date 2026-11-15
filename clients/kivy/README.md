@@ -70,7 +70,27 @@ CI builds the same APK on every change to the client (`.github/workflows/android
 artifacts). The app asks only for network access. Google's code scanner needs Play services; without them,
 paste the link.
 
+## Testing
+
+- **Unit tests:** `tests/test_kivy_client.py`. They cover the API and controller against a fake Studio over
+  pinned TLS, the display text, the jewel's colours and the QR round trip.
+- **The whole app:** `omnicortex_client/selftest.py` drives every screen in order:
+  - pair over pinned TLS;
+  - list models;
+  - stream a chat;
+  - Risk, Truth, Emotions and Fix;
+  - Review;
+  - start the QR scanner;
+  - reload the saved pairing.
+
+  It runs only when `oc_selftest.json` is in the app's data folder, which on Android only `adb run-as` can write,
+  on a debug build. It logs `[OC-SELFTEST] <step> ok|FAIL` and saves screenshots.
+  - **Desktop:** `tests/test_kivy_client.py` runs it under Xvfb against `tests/android/fake_studio.py`.
+  - **Android:** CI's `emulator` job (`.github/workflows/android.yml`) builds an x86_64 APK and boots an
+    Android 13 emulator with Play services. `tests/android/run_selftest.sh` then runs the self-test there. The
+    logcat, the app's screenshots and a capture of Google's scanner screen are kept as the run's artifact.
+
 ## Not yet
 
-- Tested on a phone: CI builds the APK, but nobody has installed it yet.
+- Tested on a real phone: CI runs it in an emulator, but nobody has installed it on a phone yet.
 - iOS (kivy-ios, which needs a Mac and Xcode).

@@ -291,6 +291,10 @@ class OmniCortexApp(App):
         # Android: the app's private folder (no other app can read the device token); desktop: ~/.config/omnicortex
         data_dir = os.environ.get("OC_CLIENT_DIR") or (self.user_data_dir if on_android() else None)
         self.client = Client(data_dir=data_dir, post=lambda fn: Clock.schedule_once(lambda dt: fn()))
+        from . import selftest
+        cfg = selftest.config(data_dir or "")     # only when oc_selftest.json is in the private data folder
+        if cfg:
+            Clock.schedule_once(lambda dt: selftest.SelfTest(self, cfg, data_dir).start(), 1.5)
         sm = ScreenManager()
         for s in (PairScreen(name="pair"), ChatScreen(name="chat"), LookupScreen(name="lookup")):
             sm.add_widget(s)

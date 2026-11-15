@@ -302,3 +302,32 @@ def test_qr_pairing_round_trip(tmp_path):
         qr.decode_image(str(tmp_path / "other.png"))
     with pytest.raises(qr.ScanError, match="cannot read"):
         qr.decode_image(str(tmp_path / "missing.png"))
+
+
+def test_app_selftest_on_the_desktop(tmp_path):
+    """The real app, its self-test (selftest.py) driving every screen against tests/android/fake_studio.py over
+    pinned TLS, on a virtual display: the same run CI does in an Android emulator."""
+    import importlib.util
+    import shutil
+    import subprocess
+    if importlib.util.find_spec("kivy") is None or not shutil.which("xvfb-run"):
+        pytest.skip("needs Kivy and xvfb-run")
+    pytest.importorskip("cryptography")
+    sys.path.insert(0, str(ROOT / "tests" / "android"))
+    import fake_studio
+    srv, link = fake_studio.serve()
+    try:
+        data = tmp_path / "data"
+        data.mkdir()
+        (data / "oc_selftest.json").write_text(json.dumps({"link": link, "name": "desktop", "quit": True,
+                                                           "shots": False}))
+        r = subprocess.run(["xvfb-run", "-a", sys.executable, str(ROOT / "clients" / "kivy" / "main.py")],
+                           capture_output=True, text=True, timeout=240, cwd=str(ROOT / "clients" / "kivy"),
+                           env={**os.environ, "OC_CLIENT_DIR": str(data), "KIVY_NO_ARGS": "1"})
+    finally:
+        srv.shutdown()
+    log = r.stdout + r.stderr
+    lines = [ln for ln in log.splitlines() if "[OC-SELFTEST" in ln]
+    assert any("DONE pass=10 fail=0" in ln for ln in lines), "\n".join(lines) or log[-3000:]
+    assert {"POST /api/pair/claim", "POST /v1/chat/completions", "POST /api/trace", "POST /api/truth",
+            "POST /api/emotions", "POST /api/harvest", "GET /api/lookup"} <= set(fake_studio.SEEN)
