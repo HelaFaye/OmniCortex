@@ -1291,3 +1291,39 @@ def test_chat_asks_for_token_probabilities_only_when_asked(studio_srv):
     assert len(lps) == 2 and len(lps[1]["top_logprobs"]) == 5
     ev = sse_chat(studio_srv, {"model": CODER, "messages": msgs})
     assert not any(e.get("choices") and e["choices"][0].get("logprobs") for e in ev)
+
+
+def test_paired_devices_and_fix_this_mistake(studio_srv, tmp_path, monkeypatch):
+    """A paired device may add Fix This Mistake pairs only when the owner allows it; the pair records which
+    device sent it, and deleting pairs stays with the owner. /api/emotions is open to devices (it answers 400
+    here: no emotion vectors set)."""
+    import harvest
+    monkeypatch.setitem(studio.STATE, "token", "owner-secret")
+    dev = studio.STATE["devices"].claim(studio.STATE["devices"].new_code()[0], "phone")
+
+    def as_(token, path, body):
+        req = urllib.request.Request(studio_srv + path, data=json.dumps(body).encode(), method="POST",
+                                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.status, json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read())
+
+    pair = {"model": "acme/coder-7b", "messages": [{"role": "user", "content": "2+2?"}], "reply": "5",
+            "correction": "4", "note": "arithmetic"}
+    code, r = as_(dev["token"], "/api/harvest", pair)
+    assert code == 403 and "Integrated options" in r["error"]               # off by default
+    with open(studio.STATE["config_path"], "w") as f:
+        json.dump({"studio": {"options": {"harvest": {"devices": True}}}}, f)
+    code, r = as_(dev["token"], "/api/harvest", pair)
+    assert code == 200 and r["pending"] == 1
+    home = os.path.dirname(studio.STATE["config_path"])
+    (item,) = harvest.items(home=home)
+    assert item["source"] == "device: phone" and item["chosen"] == "4"
+    assert as_(dev["token"], "/api/harvest/delete", {"id": item["id"]})[0] == 403
+    code, r = as_("owner-secret", "/api/harvest", {**pair, "reply": "6"})
+    assert code == 200 and not [i for i in harvest.items(home=home) if i["rejected"] == "6"][0].get("source")
+    code, r = as_(dev["token"], "/api/emotions", {"model": CODER, "messages": pair["messages"], "text": "5"})
+    assert code == 400 and "no emotion vectors set" in r["error"]
+    assert as_(dev["token"], "/api/jobs", {})[0] == 403                       # still no administration

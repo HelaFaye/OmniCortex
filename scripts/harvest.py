@@ -42,7 +42,7 @@ def _text(c) -> str:
 
 
 def add(model: str, messages: list[dict], reply: str, correction: str, note: str = "", risk=None,
-        home=None) -> dict:
+        home=None, source: str = "") -> dict:
     if not correction.strip():
         raise ValueError("the correction is empty")
     if correction.strip() == reply.strip():
@@ -53,7 +53,7 @@ def add(model: str, messages: list[dict], reply: str, correction: str, note: str
         raise ValueError("the conversation must end with the question the reply answered")
     iid = hashlib.sha1(json.dumps([model, ctx, reply]).encode()).hexdigest()[:12]
     item = {"id": iid, "t": time.time(), "model": model, "context": ctx, "rejected": reply, "chosen": correction,
-            "note": note[:500], "risk": risk, "used_in": []}
+            "note": note[:500], "risk": risk, "used_in": [], **({"source": source[:80]} if source else {})}
     d = root(home) / "pairs"
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{iid}.json").write_text(json.dumps(item, indent=1))

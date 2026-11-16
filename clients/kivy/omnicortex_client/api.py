@@ -195,6 +195,18 @@ class Studio:
         return self.call("POST", "/api/truth", {"model": model or self.p.model, "messages": messages,
                                                 "text": text, "alternatives": list(alternatives)})
 
+    def emotions(self, messages: list[dict], text: str, model: str | None = None, lanes: int = 6) -> dict:
+        """The model's emotion vectors over its reply, for the emotion jewel: {names, z [token][lane], colors,
+        mean, tokens, top}."""
+        return self.call("POST", "/api/emotions", {"model": model or self.p.model, "messages": messages,
+                                                   "text": text, "lanes": lanes})
+
+    def fix(self, messages: list[dict], reply: str, correction: str, note: str = "", model: str | None = None) -> dict:
+        """Fix This Mistake: keep (this reply rejected, the correction chosen) for training. Studio accepts it from
+        a paired device only when its owner allows that (Settings -> Integrated options)."""
+        return self.call("POST", "/api/harvest", {"model": model or self.p.model, "messages": messages,
+                                                  "reply": reply, "correction": correction, "note": note})
+
     def lookup(self, model: str) -> dict:
         """The unified review: accuracy, speed per hardware, features, for a model id or Hugging Face repo."""
         return self.call("GET", "/api/lookup?" + urllib.parse.urlencode({"model": model}))

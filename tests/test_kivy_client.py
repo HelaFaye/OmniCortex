@@ -70,6 +70,15 @@ class FakeStudio(BaseHTTPRequestHandler):
                                     "max": 0.1, "mean": 0.1})
         if self.path == "/api/truth":
             return self._send(200, {"verdict": "consistent", "alternatives": req["alternatives"]})
+        if self.path == "/api/emotions":
+            return self._send(200, {"names": ["calm", "sad"], "colors": ["#ff6b6b", "#4dabf7"], "mean": [0.4, -1.6],
+                                    "z": [[0.2, -1.0], [0.6, -2.2]], "tokens": ["Can", "berra"], "top": [[], []],
+                                    "lanes": req.get("lanes")})
+        if self.path == "/api/harvest":
+            if req["correction"] == "refuse":
+                return self._send(403, {"error": "paired devices may add Fix This Mistake pairs only when allowed"})
+            return self._send(200, {"id": "p1", "pending": 1, "auto_train": False, "min_pairs": 20,
+                                    "echo": [req["reply"], req["correction"], req["note"], req["messages"]]})
         self._send(404, {"error": "no"})
 
 
@@ -98,7 +107,7 @@ def oc_alphabet_ok():
 def test_links_parse_like_oc_pairing():
     import oc_pairing
     fp = "ab" * 32
-    for link in (f"https://h:7870/pair#c=ABCD-EFGH-JKMN&fp={fp}&a=p", f"http://10.0.0.2:7870/pair#c=abcdefghjkmn"):
+    for link in (f"https://h:7870/pair#c=ABCD-EFGH-JKMN&fp={fp}&a=p", "http://10.0.0.2:7870/pair#c=abcdefghjkmn"):
         mine = api.parse_pair_link(link)
         base, code, f = oc_pairing.parse_link(link)
         assert (mine["base"], mine["code"], mine["fingerprint"]) == (base, code, f)
@@ -144,3 +153,181 @@ def test_wrong_certificate_and_bad_code_refused(studio):
 def test_plain_http_warns_off_loopback():
     assert api.Studio(api.Pairing(base="http://127.0.0.1:7870", token="t")).warning == ""
     assert "VPN" in api.Studio(api.Pairing(base="http://100.64.0.2:7870", token="t")).warning
+
+
+# ------------------------------------------------------------------ the app's controller (no Kivy)
+
+def test_controller_pairs_chats_and_checks(studio, tmp_path):
+    from omnicortex_client import controller as C
+    base, fp = studio
+    c = C.Client(data_dir=str(tmp_path))
+    assert not c.load()
+    c.pair(f"{base}/pair#c=ABCD-EFGH-JKMN&fp={fp}", "  ")
+    assert c.pairing.name == "device" and C.Client(data_dir=str(tmp_path)).load()   # saved
+    assert c.refresh_models() == ["auto", "acme/coder-7b"]
+    c.choose("acme/coder-7b")
+    assert api.load(str(tmp_path)).model == "acme/coder-7b"
+    pieces, done, errors = [], [], []
+    reply = c.send("Capital of Australia?", lambda m: pieces.append(m.content), done.append, errors.append,
+                   background=False)
+    assert pieces == ["Can", "Canberra", "Canberra."] and done == [reply] and not errors and not c.busy
+    assert [m.role for m in c.messages] == ["user", "assistant"] and reply.model == "acme/coder-7b"
+    assert c.send("   ", None, None, None) is None                      # nothing to send
+    c.check(reply, done.append, errors.append, background=False)
+    assert "No token flagged" in reply.note and reply.check == "Canberra."
+    c.truth(reply, ["Sydney.", " ", ""], done.append, errors.append, background=False)
+    assert reply.note.startswith("The model's activations agree") and not errors
+    c.emotions(reply, done.append, errors.append, background=False)
+    assert reply.emotions["names"] == ["calm", "sad"] and reply.emotions["lanes"] == 6
+    assert reply.note == "Emotions over the reply: sad -1.6, calm +0.4 (z against the emotion stories; 0 is typical)."
+    c.fix(reply, "  ", "", done.append, errors.append, background=False)
+    c.fix(reply, "Canberra.", "", done.append, errors.append, background=False)
+    assert len(errors) == 2 and "should have given" in errors[-1]                 # empty, and unchanged
+    st_fix = []
+    c.fix(reply, "Canberra, in the ACT.", " city ", done.append, errors.append, background=False)
+    assert reply.note == "Kept for training: 1 pair waiting." and len(errors) == 2
+    c.fix(reply, "refuse", "", done.append, st_fix.append, background=False)
+    assert "403" in st_fix[0] and "allowed" in st_fix[0]
+    out = []
+    c.lookup("acme/coder-7b", out.append, errors.append, background=False)
+    assert "accuracy" in out[0] or "Nothing known" in out[0]
+    c.forget()
+    assert c.pairing is None and not C.Client(data_dir=str(tmp_path)).load()
+    with pytest.raises(api.StudioError, match="not paired"):
+        c.studio
+
+
+def test_controller_reports_errors_and_runs_callbacks_through_post(studio, tmp_path):
+    from omnicortex_client import controller as C
+    base, fp = studio
+    posted = []
+    c = C.Client(data_dir=str(tmp_path), post=lambda fn: (posted.append(fn), fn()))
+    c.pairing = api.Pairing(base=base, token="revoked", fingerprint=fp)
+    errors = []
+    c.send("hello", None, None, errors.append, background=False)
+    assert "401" in errors[0] and posted and not c.busy
+    c.lookup("", None, errors.append)
+    assert "type a model" in errors[-1]
+
+
+def test_display_text():
+    from omnicortex_client import controller as C
+    trace = {"pieces": ["Syd", "ney", " [x]"], "prob": [0.9, 0.55, 0.1], "flagged": [0, 1], "threshold": 0.5}
+    assert C.risk_markup(trace) == "[color=ff5c5c]Syd[/color][color=ffae42]ney[/color] &bl;x&br;"
+    assert C.risk_summary(trace) == "2 of 3 tokens flagged; highest risk 0.90, mean 0.52."
+    assert C.risk_summary({"pieces": [], "prob": []}) == "No tokens were scored."
+    t = C.truth_summary({"verdict": "knows_but_says_otherwise", "answer": {"text": "Sydney", "p_true": 0.01},
+                         "alternatives": [{"text": "Canberra", "p_true": 0.7}], "best_alternative": "Canberra",
+                         "alt_leads_at": ["model.layers.12"], "stage": "model.layers.25", "stage_auc": 0.93})
+    assert "favour another answer" in t and "“Canberra”: p = 0.70" in t and "model.layers.12" in t
+    assert "does not show intent" in t
+    rec = {"model": "org/m", "available": True,
+           "stats": [{"key": "tok_s", "group": "performance", "label": "Decode", "value": 31.2, "unit": "tok/s",
+                      "variant": "Q4_K_M · llama.cpp"},
+                     {"key": "accuracy", "group": "quality", "label": "Accuracy", "value": 0.71, "unit": "ratio",
+                      "n": 400}]}
+    s = C.lookup_summary(rec)
+    assert s.index("Performance") < s.index("Quality") and "Accuracy: 71% (n = 400)" in s and "31.2 tok/s" in s
+    assert "Nothing known" in C.lookup_summary({"model": "x", "available": False,
+                                                 "sources": [{"id": "b", "ok": False, "error": "offline"}]})
+
+
+def test_jewel_colour_mix():
+    import importlib.util
+    if importlib.util.find_spec("kivy") is None:
+        pytest.skip("needs Kivy")
+    os.environ.setdefault("KIVY_NO_ARGS", "1")
+    from omnicortex_client.jewel import hex_rgb, mix
+    assert hex_rgb("#ff0000") == (1.0, 0.0, 0.0) and hex_rgb("0f0") == (0.0, 1.0, 0.0)
+    assert mix(["#ff0000", "#0000ff"], [3.0, 0.0]) == (1.0, 0.0, 0.0)            # all weight on the first lane
+    r, g, b = mix(["#ff0000", "#0000ff"], [0.0, -2.0])                               # below its mean: darker
+    assert r == 0 and b == pytest.approx(0.55) and mix(["#fff"], [0.0]) == (0.5, 0.5, 0.55)
+
+
+def test_kivy_app_screens_build():
+    """The real app's layout and screens, on a virtual display (Kivy opens a window for text inputs and scroll
+    views). Skipped without Kivy or Xvfb."""
+    import importlib.util
+    import shutil
+    import subprocess
+    if importlib.util.find_spec("kivy") is None:     # not imported here: Kivy would read pytest's arguments
+        pytest.skip("needs Kivy")
+    if not shutil.which("xvfb-run"):
+        pytest.skip("needs xvfb-run")
+    code = """
+import sys
+sys.path.insert(0, %r)
+from kivy.lang import Builder
+from omnicortex_client import app as A
+from omnicortex_client.controller import Message
+Builder.load_string(A.KV)
+for s in (A.PairScreen(name="pair"), A.ChatScreen(name="chat"), A.LookupScreen(name="lookup")):
+    assert s.children, s.name
+v = A.MessageView()
+v.show(Message("assistant", "a [b] c", model="acme/coder-7b"))
+assert v.header == "acme/coder-7b" and v.body == "a &bl;b&br; c", (v.header, v.body)
+v.show(Message("assistant", "x", emotions={"names": ["calm"], "colors": ["#ff6b6b"], "mean": [1.0], "z": [[1.0]]}))
+assert v.has_jewel and "calm +1.0" in v.legend and v.ids.jewel.names == ["calm"]
+v.ids.jewel._tick(0.1); v.ids.jewel._tick(0.1)
+assert v.ids.jewel.caption.startswith("the reply's mean")
+v.show(Message("user", "hi"))
+assert v.header == "You"
+print("SCREENS-OK")
+""" % str(ROOT / "clients" / "kivy")
+    r = subprocess.run(["xvfb-run", "-a", sys.executable, "-c", code], capture_output=True, text=True, timeout=120,
+                       env={**os.environ, "KIVY_NO_ARGS": "1", "KIVY_NO_CONSOLELOG": "1"})
+    assert "SCREENS-OK" in r.stdout, r.stdout[-2000:] + r.stderr[-2000:]
+
+
+def test_qr_pairing_round_trip(tmp_path):
+    """Studio draws the pairing link as a QR code (segno); the desktop app reads it back from a picture (OpenCV).
+    Codes that are not Studio pairing links are refused rather than followed."""
+    from omnicortex_client import qr
+    link = "https://192.168.1.20:7870/pair#c=ABCD-EFGH-JKMN&fp=" + "ab" * 32 + "&a=p"
+    assert qr.check_link(" " + link + "\n") == link
+    for bad in ("https://example.com/login", "WIFI:S:home;T:WPA;P:secret;;", ""):
+        with pytest.raises(qr.ScanError, match="not a Studio pairing link"):
+            qr.check_link(bad)
+    segno = pytest.importorskip("segno")
+    pytest.importorskip("cv2")
+    sys.path.insert(0, str(ROOT / "viz"))
+    import studio
+    svg = studio.pair_qr_svg(link)
+    assert svg.startswith("<svg") and "</svg>" in svg
+    png = tmp_path / "qr.png"
+    segno.make(link, error="m").save(str(png), scale=6, border=4)    # what a screenshot of Studio's page holds
+    assert qr.decode_image(str(png)) == link
+    segno.make("https://example.com/").save(str(tmp_path / "other.png"), scale=6, border=4)
+    with pytest.raises(qr.ScanError, match="not a Studio pairing link"):
+        qr.decode_image(str(tmp_path / "other.png"))
+    with pytest.raises(qr.ScanError, match="cannot read"):
+        qr.decode_image(str(tmp_path / "missing.png"))
+
+
+def test_app_selftest_on_the_desktop(tmp_path):
+    """The real app, its self-test (selftest.py) driving every screen against tests/android/fake_studio.py over
+    pinned TLS, on a virtual display: the same run CI does in an Android emulator."""
+    import importlib.util
+    import shutil
+    import subprocess
+    if importlib.util.find_spec("kivy") is None or not shutil.which("xvfb-run"):
+        pytest.skip("needs Kivy and xvfb-run")
+    pytest.importorskip("cryptography")
+    sys.path.insert(0, str(ROOT / "tests" / "android"))
+    import fake_studio
+    srv, link = fake_studio.serve()
+    try:
+        data = tmp_path / "data"
+        data.mkdir()
+        (data / "oc_selftest.json").write_text(json.dumps({"link": link, "name": "desktop", "quit": True,
+                                                           "shots": False}))
+        r = subprocess.run(["xvfb-run", "-a", sys.executable, str(ROOT / "clients" / "kivy" / "main.py")],
+                           capture_output=True, text=True, timeout=240, cwd=str(ROOT / "clients" / "kivy"),
+                           env={**os.environ, "OC_CLIENT_DIR": str(data), "KIVY_NO_ARGS": "1"})
+    finally:
+        srv.shutdown()
+    log = r.stdout + r.stderr
+    lines = [ln for ln in log.splitlines() if "[OC-SELFTEST" in ln]
+    assert any("DONE pass=10 fail=0" in ln for ln in lines), "\n".join(lines) or log[-3000:]
+    assert {"POST /api/pair/claim", "POST /v1/chat/completions", "POST /api/trace", "POST /api/truth",
+            "POST /api/emotions", "POST /api/harvest", "GET /api/lookup"} <= set(fake_studio.SEEN)

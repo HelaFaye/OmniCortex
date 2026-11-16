@@ -30,9 +30,13 @@ OPTIONS: dict[str, dict] = {
         "help": "A button under each reply takes your correction and keeps the pair for training; with auto-train, "
                 "a short DPO micro-tune runs on them when the computer has been idle a while.",
         "fields": {"enabled": ("bool", True), "auto_train": ("bool", False), "train_model": ("str", ""),
-                   "min_pairs": ("int", 20, 1, 100000), "idle_minutes": ("int", 20, 1, 1440), "steps": ("int", 40, 1, 5000)},
+                   "min_pairs": ("int", 20, 1, 100000), "idle_minutes": ("int", 20, 1, 1440), "steps": ("int", 40, 1, 5000),
+                   "devices": ("bool", False)},
         "sensitive": {"auto_train": "Starts GPU-heavy training on its own when the computer is idle. It never "
-                                    "replaces a model, but it can keep a GPU busy for a long time."}},
+                                    "replaces a model, but it can keep a GPU busy for a long time.",
+                      "devices": "Lets paired devices (phones, the Kivy and Godot clients) add pairs. Each pair records "
+                                 "which device sent it, but with auto-train on, a lost or misused device can steer "
+                                 "what a model learns until you revoke it."}},
     "decay": {
         "title": "Neuron aging and decay",
         "help": "A served LoRA correction that has not been needed for a while eases off toward a floor, and returns "

@@ -41,6 +41,11 @@ the neuron review with verdict *wrong*. Neurons that fire on confident mistakes 
 
 The pairs collect in `~/.omnicortex/harvest/`.
 
+**From paired devices.** The Kivy client has the same **Fix…** button. Studio accepts its pairs only when **let
+paired devices add pairs** (`devices`) is on; it is off by default. Each such pair records which device sent it
+(`"source": "device: phone"`), and only the owner can delete pairs. With auto train on, a device's pairs shape
+what the model learns, so revoke a lost device (Connect → Paired devices).
+
 The **Fix This Mistake: micro-tune** job (`harvest.py train`) runs a short SFT + DPO pass (`finetune.py`) on
 the pairs no earlier run used. Turn on **auto train** to run it by itself when two things hold:
 - at least *min pairs* new pairs are waiting;

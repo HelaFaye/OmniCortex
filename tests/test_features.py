@@ -412,3 +412,25 @@ def test_decode_lab_watch_flags():
                          text=True, timeout=120).stdout
     for flag in ("--watch-cett", "--watch-bins", "--watch-emotions", "--watch-sae", "--publish", "--record"):
         assert flag in out
+
+
+def test_studio_emotions_for_a_reply(tiny, emo, monkeypatch):
+    """Studio's /api/emotions computation: the emotion vectors over just the reply's tokens, the strongest lanes
+    first, for the clients' emotion jewel."""
+    sys.path.insert(0, str(ROOT / "viz"))
+    import studio
+    m = {"path": "/models/tiny.gguf", "id": "tiny"}
+    monkeypatch.setattr(studio, "load_settings", lambda: {studio._key(m["path"]): {"emotions": str(emo)}})
+    msgs = [{"role": "user", "content": "how was the dog"}, {"role": "tool", "content": "ignored"}]
+    r = studio.emotions_reply(m, msgs, "the dog was happy and warm", lanes=3)
+    assert len(r["names"]) == 3 and set(r["names"]) <= {"angry", "calm", "happy", "sad"}
+    assert r["tokens"] and "".join(r["tokens"]).strip().endswith("warm") and "how" not in "".join(r["tokens"])
+    assert len(r["z"]) == len(r["tokens"]) == len(r["top"]) and all(len(row) == 3 for row in r["z"])
+    strength = [sum(abs(row[i]) for row in r["z"]) for i in range(3)]
+    assert strength == sorted(strength, reverse=True) and len(r["colors"]) == 3 and len(r["mean"]) == 3
+    assert r["vectors_for"] == str(tiny)
+    again = studio.emotions_reply(m, msgs, "the dog was sad", lanes=12)       # the loaded model is reused
+    assert len(again["names"]) == 4
+    monkeypatch.setattr(studio, "load_settings", lambda: {})
+    with pytest.raises(ValueError, match="no emotion vectors set"):
+        studio.emotions_reply(m, msgs, "x")

@@ -504,6 +504,9 @@ DEFAULTS = {"ngl": 99, "ctx": 8192, "batch": 2048, "threads": 0,
             # truth probe for this model (scripts/truth_probe.py, gguf backend): /api/truth checks whether the
             # model's activations agree with what it wrote
             "truth_probe": "",
+            # emotion vectors for this model (scripts/emotions.py build): /api/emotions reads them over a reply,
+            # for the emotion jewel in the clients. Runs the PyTorch weights the vectors were built from
+            "emotions": "",
             # Several GPUs (a Tesla M10 is four): which ones this model may use
             # (CUDA_VISIBLE_DEVICES), how llama-server splits it (layer | row |
             # tensor | none), the per-GPU proportions ("1,1,1,1") and the main GPU.
@@ -934,7 +937,9 @@ def stop_server():
 # What a paired device may POST. Everything else needs the owner's token.
 DEVICE_POSTS = {"/v1/chat/completions", "/v1/completions", "/v1/embeddings", "/api/chat", "/api/chats",
                 "/api/chats/delete", "/api/rag/search", "/api/tools/approve", "/api/trace", "/api/truth",
-                "/mcp", "/api/route", "/api/context"}
+                "/mcp", "/api/route", "/api/context", "/api/emotions",
+                # Fix This Mistake: only while Settings -> Integrated options lets paired devices add pairs
+                "/api/harvest"}
 
 LINKS = {"cache": {}, "lock": threading.Lock()}
 LINK_SEP = ":"
@@ -1961,7 +1966,7 @@ def harvest_add(req: dict) -> dict:
     msgs = req.get("messages") if isinstance(req.get("messages"), list) else []
     reply = str(req.get("reply") or "")
     item = harvest.add(model_id, msgs, reply, str(req.get("correction") or ""), str(req.get("note") or ""),
-                       home=os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json")))
+                       source=str(req.get("source") or ""), home=os.path.dirname(os.path.expanduser(STATE.get("config_path") or "~/.omnicortex/config.json")))
     m = find_model(model_id) if model_id else None
     if m is not None and STATE.get("cett") and activation_settings()["collect"]:
         clf = load_settings().get(_key(m["path"]), {}).get("classifier")
@@ -2572,6 +2577,65 @@ def truth_reply(model, messages, text, alternatives=()):
         question = " ".join(c.get("text", "") for c in question if isinstance(c, dict))
     feat = truth_probe.GGUFFeatures(model["path"], STATE["cett"], scorer=_scorer(model, None))
     return truth_probe.check(feat, _PROBES[key], question, text, [str(a) for a in alternatives][:8])
+
+
+def pair_qr_svg(link: str) -> str | None:
+    """The pairing link as an inline SVG QR code, for a phone's camera (the Kivy client scans it). Needs segno
+    (pure Python, in requirements-core.txt); without it Studio shows the link alone."""
+    try:
+        import segno
+    except ImportError:
+        return None
+    return segno.make(link, error="m").svg_inline(scale=4, border=2, dark="#000", light="#fff")
+
+
+_EMOTIONS = {"lock": threading.Lock()}
+
+
+def emotions_reply(model, messages, text, lanes=6):
+    """The model's emotion vectors over its reply (scripts/emotions.py, docs/FEATURES.md): for the emotion jewel.
+    Emotion vectors read the residual stream, so this runs the PyTorch weights the vectors were built from.
+    -> {layer, tokens, names (the strongest `lanes` emotions over the reply), z [token][lane], colors, mean,
+        top [token] -> [[emotion, z], ...]}"""
+    path = load_settings().get(_key(model["path"]), {}).get("emotions")
+    if not path:
+        raise ValueError(f"{model['id']} has no emotion vectors set (Studio -> Models, the model's settings: "
+                         "emotion vectors, made with scripts/emotions.py build)")
+    try:
+        import torch  # noqa: F401
+    except ImportError:
+        raise ValueError("emotion checks need PyTorch on Studio's computer (the model's own weights are run)")
+    import emotions as EM
+    import features as FX
+    f = Path(os.path.expanduser(path))
+    f = f / "emotions.pt" if f.is_dir() else f
+    key = (str(f), f.stat().st_mtime)
+    with _EMOTIONS["lock"]:                        # one model in memory, one request at a time
+        if _EMOTIONS.get("key") != key:
+            _EMOTIONS.clear()
+            _EMOTIONS["lock"] = threading.Lock()
+            vec = EM.Vectors(f)
+            if not vec.model:
+                raise ValueError(f"{f} does not say which model it was built for")
+            m, tok, _dev = FX.load_model(vec.model)
+            _EMOTIONS.update(key=key, vec=vec, model=m, tok=tok)
+        vec, m, tok = _EMOTIONS["vec"], _EMOTIONS["model"], _EMOTIONS["tok"]
+        msgs = [{"role": x.get("role"), "content": str(x.get("content") or "")} for x in messages or []
+                if x.get("role") in ("system", "user", "assistant")]
+        ids, start = EM.encode_text(tok, None, msgs, text)
+        r = EM.trace(m, tok, vec, ids, top=3)
+    z = r["z"][start:]
+    if not z:
+        raise ValueError("empty reply")
+    E = len(r["names"])
+    strength = [sum(abs(row[e]) for row in z) / len(z) for e in range(E)]
+    keep = sorted(range(E), key=lambda e: -strength[e])[:max(1, min(int(lanes), 12))]
+    palette = ["#ff6b6b", "#4dabf7", "#ffd43b", "#69db7c", "#da77f2", "#ffa94d", "#3bc9db", "#f783ac",
+               "#a9e34b", "#9775fa", "#ff8787", "#74c0fc"]
+    return {"layer": r["layer"], "tokens": r["tokens"][start:], "names": [r["names"][e] for e in keep],
+            "z": [[row[e] for e in keep] for row in z], "colors": palette[:len(keep)],
+            "mean": [round(sum(row[e] for row in z) / len(z), 3) for e in keep],
+            "top": r["top"][start:], "vectors_for": vec.model}
 
 
 def save_trace(model_name, model_id, msgs, text, r, threshold=0.5, source="chat-check", extra=None):
@@ -4275,6 +4339,7 @@ class Handler(BaseHTTPRequestHandler):
     # that is not something to leave open, so --token gates everything except
     # the login page itself.
     _role = None      # "owner" (master token, or no token configured) or "device" (a paired device)
+    _device = None    # the paired device's record, when _role == "device"
 
     def _presented(self) -> list[str]:
         out = []
@@ -4292,7 +4357,7 @@ class Handler(BaseHTTPRequestHandler):
         return out
 
     def _authed(self):
-        self._role = None
+        self._role, self._device = None, None
         tok = STATE["token"]
         if not tok:
             self._role = "owner"
@@ -4302,9 +4367,11 @@ class Handler(BaseHTTPRequestHandler):
             self._role = "owner"
             return True
         reg = STATE.get("devices")
-        if reg is not None and any(reg.check(p) for p in presented):
-            self._role = "device"
-            return True
+        for p in presented if reg is not None else []:
+            rec = reg.check(p)
+            if rec:
+                self._role, self._device = "device", rec
+                return True
         return False
 
     def _plugins_get(self):
@@ -4514,7 +4581,8 @@ class Handler(BaseHTTPRequestHandler):
             frag = (f"c={code[:4]}-{code[4:8]}-{code[8:]}"
                     + (f"&fp={STATE['fingerprint']}" if STATE.get("fingerprint") else "")
                     + f"&a={'p' if access is None else oc_pairing.fmt_duration(access)}")
-            return self._json(200, {"code": code, "expires": exp, "link": f"{scheme}://{host}/pair#{frag}",
+            link = f"{scheme}://{host}/pair#{frag}"
+            return self._json(200, {"code": code, "expires": exp, "link": link, "qr": pair_qr_svg(link),
                                     "fingerprint": STATE.get("fingerprint"), "persistent": access is None,
                                     "access_seconds": access})
         if self.path == "/api/devices/revoke":
@@ -6009,7 +6077,7 @@ class Handler(BaseHTTPRequestHandler):
             import harvest
             its = harvest.items(home=_harvest_home())
             return self._json(200, {"settings": options()["harvest"], "pairs": [
-                {k: it.get(k) for k in ("id", "t", "model", "note", "used_in")} | {"question": it["context"][-1]["content"][:200]}
+                {k: it.get(k) for k in ("id", "t", "model", "note", "used_in", "source")} | {"question": it["context"][-1]["content"][:200]}
                 for it in its[-200:]], "unused": sum(1 for i in its if not i.get("used_in"))})
         if self.path == "/api/env/snapshot":
             import dep_snapshot
@@ -6343,9 +6411,15 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                 return self._hw_profiles(self._read())
 
             if self.path in ("/api/harvest", "/api/harvest/delete"):
-                if not self._owner_only():
+                device = self._role == "device"
+                if device and not (self.path == "/api/harvest" and options()["harvest"].get("devices")):
+                    return self._json(403, {"error": "paired devices may add Fix This Mistake pairs only when "
+                                                     "Settings -> Integrated options -> Fix This Mistake allows it"})
+                if not device and not self._owner_only():
                     return
                 req = self._read(MAX_BODY)
+                if device:
+                    req["source"] = "device: " + str((self._device or {}).get("name") or "unnamed")[:60]
                 if self.path == "/api/harvest/delete":
                     import harvest
                     return self._json(200, {"removed": harvest.remove(str(req.get("id") or ""), home=_harvest_home())})
@@ -6582,6 +6656,22 @@ border-radius:6px;border:1px solid #6f93ff;background:#6f93ff;color:#0b0b0a;curs
                         links = [{"href": "/setup#build", "label": "build llama.cpp with cett-dump"},
                                  {"href": "/settings#workspaces", "label": "use an existing build"}]
                     return self._json(400, {"error": str(e), "links": links})
+
+            if self.path == "/api/emotions":
+                req = self._read(MAX_BODY)
+                ref, text = req.get("model"), str(req.get("text") or "")
+                if not text.strip():
+                    return self._json(400, {"error": "nothing to check"})
+                if ref and LINK_SEP in ref and link_target(ref) is not None:
+                    return self._json(400, {"error": "emotion checks of a linked Studio's models run in that Studio"})
+                model = find_model(ref) if ref and ref != "auto" else PROC["model"]
+                if model is None:
+                    return self._json(404, {"error": "no such model"})
+                try:
+                    return self._json(200, emotions_reply(model, req.get("messages") or [], text,
+                                                          int(req.get("lanes") or 6)))
+                except (ValueError, FileNotFoundError, KeyError) as e:
+                    return self._json(400, {"error": str(e)})
 
             if self.path == "/api/truth":
                 req = self._read(MAX_BODY)

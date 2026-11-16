@@ -91,7 +91,7 @@ async function load(){ const r=await fetch('/api/devices'); const j=await r.json
   document.querySelectorAll('[data-l]').forEach(b=>b.onclick=async()=>{ await post('/api/links/remove',{name:b.dataset.l}); load(); }); }
 $('#start').onclick=async()=>{ const r=await post('/api/pair/start',accessChoice()); const j=await r.json();
   const grants=j.persistent?'persistent access (until revoked)':`temporary access for ${Math.round(j.access_seconds/3600*10)/10} h after pairing`;
-  $('#pairout').innerHTML=r.ok?`<div><span class="code" id="plink">${esc(j.link)}</span> <button id="cp">Copy</button></div><div class="note">Grants ${grants}. Code <b>${esc(j.code)}</b>, claimable until ${new Date(j.expires*1000).toLocaleTimeString()}, single use.${j.fingerprint?'':' <span class="err">No TLS on this Studio: use the link only inside a VPN.</span>'}</div>`:'<span class="err">'+esc(j.error)+'</span>';
+  $('#pairout').innerHTML=r.ok?`${j.qr?`<div class="pairqr" title="Scan with the OmniCortex app (Pair, then Scan QR code)">${j.qr}</div>`:''}<div><span class="code" id="plink">${esc(j.link)}</span> <button id="cp">Copy</button></div><div class="note">Grants ${grants}. Code <b>${esc(j.code)}</b>, claimable until ${new Date(j.expires*1000).toLocaleTimeString()}, single use.${j.fingerprint?'':' <span class="err">No TLS on this Studio: use the link only inside a VPN.</span>'}</div>`:'<span class="err">'+esc(j.error)+'</span>';
   if(r.ok) $('#cp').onclick=()=>navigator.clipboard.writeText(j.link); };
 $('#add').onclick=async()=>{ $('#addmsg').textContent='pairing…'; const r=await post('/api/links/add',{link:$('#lnk').value.trim(),name:$('#lname').value.trim()||'remote',device_name:location.host});
   const j=await r.json(); $('#addmsg').innerHTML=r.ok?`<span class="ok">Linked ${esc(j.name)}: ${j.models.length} models.</span>`:'<span class="err">'+esc(j.error)+'</span>'; if(r.ok){ $('#lnk').value=''; } load(); };
@@ -294,6 +294,7 @@ section.chat{position:relative}
     <label id="visionrow" style="display:none"><input type="checkbox" id="vision" checked> load vision projector <span id="mmname"></span></label>
     <label>H-Neuron classifier (optional, enables activation stats)</label><input id="classifier" placeholder="models/classifier.npz for this model">
     <label title="scripts/truth_probe.py train --gguf: lets /api/truth check whether the model's activations agree with its reply">Truth probe (optional)</label><input id="truth_probe" placeholder="models/this-model.truth.npz">
+    <label title="scripts/emotions.py build: lets /api/emotions read the emotion vectors over a reply (the clients' emotion jewel). Needs PyTorch and the model's own weights">Emotion vectors (optional)</label><input id="emotions" placeholder="runs/emotions/this-model">
     <button id="load" class="pri" style="margin-top:.7rem;width:100%">Load</button>
     <div id="radarBox" style="display:none"><div class="row2" style="align-items:end"><div><label>Compare with (2P)</label><select id="vsPick"></select></div><div class="note" id="radarNote"></div></div><div id="radar"></div></div>
     <div id="statsbox"></div>
@@ -342,8 +343,8 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let models=[], sel=null, busy=false, ctrl=null, status_={}, pendingImgs=[];
 let chat={id:null,title:'New chat',messages:[]};
-const F=["ngl","ctx","batch","threads","experts","served_name","lora","extra","classifier","gpus","split_mode","tensor_split","main_gpu","rpc","loops","loop_kv","truth_probe"];
-const TEXT_FIELDS=["served_name","lora","extra","classifier","truth_probe","gpus","split_mode","tensor_split","rpc","loops","loop_kv"];
+const F=["ngl","ctx","batch","threads","experts","served_name","lora","extra","classifier","gpus","split_mode","tensor_split","main_gpu","rpc","loops","loop_kv","truth_probe","emotions"];
+const TEXT_FIELDS=["served_name","lora","extra","classifier","truth_probe","emotions","gpus","split_mode","tensor_split","rpc","loops","loop_kv"];
 // ---------- engine options (scripts/engine_options.py: one table for the form, the flags and the optimizer)
 let EO=null;
 async function loadEO(engine, values){

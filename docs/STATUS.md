@@ -27,7 +27,7 @@ The **Checked** column says how far each piece has been verified:
 | Faster activation capture ([PIPELINE.md](PIPELINE.md)) | `device`, `stream` and `auto` capture modes | CI on the CPU; GPU modes not on hardware |
 | Proxmox backend ([PROXMOX.md](PROXMOX.md)) | OmniCortex in an LXC container with the host's GPUs; MI50 VBIOS check | Simulated hosts |
 | CI (`.github/workflows/tests.yml`, `binaries.yml`) | Tests with cached models and a cached llama.cpp build; binaries for 10 targets | Green except 32-bit Windows (best-effort, llama.cpp's own source) |
-| Kivy client ([MOBILE_CLIENTS.md](MOBILE_CLIENTS.md)) | Python/Kivy app for Studio | The API layer only (`clients/kivy`): pairing with certificate pinning, models, streaming chat, reply checks, review lookup. CI against a fake Studio over TLS. No interface yet |
+| Kivy client ([MOBILE_CLIENTS.md](MOBILE_CLIENTS.md)) | Python/Kivy app for Studio | `clients/kivy`: pairing by link or QR code with certificate pinning, model choice, streamed chat, the risk strip, the truth probe, the emotion jewel, Fix This Mistake, the review lookup. CI against a fake Studio over TLS; the real app driven on a virtual display against a fake Studio; `/api/emotions` on a tiny real model. CI builds the Android APK. Not yet against a real Studio or on a phone |
 
 Companion repositories, both merged:
 - **mi50-arm #1:** a VBIOS check in `check-mi50.sh`, and which MI50 VBIOSes can shrink BAR0 on RK3588.
@@ -73,18 +73,18 @@ None of these can be done in a cloud container. Each turns an "untested" note in
    - the `stream` and `device` capture modes (`tests/test_capture_modes.py` runs its GPU test when a GPU is present);
    - a truth probe on a 7B-or-larger model.
 5. **Windows ARM64 and macOS builds:** CI builds them; nobody has run them yet.
+6. **The Kivy client on Android:** install the APK CI builds, scan Studio's QR code, chat, and try each reply
+   check against a real model.
 
 ## Next stage, after merging
 
 In this order unless you reorder it.
 
 1. **Kivy client interface:**
-   - pair by link or QR code;
-   - chat with model choice and streaming;
-   - the reply checks (risk strip, truth probe);
-   - the review lookup.
-
-   Desktop first, then Android through Buildozer.
+   - **done:** pairing by link or QR code, chat with model choice and streaming, the reply checks (risk strip,
+     truth probe), the emotion jewel, Fix This Mistake, the review lookup (`clients/kivy/README.md`);
+   - **built, not yet run:** the Android APK (Buildozer, in CI). Next: install it on a phone and pair with a real
+     Studio.
 2. **Quantization fidelity (from Project Maya's quality reports):** compare a quantized model with its original:
    - top-1 next-token agreement and KL divergence (llama.cpp's `llama-perplexity --kl-divergence`);
    - TestQA's confident mistakes;
