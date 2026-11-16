@@ -176,7 +176,9 @@ class SelfTest:
         Logger.info("OC-SELFTEST: scan-open, photograph the screen now")
 
         def back(dt):
-            if "error" in seen:
+            if "error" in seen and qr.CODE_FAILED in seen["error"]:
+                self.log(name, False, seen["error"])             # a bug in the app, not the device
+            elif "error" in seen:
                 self.log(name, True, "no scanner on this device, and the app says so: " + seen["error"])
             else:
                 self.log(name, True, "the scanner opened" + (f" and read {seen['link']}" if "link" in seen else ""))

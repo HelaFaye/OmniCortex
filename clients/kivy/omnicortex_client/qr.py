@@ -21,6 +21,9 @@ class ScanError(RuntimeError):
     pass
 
 
+CODE_FAILED = "the app's scanner code failed"     # an error in this file, as opposed to a device without a scanner
+
+
 def on_android() -> bool:
     try:
         from kivy.utils import platform
@@ -113,19 +116,20 @@ def scan_android(on_result, on_error):
         def onFailure(self, e):
             on_error(f"the scanner could not run ({e.getMessage()}); paste the link instead")
 
+    from jnius import JavaException
     try:
         activity = autoclass("org.kivy.android.PythonActivity").mActivity
-        Options = autoclass("com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions$Builder")
-        Barcode = autoclass("com.google.mlkit.vision.barcode.common.Barcode")
         Scanning = autoclass("com.google.mlkit.vision.codescanner.GmsBarcodeScanning")
-        opts = Options().setBarcodeFormats(Barcode.FORMAT_QR_CODE, []).build()
-        task = Scanning.getClient(activity, opts).startScan()
+        # every format: whatever is read must still pass check_link, so a QR-only filter would add nothing
+        task = Scanning.getClient(activity).startScan()
         # keep the listeners alive as long as the task (pyjnius would otherwise collect them)
         scan_android.listeners = (Success(), Failure())
         task.addOnSuccessListener(scan_android.listeners[0])
         task.addOnFailureListener(scan_android.listeners[1])
-    except Exception as e:                                    # no Play services, an old device
+    except JavaException as e:                                # no Play services, an old device
         on_error(f"the scanner is not available on this device ({e}); paste the link instead")
+    except Exception as e:                                    # a bug here, not the device: say so plainly
+        on_error(f"{CODE_FAILED} ({type(e).__name__}: {e}); paste the link instead")
 
 
 def scan(on_result, on_error):
