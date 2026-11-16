@@ -26,6 +26,8 @@ android.archs = arm64-v8a, armeabi-v7a
 android.accept_sdk_license = True
 android.enable_androidx = True
 android.gradle_dependencies = com.google.android.gms:play-services-code-scanner:16.1.0
+# ask Play services to fetch the scanner's UI module when the app is installed, not at the first scan
+android.meta_data = com.google.mlkit.vision.DEPENDENCIES=barcode_ui
 android.allow_backup = False
 p4a.branch = v2024.01.21
 

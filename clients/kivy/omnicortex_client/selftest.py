@@ -178,6 +178,8 @@ class SelfTest:
         def back(dt):
             if "error" in seen and qr.CODE_FAILED in seen["error"]:
                 self.log(name, False, seen["error"])             # a bug in the app, not the device
+            elif "error" in seen and qr.DOWNLOADING in seen["error"]:
+                self.log(name, True, "Google's scanner answered (its module is still downloading): " + seen["error"])
             elif "error" in seen:
                 self.log(name, True, "no scanner on this device, and the app says so: " + seen["error"])
             else:

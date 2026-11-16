@@ -21,6 +21,7 @@ class ScanError(RuntimeError):
     pass
 
 
+DOWNLOADING = "Google Play services is still downloading the QR scanner"
 CODE_FAILED = "the app's scanner code failed"     # an error in this file, as opposed to a device without a scanner
 
 
@@ -114,7 +115,11 @@ def scan_android(on_result, on_error):
 
         @java_method("(Ljava/lang/Exception;)V")
         def onFailure(self, e):
-            on_error(f"the scanner could not run ({e.getMessage()}); paste the link instead")
+            msg = str(e.getMessage() or "")
+            if "download" in msg.lower():         # Play services is still fetching the scanner (first use)
+                on_error(f"{DOWNLOADING}: try again in a minute, or paste the link")
+            else:
+                on_error(f"the scanner could not run ({msg}); paste the link instead")
 
     from jnius import JavaException
     try:
