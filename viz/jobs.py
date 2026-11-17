@@ -257,6 +257,27 @@ SPECS: dict[str, dict] = {
                    F("fidelity", choices=["auto", "kld", "agreement"], default="auto"),
                    F("max_kld", kind="float", default=0.1), F("min_agreement", kind="float", default=0.6),
                    F("server", help="llama-server"), F("out", req=True)]},
+    "quant_fidelity": {
+        "title": "Did a quantization keep what the model knows?", "group": "Benchmarks",
+        "argv": [S / "quant_fidelity.py"],
+        "help": "Compare quantized GGUFs with their reference: KL divergence and top token, TestQA answers lost "
+                "(confident mistakes vs abstentions), H-neuron drift, and whether the truth probe still works. "
+                "One verdict per quant (docs/QUANT_FIDELITY.md).",
+        "fields": [F("ref", req=True, help="the original, or the highest-precision GGUF"),
+                   F("quant", req=True, repeat=True, help="quantized GGUFs of the same model"),
+                   F("testqa", multi=True, help="TestQA bank files or folders, e.g. qa/bank"),
+                   F("testqa_limit", kind="int", default=200), F("per_subject", kind="bool"),
+                   F("classifier", help="the reference model's H-neuron classifier"),
+                   F("hneuron_n", kind="int", default=100),
+                   F("truth_probe", help="a probe trained on the reference (truth_probe.py --gguf)"),
+                   F("truth_data", help="labelled rows the probe was not trained on"),
+                   F("truth_n", kind="int", default=200),
+                   F("eval_text", help="text for the KL divergence (default: OmniCortex's docs)"),
+                   F("chunks", kind="int", default=20), F("ngl", kind="int", default=99),
+                   F("max_kld", kind="float", default=0.1), F("min_same_top", kind="float", default=85.0),
+                   F("max_lost", kind="float", default=0.03), F("min_cett_cos", kind="float", default=0.95),
+                   F("max_flag_flips", kind="float", default=0.05), F("max_auc_drop", kind="float", default=0.05),
+                   F("server", help="llama-server"), F("cett", help="llama-cett-dump"), F("out", req=True)]},
     "clip_bench": {
         "title": "CLIP_benchmark", "group": "Benchmarks", "argv": [S / "clip_bench.py", "eval"],
         "help": "Zero-shot classification at each suppression scale.",

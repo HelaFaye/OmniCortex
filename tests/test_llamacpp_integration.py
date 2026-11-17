@@ -272,3 +272,48 @@ def test_docker_cett_dump_matches_host(tiny_gguf, tmp_path):
     _, a, seen_a, _, _ = read_aggregate(tmp_path / "host" / "x.bin")
     _, b, seen_b, _, _ = read_aggregate(tmp_path / "box" / "x.bin")
     assert seen_b.all() and np.abs(a - b).max() / np.abs(a).max() < 1e-4
+
+
+def test_quant_fidelity_end_to_end(tiny_gguf, tmp_path):
+    """quant_fidelity.py on real quants of the tiny model (Q8_0 and Q4_0): KL divergence through
+    llama-perplexity, TestQA through llama-server, H-neuron drift with a classifier, and a truth probe trained
+    on the reference and scored on each quant."""
+    import quant_fidelity
+    import truth_probe
+    _, ref = tiny_gguf
+    binr = LLAMA / "build" / "bin"
+    if not (binr / "llama-quantize").exists():
+        pytest.skip("needs llama-quantize")
+    quants = []
+    for t in ("Q8_0", "Q4_0"):
+        q = tmp_path / f"tiny-{t}.gguf"
+        subprocess.run([str(binr / "llama-quantize"), str(ref), str(q), t], check=True, capture_output=True)
+        quants.append(q)
+    coef = np.random.default_rng(1).normal(size=4 * 128).astype(np.float32)
+    np.savez(tmp_path / "clf.npz", coef=coef, intercept=0.0, n_layers=4, n_neurons=128)
+    rows = truth_probe.build_rows([str(ROOT / "qa" / "truth" / "basic.jsonl")], borrow=False)[:16]
+    data = tmp_path / "truth.jsonl"
+    data.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    feat = truth_probe.GGUFFeatures(str(ref), str(CETT), ngl=0)
+    truth_probe.train(feat, rows, folds=2).save(tmp_path / "probe.npz")
+    args = ["--ref", str(ref), "--quant", str(quants[0]), "--quant", str(quants[1]), "--out", str(tmp_path / "out"),
+            "--server", str(binr / "llama-server"), "--cett", str(CETT), "--ngl", "0", "--chunks", "2",
+            "--eval-text", str(ROOT / "README.md"),
+            "--testqa", str(ROOT / "qa" / "bank" / "factual.jsonl"), "--testqa-limit", "4", "--max-tokens", "16",
+            "--classifier", str(tmp_path / "clf.npz"), "--hneuron-n", "4",
+            "--truth-probe", str(tmp_path / "probe.npz"), "--truth-data", str(data), "--truth-n", "16"]
+    quant_fidelity.main(args)
+    rep = json.loads((tmp_path / "out" / "fidelity.json").read_text())
+    q8, q4 = rep["quants"]["tiny-Q8_0"], rep["quants"]["tiny-Q4_0"]
+    for r in (q8, q4):
+        assert r["verdict"] in ("keeps", "check", "loses") and isinstance(r["reasons"], list)
+        assert r["knowledge"]["n"] == 4 and r["hneurons"]["texts"] == 4 and len(r["hneurons"]["cett_cos_per_layer"]) == 4
+        assert 0 <= r["hneurons"]["flag_flip_rate"] <= 1 and r["truth"]["rows"] == 16
+    if (binr / "llama-perplexity").exists():
+        assert q8["next_token"]["kld"] < q4["next_token"]["kld"]          # fewer bits, further from the reference
+    assert q8["hneurons"]["cett_cos_mean"] >= q4["hneurons"]["cett_cos_mean"] - 1e-3
+    assert "tiny-Q4_0" in (tmp_path / "out" / "fidelity.md").read_text()
+    # cached: a second run reads every count back without starting a model, and reports the same
+    quant_fidelity.main(args + ["--server", "/nonexistent", "--perplexity", "/nonexistent"])
+    again = json.loads((tmp_path / "out" / "fidelity.json").read_text())
+    assert again["quants"] == rep["quants"]

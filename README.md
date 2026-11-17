@@ -54,6 +54,7 @@ Progress, what has been checked on real hardware, and the plan: [docs/STATUS.md]
 | **External benchmarks** | CLIP_benchmark (ImageNetV2, ImageNet-Sketch, VTAB, ...) for CLIP and its edits; LiveBench and SWE-bench for chat/coding models, feeding stats; leaderboard (BenchLM) imports as reference | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) |
 | **Retraining on deficits** | turns measured failures into verified SFT and DPO data with replay and a holdout, trains with QLoRA, LoRA or full fine-tuning (DDP/FSDP), merges and converts to GGUF | [docs/RETRAINING.md](docs/RETRAINING.md) |
 | **Labs** | capability-preserving quantization, scale sweeps, adaptive remote tuning | [docs/LABS.md](docs/LABS.md) |
+| **Quantization fidelity** | did a quant keep what the model knows? KL divergence and top token, TestQA answers it now gets wrong, H-neuron drift, and whether a truth probe still works; a verdict per quant | [docs/QUANT_FIDELITY.md](docs/QUANT_FIDELITY.md) |
 | **Connect** | your models as the AI of Cline, Claude Desktop or any OpenAI-compatible app; OmniCortex's harness and lab as MCP tools (models, reply checks, jobs, projects), with a Connect page that writes the settings | [docs/CONNECT.md](docs/CONNECT.md) |
 | **Neuron review** | every neuron's link to wrong answers across tests, benchmarks and checked chat replies, filtered by source, subject and time, played over time in 3D | [docs/REVIEW.md](docs/REVIEW.md) |
 | **Unified review and browser extension** | one record per model from review boards, hardware reports, SAELens and your own Studio; a Firefox/Chromium/Opera extension whose icon glows blue on Hugging Face pages that have data, with a dropdown per statistic and source | [docs/UNIFIED_REVIEW.md](docs/UNIFIED_REVIEW.md), [docs/BROWSER_EXTENSION.md](docs/BROWSER_EXTENSION.md) |
@@ -61,6 +62,7 @@ Progress, what has been checked on real hardware, and the plan: [docs/STATUS.md]
 | **Truth probes** | does the model believe what it said? A probe on every layer, for Hugging Face models or any GGUF, flags replies whose activations favour another answer ("knows but says otherwise"), with a per-layer trajectory; a signal, not proof of intent | [docs/TRUTH_PROBE.md](docs/TRUTH_PROBE.md) |
 | **Proxmox** | run the remote agent or Studio in an LXC container with the host's GPUs (AMD or NVIDIA, legacy or current); the only GPU route on boards with non-coherent PCIe such as RK3588; plus an MI50 VBIOS check | [docs/PROXMOX.md](docs/PROXMOX.md) |
 | **Clients** | the web pages, a terminal client (`./omnicortex cli`) and a Godot client (`./omnicortex godot`) over the same API; the Godot client is a full UI with a native 3D view, built to run on another computer so drawing never takes GPU memory from the model | [docs/CLIENTS.md](docs/CLIENTS.md) |
+| **Client app (desktop and Android)** | pair with Studio by link or QR code (certificate pinned), chat with streamed replies, and check any reply: the risk strip, the truth probe, the emotion jewel, Fix This Mistake; the review lookup. An APK from CI, tested in an Android emulator | [clients/kivy/README.md](clients/kivy/README.md), [docs/MOBILE_CLIENTS.md](docs/MOBILE_CLIENTS.md) |
 | **Remote hosts** | use the models on computers that run LM Studio, Ollama or llama.cpp but not OmniCortex: a small agent there (distributed on its own) is controlled over MCP; same network, VPN (Tailscale, ZeroTier, WireGuard…), SSH, a public tunnel, or the host calling in from behind NAT; pairing with a short code, and the host's owner sees and revokes every controller | [docs/REMOTE.md](docs/REMOTE.md), [remote/](remote/README.md) |
 | **Settings** | named workspaces for every folder and binary (no fixed layout), the default model per subject for `auto`, and rules for when chat tool calls are allowed, asked or denied (by tool, kind of operation, argument regexes, rate limits) | [docs/SETTINGS.md](docs/SETTINGS.md) |
 | **Requirements** | what each feature needs (packages, programs, llama.cpp GPU backends, drivers, device access, memory), fixes for your OS, one-click Python installs, environment snapshots and diffs | [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) |
@@ -100,7 +102,8 @@ scripts/build_llama_tools.sh --backend vulkan  # llama.cpp + the cett-dump extra
 
 Full setup: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md). Hardware notes,
 including AMD APUs: [docs/HARDWARE.md](docs/HARDWARE.md). OmniCortex supports legacy and modern
-hardware alike; [hardware support profiles](docs/HARDWARE_PROFILES.md) record the right setup per family and purpose.
+hardware alike; [hardware support profiles](docs/HARDWARE_PROFILES.md) record the right setup per family and purpose,
+including MI50s with the gfx906-tuned [mx-llama.cpp](docs/MX_LLAMA.md) fork.
 
 Each block below is safe to paste as a whole. Set your folders once (or set
 them on Studio's **Settings** page and skip the flags):

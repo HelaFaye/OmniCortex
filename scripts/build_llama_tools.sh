@@ -15,8 +15,9 @@
 #       --cmake "-DAMDGPU_TARGETS=gfx906 -DGGML_HIP_GRAPHS=ON -DGGML_HIP_RCCL=OFF"   # MI50-tuned (docs/MX_LLAMA.md)
 #
 # Clones (or updates) llama.cpp, copies llama-tools/cett-dump into tools/,
-# registers it, and builds llama-cett-dump, llama-server, llama-quantize and
-# llama-eval-callback. --server-activations also applies
+# registers it, and builds llama-cett-dump, llama-server, llama-quantize,
+# llama-eval-callback and llama-perplexity (KL divergence for quant_fidelity.py
+# and quant_select.py). --server-activations also applies
 # llama-tools/server-activations (live per-token CETT over SSE).
 # Prints the env exports for env.local.sh at the end.
 set -euo pipefail
@@ -74,7 +75,7 @@ case "$BACKEND" in
   hip|rocm) FLAGS=(-DGGML_HIP=ON) ;;
   *) echo "backend must be cpu, vulkan, cuda, metal or hip" >&2; exit 1 ;;
 esac
-TARGETS=(llama-cett-dump llama-server llama-quantize llama-eval-callback)
+TARGETS=(llama-cett-dump llama-server llama-quantize llama-eval-callback llama-perplexity)
 if [[ "$RPC" == 1 ]]; then FLAGS+=(-DGGML_RPC=ON); TARGETS+=(rpc-server); fi
 if [[ ! -d "$DIR/.git" ]]; then
   # Shallow: the history is ~1 GB and nothing here needs it (--ref fetches a pinned commit).
