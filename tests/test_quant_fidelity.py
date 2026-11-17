@@ -61,10 +61,18 @@ def test_verdicts():
     v, why = QF.verdict({"next_token": {"kld": 0.01, "same_top": 80.0}}, t)
     assert v == "check" and "same top token 80.0%" in why[0]
     assert QF.verdict({"next_token": {"kld": 0.5}}, t)[0] == "loses"
-    k = {"n": 100, "confident_mistakes": 4, "now_abstains": 1, "lost_rate": 0.05}
-    v, why = QF.verdict({"knowledge": k}, t)
-    assert v == "check" and "4 answers to confident mistakes and 1 to abstentions of 100" in why[0]
-    assert QF.verdict({"knowledge": {**k, "lost_rate": 0.1}}, t)[0] == "loses"
+    # lost answers are judged by the 95% lower bound: one flip in 30 is noise, 5 in 30 is not
+    one = QF.knowledge([row(i, "correct") for i in range(30)], [row(0, "wrong")] + [row(i, "correct") for i in range(1, 30)])
+    assert one["lost_rate"] == pytest.approx(1 / 30, abs=1e-4) and one["lost_ci"][0] < 0.03
+    assert QF.verdict({"knowledge": one}, t) == ("keeps", [])
+    five = QF.knowledge([row(i, "correct") for i in range(30)],
+                        [row(i, "wrong") for i in range(5)] + [row(i, "correct") for i in range(5, 30)])
+    v, why = QF.verdict({"knowledge": five}, t)
+    assert v == "loses" and "5 answers to confident mistakes and 0 to abstentions of 30" in why[0]
+    k = {"n": 1000, "confident_mistakes": 40, "now_abstains": 5, "lost_rate": 0.045, "lost_ci": [0.034, 0.06]}
+    assert QF.verdict({"knowledge": k}, t)[0] == "check"
+    assert QF.verdict({"knowledge": {"n": 9, "confident_mistakes": 1, "now_abstains": 0, "lost_rate": 0.1}},
+                      t)[0] == "loses"                                          # no interval: the rate itself
     assert QF.verdict({"hneurons": {"cett_cos_mean": 0.9, "weakest_layer": 7, "texts": 10, "flag_flips": 0,
                                     "flag_flip_rate": 0.0}}, t)[0] == "check"
     assert QF.verdict({"truth": {"auroc_ref": 0.92, "auroc_quant": 0.78, "auroc_drop": 0.14}}, t)[0] == "loses"

@@ -52,7 +52,7 @@ Each quant gets one verdict:
 | KL divergence | 0.1 | `--max-kld` |
 | same top token | 85% | `--min-same-top` |
 | greedy agreement (without `llama-perplexity`) | 0.8 | `--min-agreement` |
-| TestQA answers lost (mistakes + abstentions) | 3% | `--max-lost` |
+| TestQA answers lost (mistakes + abstentions), the 95% lower bound | 3% | `--max-lost` |
 | H-neuron activity similarity (mean cosine) | 0.95 | `--min-cett-cos` |
 | risk flags flipped | 5% of texts | `--max-flag-flips` |
 | truth probe AUROC drop | 0.05 | `--max-auc-drop` |
@@ -71,7 +71,35 @@ Q8_0 kept everything and Q4_0 lost the truth probe:
 | Q4_0 | loses | 82.7% | 0.991 | 0.921 → 0.778 |
 
 Even on a toy model, the truth probe was the most sensitive count: activity stayed 99% similar while the probe's
-AUROC fell by 0.14. A run on a real model is in progress and will be added here.
+AUROC fell by 0.14.
+
+**Qwen2.5-1.5B-Instruct**, F16 against three llama.cpp quants, on a CPU:
+- KL over 10 chunks of OmniCortex's docs;
+- TestQA's 30 factual items (the F16 got 26 right);
+- H-neuron activity over the F16's own 30 replies;
+- a truth probe trained on the F16 with 30 of the starter set's 44 questions (65 rows; cross-validated AUROC
+  0.93 at `layer.24`), scored on the other 14 questions (28 rows).
+
+| Quant | Size | Verdict | KLD / same top | Lost (mistakes + abstains) | H-neuron cos | Truth AUROC (held out) |
+|---|---|---|---|---|---|---|
+| F16 (reference) | 3.09 GB | | 0 / 100% | | 1 | 0.939 |
+| Q8_0 | 1.65 GB | keeps | 0.0024 / 96.9% | 1 + 0 of 30 | 1.000 | 0.939 |
+| Q4_K_M | 0.99 GB | keeps | 0.0560 / 86.8% | 1 + 0 of 30 | 0.988 | 0.934 |
+| Q2_K | 0.68 GB | **loses** | 1.2327 / 46.7% | 5 + 0 of 30 | 0.863 | **0.679** |
+
+- **Q8_0 and Q4_K_M kept what the model knows.** Each lost one answer of 30. Its 95% interval (0.6% to 17%)
+  doesn't rule out no loss, so the verdict doesn't count it. Q8_0's lost item was in fact a sensible refusal
+  of an unanswerable question that the grader didn't count as an abstention.
+- **Q2_K lost it**, on every count. Its five confident mistakes include "the largest country in the world by
+  area is Antarctica", the Colosseum built "in Alexandria, Egypt", and a made-up painter for the Sistine Chapel.
+  Its activity drifted most at layer 15. A probe trained on the F16 dropped from 0.94 to 0.68 on it, so neither
+  the probe nor the H-neuron classifier should be trusted on Q2_K without retraining.
+- **The truth probe barely moved on Q4_K_M** (0.939 to 0.934), although its next-token agreement was only 86.8%.
+  A probe trained on the original can be used on a good quant.
+
+**Lost answers are judged by their 95% interval.** The verdict compares the interval's lower bound with
+`--max-lost`, so one flipped answer in a small set isn't a finding, and five of 30 is (at least 7.3%). Use
+more TestQA items (`--testqa qa/bank`, all subjects) to see smaller losses.
 
 ## Related
 

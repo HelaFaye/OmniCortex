@@ -152,8 +152,12 @@ def knowledge(ref_rows: list[dict], quant_rows: list[dict]) -> dict:
         elif r["verdict"] not in good and x["verdict"] in good:
             gained += 1
     ref_good = sum(1 for r in ref_rows if r["verdict"] in good)
+    from model_stats import wilson
+    lost = mistakes + abstains
     return {"n": n, "reference_correct": ref_good, "confident_mistakes": mistakes, "now_abstains": abstains,
-            "gained": gained, "lost_rate": round((mistakes + abstains) / n, 4) if n else None,
+            "gained": gained, "lost_rate": round(lost / n, 4) if n else None,
+            # 95% interval: the verdict judges its lower bound, so one flip in a small set is not a finding
+            "lost_ci": [round(x, 4) for x in wilson(lost, n)] if n else None,
             "mistake_examples": examples}
 
 
@@ -272,10 +276,12 @@ def verdict(row: dict, t: dict) -> tuple[str, list[str]]:
     elif nt.get("agreement") is not None and nt["agreement"] < t["min_agreement"]:
         why.append(f"greedy agreement {nt['agreement']:.2f} (limit {t['min_agreement']})")
     k = row.get("knowledge") or {}
-    if k.get("lost_rate") is not None and k["lost_rate"] > t["max_lost"]:
-        (bad if k["lost_rate"] > 2 * t["max_lost"] else why).append(
+    low = (k.get("lost_ci") or [k.get("lost_rate")])[0]        # the 95% lower bound, when there is one
+    if low is not None and low > t["max_lost"]:
+        (bad if low > 2 * t["max_lost"] else why).append(
             f"lost {k['confident_mistakes']} answers to confident mistakes and {k['now_abstains']} to abstentions "
-            f"of {k['n']} ({100 * k['lost_rate']:.1f}%, limit {100 * t['max_lost']:.1f}%)")
+            f"of {k['n']} ({100 * k['lost_rate']:.1f}%, at least {100 * low:.1f}% at 95% confidence; "
+            f"limit {100 * t['max_lost']:.1f}%)")
     h = row.get("hneurons") or {}
     if h.get("cett_cos_mean") is not None and h["cett_cos_mean"] < t["min_cett_cos"]:
         why.append(f"H-neuron activity similarity {h['cett_cos_mean']:.3f} (limit {t['min_cett_cos']}); "
