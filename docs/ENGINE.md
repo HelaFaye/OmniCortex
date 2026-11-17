@@ -234,6 +234,11 @@ how much. The ternary types TQ1_0 and TQ2_0 keep quality only for models
 trained ternary (BitNet b1.58 and its relatives). Quantizing an ordinary
 model to ternary wrecks it, and the numbers will show that.
 
+The next-token numbers say how far a quant moved, not what it lost.
+`scripts/quant_fidelity.py` ([QUANT_FIDELITY.md](QUANT_FIDELITY.md)) goes further: which TestQA answers a quant
+gets wrong that the original got right, how far its H-neuron activity drifts, and whether a truth probe trained
+on the original still works on it.
+
 ## What Studio does not do for you
 
 These are real gains in some setups, but outside what an application should

@@ -85,7 +85,8 @@ In this order unless you reorder it.
      truth probe), the emotion jewel, Fix This Mistake, the review lookup (`clients/kivy/README.md`);
    - **built, not yet run:** the Android APK (Buildozer, in CI). Next: install it on a phone and pair with a real
      Studio.
-2. **Quantization fidelity (from Project Maya's quality reports):** compare a quantized model with its original:
+2. **Quantization fidelity (from Project Maya's quality reports):** *done:* `scripts/quant_fidelity.py`,
+   [QUANT_FIDELITY.md](QUANT_FIDELITY.md). Compare a quantized model with its original:
    - top-1 next-token agreement and KL divergence (llama.cpp's `llama-perplexity --kl-divergence`);
    - TestQA's confident mistakes;
    - H-neuron activity;

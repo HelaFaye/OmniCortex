@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added (quantization fidelity)
+
+- `scripts/quant_fidelity.py` (Jobs → *Did a quantization keep what the model knows?*,
+  [docs/QUANT_FIDELITY.md](docs/QUANT_FIDELITY.md)) compares quantized GGUFs with their reference on four counts:
+  - KL divergence and same top token;
+  - TestQA answers lost, as confident mistakes or abstentions;
+  - H-neuron activity drift and risk flags flipped;
+  - whether a truth probe trained on the original still works on the quant.
+
+  It gives one verdict per quant (keeps, check or loses) against thresholds you can set. Models run one at a
+  time, and every count is cached.
+- `scripts/build_llama_tools.sh` also builds `llama-perplexity`, for the KL divergence here and in
+  `quant_select.py`.
+
 ### Added (Kivy client: emotion jewel, Fix This Mistake, QR pairing, Android)
 
 - **Emotion jewel:** the client's **Emotions** button draws the jewel (the reactor-core style) for a reply, with its
