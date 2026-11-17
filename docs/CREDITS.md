@@ -74,6 +74,9 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 | Li et al. (2025), *EAGLE-3: Scaling up Inference Acceleration of Large Language Models via Training-Time Test*, [arXiv:2503.01840](https://arxiv.org/abs/2503.01840) | The `draft-eagle3` engine option, where llama.cpp supports it |
 | Saxena (2023), [prompt lookup decoding](https://github.com/apoorvumang/prompt-lookup-decoding) | The n-gram speculative decoding options |
 | Ma et al. (2024), *The Era of 1-bit LLMs: All Large Language Models are in 1.58 Bits* (BitNet b1.58), [arXiv:2402.17764](https://arxiv.org/abs/2402.17764) | The ternary TQ1_0 / TQ2_0 types `quant_select.py` can try |
+| Kullback & Leibler (1951), *On Information and Sufficiency*, Annals of Mathematical Statistics 22(1), as measured by llama.cpp's `llama-perplexity --kl-divergence` | Next-token fidelity of a quant against its original (`quant_select.py`, `quant_fidelity.py`) |
+| [Project Maya](https://github.com/mw00/project-maya)'s per-quant quality reports | The idea behind `quant_fidelity.py`: report what a quant loses, not only how far it moved ([QUANT_FIDELITY.md](QUANT_FIDELITY.md)) |
+| [mx-llama.cpp](https://github.com/mxxm-t/mx-llama.cpp) (mxxm-t), a llama.cpp fork tuned for gfx906 | The `amd-gfx906-mx` hardware profile: its build flags, `-sm tensor -tps`, `-lm dio`, and the notes on its peer-write AllReduce ([MX_LLAMA.md](MX_LLAMA.md)) |
 
 ## Training, merging and data
 
@@ -93,7 +96,7 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 | Robertson & Zaragoza (2009), *The Probabilistic Relevance Framework: BM25 and Beyond* | `rag.py`, `context_compress.py` |
 | Cormack, Clarke & Büttcher (2009), *Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods*, SIGIR | `rag.py` combines BM25 and embeddings |
 | Bergstra et al. (2011), *Algorithms for Hyper-Parameter Optimization* (TPE), NeurIPS; Akiba et al. (2019), *Optuna*, KDD, [arXiv:1907.10902](https://arxiv.org/abs/1907.10902) | `engine_optimizer.py`'s search |
-| Wilson (1927), *Probable inference, the law of succession, and statistical inference*, JASA 22(158) | Confidence intervals on right / wrong / declined rates (TestQA, model stats) |
+| Wilson (1927), *Probable inference, the law of succession, and statistical inference*, JASA 22(158) | Confidence intervals on right / wrong / declined rates (TestQA, model stats); the lost-answer verdict in `quant_fidelity.py` |
 | McNemar (1947), *Note on the sampling error of the difference between correlated proportions or percentages*, Psychometrika 12(2) | Paired comparisons: the retrain gate, model comparisons, merges, expert sweeps |
 | Efron (1979), *Bootstrap Methods: Another Look at the Jackknife*, Annals of Statistics 7(1) | Bootstrap intervals in `cv.py` |
 
@@ -171,6 +174,11 @@ What [FEATURES.md](FEATURES.md) implements, and where it departs from these work
 | WebRTC | Peer-to-peer model transfer ([TRANSFER.md](TRANSFER.md)) |
 | [Home Assistant](https://www.home-assistant.io) REST API | Power rules on the System page ([SYSTEM.md](SYSTEM.md)) |
 | [psutil](https://github.com/giampaolo/psutil) | System monitoring, where installed |
+| [Kivy](https://kivy.org), [Buildozer](https://github.com/kivy/buildozer), [python-for-android](https://github.com/kivy/python-for-android), [PyJNIus](https://github.com/kivy/pyjnius), and [filetype](https://github.com/h2non/filetype.py) | The client app (`clients/kivy`) on the desktop and Android, its APK build, and its calls into Android ([MOBILE_CLIENTS.md](MOBILE_CLIENTS.md)) |
+| Google's [ML Kit code scanner](https://developers.google.com/ml-kit/vision/barcode-scanning/code-scanner) (Play services) | QR pairing in the Android client, without a camera permission |
+| [segno](https://github.com/heuer/segno) | Studio's pairing link as a QR code |
+| [OpenCV](https://opencv.org) | QR scanning from a webcam or picture in the desktop client, where installed |
+| [ReactiveCircus/android-emulator-runner](https://github.com/ReactiveCircus/android-emulator-runner) and the Android Emulator; [Xvfb](https://www.x.org) | The client's self-test in an Android emulator in CI, and on a virtual display |
 
 Each project keeps its own licence. Using its models, datasets or outputs
 is subject to that licence, and the same goes for the model weights you

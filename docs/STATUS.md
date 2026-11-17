@@ -1,12 +1,18 @@
 # Progress and plan
 
-Where OmniCortex stands, what has and hasn't been checked, and what comes next. Updated 2026-11-14.
+Where OmniCortex stands, what has and hasn't been checked, and what comes next. Updated 2026-11-17.
 
 ## Where things stand
 
-Everything below is on `main`. It came in through pull request #3, merged 2026-11-13, together with the hardening
-of execution permissions, network services, remote transfers, tool rules and the tuning worker. Each area has its
-own document.
+Everything below is on `main`, except quantization fidelity, which is in the pull request after #6. It came in
+through these pull requests:
+- **#3** (merged 2026-11-13): the bulk of it, with the hardening of execution permissions, network services,
+  remote transfers, tool rules and the tuning worker;
+- **#4**: the audit fixes and the Kivy client's API layer;
+- **#5**: mx-llama.cpp;
+- **#6** (merged 2026-11-16): the Kivy client app, desktop and Android.
+
+Each area has its own document.
 
 The **Checked** column says how far each piece has been verified:
 - **CI**: the GitHub Actions test or build runs it on every push;
@@ -26,12 +32,19 @@ The **Checked** column says how far each piece has been verified:
 | Truth probes ([TRUTH_PROBE.md](TRUTH_PROBE.md)) | "Knows but says otherwise", Hugging Face or GGUF, Studio `/api/truth` | CI; local on Qwen2.5 0.5B and 1.5B (results in the doc) |
 | Faster activation capture ([PIPELINE.md](PIPELINE.md)) | `device`, `stream` and `auto` capture modes | CI on the CPU; GPU modes not on hardware |
 | Proxmox backend ([PROXMOX.md](PROXMOX.md)) | OmniCortex in an LXC container with the host's GPUs; MI50 VBIOS check | Simulated hosts |
-| CI (`.github/workflows/tests.yml`, `binaries.yml`) | Tests with cached models and a cached llama.cpp build; binaries for 10 targets | Green except 32-bit Windows (best-effort, llama.cpp's own source) |
+| mx-llama.cpp ([MX_LLAMA.md](MX_LLAMA.md)) | The MI50-tuned llama.cpp fork as the `amd-gfx906-mx` profile; split mode `tensor`, `-tps`, `-lm dio` in Studio | CI; cett-dump and the server activations patch built into the fork and its binaries passed the integration tests (CPU); HIP not on hardware |
+| Quantization fidelity ([QUANT_FIDELITY.md](QUANT_FIDELITY.md)) | Did a quant keep what the model knows: KL and top token, TestQA answers lost, H-neuron drift, truth probe transfer; a verdict per quant | CI (tiny model's Q8_0 and Q4_0); local on Qwen2.5-1.5B (F16 against Q8_0, Q4_K_M, Q2_K; results in the doc) |
+| CI (`.github/workflows/tests.yml`, `binaries.yml`, `android.yml`) | Tests with cached models and a cached llama.cpp build; binaries for 10 targets; the Android APK, and the client's self-test in an Android 13 emulator | Green except 32-bit Windows (best-effort, llama.cpp's own source) |
 | Kivy client ([MOBILE_CLIENTS.md](MOBILE_CLIENTS.md)) | Python/Kivy app for Studio | `clients/kivy`: pairing by link or QR code with certificate pinning, model choice, streamed chat, the risk strip, the truth probe, the emotion jewel, Fix This Mistake, the review lookup. CI against a fake Studio over TLS; the real app driven on a virtual display against a fake Studio; `/api/emotions` on a tiny real model. CI builds the Android APK. Not yet against a real Studio or on a phone |
 
-Companion repositories, both merged:
-- **mi50-arm #1:** a VBIOS check in `check-mi50.sh`, and which MI50 VBIOSes can shrink BAR0 on RK3588.
-- **m10-arm #1:** a Proxmox guide for sharing the Tesla M10 with an LXC container.
+Companion repositories:
+- **mi50-arm #1** (merged): a VBIOS check in `check-mi50.sh`, and which MI50 VBIOSes can shrink BAR0 on RK3588.
+- **m10-arm #1** (merged): a Proxmox guide for sharing the Tesla M10 with an LXC container.
+- **mi50-arm #2 and m10-arm #2** (open, ready to merge), after Llaminar's ARM work:
+  - `arm-cpu.sh`: what the CPU can execute, and whether a build uses instructions it lacks;
+  - `gpu-parity.sh`: every GPU operation checked against the CPU;
+  - `cpu-threads-bench.sh`: fast cores against every core, and a longer thread spin, measured on a model;
+  - mx-llama.cpp builds (mi50-arm).
 
 ## Audit, 2026-11-14
 
