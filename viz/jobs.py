@@ -286,6 +286,40 @@ SPECS: dict[str, dict] = {
                    F("style", choices=["off", "auto", "pixel", "cartoon"], default="off", help="pixel art and cartoons: clean upscaling, padding, style prompts"), F("out", req=True)]},
 }
 
+# ---- adapting a model to one repository (docs/REPO_ADAPT.md)
+SPECS.update({
+    "repo_adapt": {
+        "title": "Adapt to a repository: training data from its source", "group": "Retrain",
+        "argv": [S / "repo_adapt.py", "run"],
+        "help": "Scan a repository, have a teacher write questions and answers grounded in its source, keep the "
+                "ones the source supports, and build sft.jsonl (85% repository, 15% general replay), a holdout of "
+                "whole symbols and a provenance manifest. The teacher's key comes from the environment variable "
+                "named below, set where Studio runs; it is never stored. Then Fine-tune with lora (docs/REPO_ADAPT.md).",
+        "fields": [F("repo", req=True, help="the repository's folder"),
+                   F("teacher", help="URL@model of the teacher (OpenAI-compatible)"),
+                   F("judge", help="URL@model of a separate judge (default: the teacher)"),
+                   F("no_judge_model", kind="bool", help="only the cheap checks, no judge model"),
+                   F("key_env", default="OC_TEACHER_KEY", help="environment variable holding the teacher's API key"),
+                   F("core", repeat=True, help="globs of core paths, e.g. src/api/** (default: all)"),
+                   F("per_unit", kind="int", default=3, help="pairs per symbol or document piece"),
+                   F("limit", kind="int", help="ask about at most this many units (a trial run)"),
+                   F("replay", repeat=True, help="general chat-format JSONL to mix in"),
+                   F("replay_share", kind="float", default=0.15),
+                   F("holdout", kind="float", default=0.1, help="share of symbols held out"),
+                   F("lora_r", kind="int", default=16, choices=None, help="the LoRA rank to suggest (16 or 32)"),
+                   F("scan_only", kind="bool", help="scan and stop: see what would be asked about"),
+                   F("out", req=True, help="output folder (an existing one resumes)")]},
+    "repo_adapt_check": {
+        "title": "Adapt to a repository: is the adapter still current?", "group": "Retrain",
+        "argv": [S / "repo_adapt.py", "check"],
+        "help": "Compare the repository's core interfaces now with those the adapter was trained on; list what "
+                "changed. Optionally refuse an adapter larger than its budget. Fails when stale or too large.",
+        "fields": [F("manifest", req=True, help="manifest.json from the adaptation run"),
+                   F("repo", req=True, help="the repository's folder"),
+                   F("adapter", help="the adapter file, for the size check"),
+                   F("max_adapter_mb", kind="float", help="size budget in MB")]},
+})
+
 # ---- interpretability: feature dictionaries, circuits and emotion vectors (docs/FEATURES.md)
 SITE_CHOICES = ["resid", "mlp_in", "mlp_out", "neurons"]
 DTYPES = ["auto", "float32", "bfloat16", "float16"]

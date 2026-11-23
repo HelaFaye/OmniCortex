@@ -74,7 +74,8 @@ The setup the spec is written for:
 
 ## Phase 1: adapt a model to a repository ("parametric context distillation")
 
-**Status: planned.** It reuses what exists:
+**Status: partial.** `scripts/repo_adapt.py` ([REPO_ADAPT.md](REPO_ADAPT.md)) does the scan, the questions, the
+judge, the mix, the manifest, staleness and the size check, as two jobs. It reuses what exists:
 - `deficits.py`: teacher, verification, replay, holdout;
 - `finetune.py`: LoRA;
 - `merge_export.py --lora-gguf`;
@@ -83,15 +84,16 @@ The setup the spec is written for:
 
 | Item | Status |
 |---|---|
-| **Repository scanner:** files, symbols, public interfaces, build files, tests; the same skip rules as the Docs folder import | planned (the file walk is done: `rag.folder_files`) |
-| **Questions grounded in the source:** the teacher writes question-and-answer pairs, each citing the file and lines it rests on | planned |
-| **Judge:** a pair is kept only if its answer is supported by the cited source (a second teacher pass, or a check that runs the code) | planned |
-| **Provenance manifest:** for each pair, the repository, commit, files and lines, teacher, judge verdict and time; no keys | planned |
-| **Expiry:** the adapter records a fingerprint of the repository's core interfaces and the git commit. When the interfaces change, Studio says the adapter is stale. Commits that don't touch them don't expire it | planned |
-| **Training mix:** 85% repository pairs and 15% general replay, so the model doesn't forget what it knew (`deficits.py`'s own default is a 25% deficit share, for failures) | planned |
-| **LoRA:** rank 16 or 32; exported as a GGUF LoRA so Studio can switch it on per chat; a size check refuses an adapter larger than its budget | partial (the LoRA, the export and the hot-swap exist) |
+| **Repository scanner:** files, symbols, public interfaces, build files, tests; the same skip rules as the Docs folder import | done (`repo_adapt.py`: Python by its parser; JavaScript and TypeScript, Rust, Go, C and C++ headers, Java, Kotlin, C# by pattern) |
+| **Questions grounded in the source:** the teacher writes question-and-answer pairs, each citing the file and lines it rests on | done |
+| **Judge:** a pair is kept only if its answer is supported by the cited source (a second teacher pass, or a check that runs the code) | done |
+| **Provenance manifest:** for each pair, the repository, commit, files and lines, teacher, judge verdict and time; no keys | done |
+| **Expiry:** the adapter records a fingerprint of the repository's core interfaces and the git commit. When the interfaces change, Studio says the adapter is stale. Commits that don't touch them don't expire it | done |
+| **Training mix:** 85% repository pairs and 15% general replay, so the model doesn't forget what it knew (`deficits.py`'s own default is a 25% deficit share, for failures) | done (too little replay is a warning) |
+| **LoRA:** rank 16 or 32; exported as a GGUF LoRA so Studio can switch it on per chat; a size check refuses an adapter larger than its budget | partial (the LoRA, the export, the hot-swap and the size check exist; a Studio indicator for a stale adapter is planned) |
 | **Truth-probe calibration check:** the base model's probe still reads the adapted model (AUROC drop within the gate's limit) | partial (`quant_fidelity.py`'s truth transfer does this for quants; it will reuse it) |
-| **Tests:** the scanner, the manifest, expiry against real git histories, and the mix ratios | planned |
+| **Tests:** the scanner, the manifest, expiry against real git histories, and the mix ratios | done (`tests/test_repo_adapt.py`, with a fake teacher; a trial with a real small teacher is in REPO_ADAPT.md) |
+| **API keys from the environment only** | partial: done in `repo_adapt.py` (`--key-env`; the tests check that no output holds the key). `deficits.py` still takes `--api-key` on the command line, where job records and the process list can see it; move it to the same scheme |
 
 ## Phase 2: one acceptance gate
 
@@ -210,10 +212,11 @@ report.
 
 ## Order, as the audit recommends
 
-1. Phase 1's scanner, question generator, judge, manifest and expiry tests.
-2. Wire them into `finetune.py` and `merge_export.py`, with the 15% replay and the size check.
+1. Phase 1's scanner, question generator, judge, manifest and expiry tests. *Done.*
+2. Wire them into `finetune.py` and `merge_export.py`, with the 15% replay and the size check. *Done as job
+   steps (quick-start path 5); a Studio stale-adapter indicator is left.*
 3. Phase 2's strict preset (AUROC drop at most 0.02).
-4. A Studio job for phase 1, and quick-start path 5 completed.
+4. A Studio job for phase 1, and quick-start path 5 completed. *Done.*
 5. Phase 3: the MI50 training path and the capability flags, checked on hardware.
 6. Phase 4: long context, xGMI and telemetry benchmarks.
 

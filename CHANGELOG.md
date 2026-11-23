@@ -22,6 +22,16 @@
   planned, with the hardware limits that shape it. The plan starts with adapting a model to a repository and one
   acceptance gate.
 
+- `scripts/repo_adapt.py` (Jobs → Retrain → *Adapt to a repository*, [docs/REPO_ADAPT.md](docs/REPO_ADAPT.md)): training
+  data that teaches a model one repository:
+  - questions a teacher writes from the source, each citing its lines;
+  - a judge that drops pairs naming things the repository lacks or claims the source doesn't support;
+  - 85% repository pairs with 15% general replay, and a holdout of whole symbols;
+  - a provenance manifest with no keys (the key comes from `OC_TEACHER_KEY`).
+
+  `check` says when the repository's interfaces have changed since the adapter was trained, and whether the adapter
+  is within its size budget.
+
 ### Fixed
 
 - Lab's *Open in Jobs* buttons open their own job, not the job list.

@@ -81,6 +81,7 @@ deliberately not on the Setup page: set it in `config.json` or with flags
 | Per-model, per-subject results | Studio → Models (stats) | `python scripts/model_stats.py show` | `model_stats` |
 | SWE-bench, LiveBench, CLIP_benchmark | **Jobs → Benchmarks** | `python scripts/benchmarks.py`, `clip_bench.py` | `start_job …` |
 | Retraining on failures (data, fine-tune, merge) | **Jobs → Retrain** | `deficits.py`, `finetune.py`, `merge_export.py` | `start_job …` |
+| Adapt a model to one repository: grounded questions, judge, replay mix, provenance, staleness | **Jobs → Retrain → Adapt to a repository** | `python scripts/repo_adapt.py run / check` ([REPO_ADAPT.md](REPO_ADAPT.md)) | `start_job repo_adapt` |
 | A whole retraining cycle: baseline, data, one or more layer arms, holdout, verdict | **Jobs → Retrain → Retraining cycle** | `python scripts/retrain_cycle.py` | `start_job retrain_cycle` |
 | Find and remove a concept's direction from the weights (norm-preserving, KL damage meter, optimized) | **Jobs → Retrain → Concept edit** | `python scripts/concept_edit.py` ([CONCEPT_EDITING.md](CONCEPT_EDITING.md)) | `start_job concept_edit` |
 | Adapt to a task while protecting a subspace (SAGE) | **Jobs → Retrain → SAGE** | `python scripts/sage_edit.py train / chat / export` | `start_job sage_train` |

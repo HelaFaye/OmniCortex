@@ -71,16 +71,18 @@ For a single wrong reply in chat, **Fix This Mistake** under the reply keeps the
 
 ## 5. Adapt a model to one repository
 
-*Partly available.* A dedicated workflow is planned ([ROADMAP.md](ROADMAP.md), phase 1). It will scan the
-repository, have a teacher write questions and answers grounded in its source, train a small LoRA mixed with
-general replay data, record where every pair came from, and expire the adapter when the repository's core
-interfaces change.
+Train a small LoRA that knows the repository, from questions and answers grounded in its own source
+([REPO_ADAPT.md](REPO_ADAPT.md)). Try path 1 first: retrieval is often enough, and it never goes out of date.
 
-Today:
-- **Without training:** path 1. Retrieval over the repository is often enough, and it never goes stale.
-- **With training:** write question-and-answer pairs about the repository in the deficit dataset's format, then
-  use steps 3 to 5 of path 4. Keep general replay data in the mix (the deficit dataset adds it), and check the
-  result with the gate.
+1. Set the teacher's API key where Studio runs, as the environment variable `OC_TEACHER_KEY`. It is never typed
+   into a form or stored.
+2. [Adapt to a repository](/jobs#kind=repo_adapt&per_unit=3&limit=20&replay_share=0.15): give the repository's
+   folder, the teacher, and general chat data for *replay*. The link starts with a trial of 20 symbols: read
+   `manifest.json` and the kept pairs, then clear *limit* and run again. It resumes, so the trial isn't wasted.
+3. [Fine-tune](/jobs#kind=finetune&method=lora&lora_r=16) with *data* set to that output folder.
+4. [Merge and convert](/jobs#kind=merge&lora_gguf=1) to a GGUF LoRA, which Studio switches on per chat.
+5. [Is the adapter still current?](/jobs#kind=repo_adapt_check&max_adapter_mb=200) whenever the repository moves
+   on: it lists the interfaces that changed, and checks the adapter's size against a budget.
 
 ## 6. Prepare a model for deployment
 
