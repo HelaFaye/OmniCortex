@@ -53,9 +53,9 @@ function render(){
     try{ const r=await api('api/lab/'+b.dataset.a,{name:n,cfg}); if(b.dataset.a==='start') window.open(url(r.port),'_blank'); }
     catch(e){ card.querySelector('.err').textContent=e.message }
     await load(); }));
-  $('#views').innerHTML=[['Timeline','Exact per-token view of a trace, no glow: for measuring.'],['Explorer','Mean and contrast maps and a 3D volume of an activations run; click a cell to inspect.'],
-    ['Weights','Weight magnitude, quantization error and where the H-Neurons sit in a GGUF.'],['Compare','Two or more runs side by side: depth profiles, overlap (a report).']]
-    .map(([t,d])=>`<div class="card"><h2>${t}</h2><div class="note">${d}</div><div class="row"><a class="btn" href="/jobs">Open in Jobs</a></div></div>`).join('');
+  $('#views').innerHTML=[['Timeline','Exact per-token view of a trace, no glow: for measuring.','view_timeline'],['Explorer','Mean and contrast maps and a 3D volume of an activations run; click a cell to inspect.','view_explore'],
+    ['Weights','Weight magnitude, quantization error and where the H-Neurons sit in a GGUF.','view_weights'],['Compare','Two or more runs side by side: depth profiles, overlap (a report).','compare']]
+    .map(([t,d,k])=>`<div class="card"><h2>${t}</h2><div class="note">${d}</div><div class="row"><a class="btn" href="/jobs#${k}">Open in Jobs</a></div></div>`).join('');
 }
 async function load(){ D=await api('api/lab'); render(); }
 load().catch(e=>$('#svcs').innerHTML=`<div class="err">${esc(e.message)}</div>`);

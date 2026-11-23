@@ -1344,6 +1344,13 @@ pre{background:var(--code);padding:.6rem;border-radius:6px;max-height:60vh;overf
 <header><h1>Studio · Jobs</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/lab">Lab</a><a href="/review">Review</a><a href="/projects">Projects</a><a href="/workers">Workers</a><a href="/jobs">Jobs</a><a href="/connect">Connect</a><span class="note" id="hint"></span></header>
 <main>
  <section class="card"><h2>New job</h2>
+  <div class="note" id="qs" style="margin:-.2rem 0 .5rem">Not sure which job? <a href="/help/QUICKSTART">Quick start</a>:
+   <a href="/help/QUICKSTART#1-ask-questions-about-a-repository">ask about a repo</a> ·
+   <a href="/help/QUICKSTART#2-fix-or-extend-a-repository">fix or extend one</a> ·
+   <a href="/help/QUICKSTART#3-measure-how-well-a-model-codes">measure coding</a> ·
+   <a href="/help/QUICKSTART#4-improve-what-a-model-gets-wrong">improve weaknesses</a> ·
+   <a href="/help/QUICKSTART#5-adapt-a-model-to-one-repository">adapt to a repo</a> ·
+   <a href="/help/QUICKSTART#6-prepare-a-model-for-deployment">prepare for deployment</a></div>
   <select id="kind"></select><div id="khelp" class="note" style="margin-top:.3rem"></div>
   <div id="profbar" style="margin:.5rem 0 .2rem"></div>
   <form id="form"></form>

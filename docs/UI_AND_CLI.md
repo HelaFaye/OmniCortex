@@ -1,5 +1,7 @@
 # Every feature: in the UI, on the command line, and for agents
 
+Looking for where to start on a task rather than a feature? [QUICKSTART.md](QUICKSTART.md).
+
 After `./install.sh`, nothing needs a terminal: start **OmniCortex** from the
 app menu (or `./omnicortex`, or `OmniCortex.bat` on Windows) and Studio opens
 in your browser. Everything below is also scriptable, for people who prefer a
@@ -65,7 +67,7 @@ deliberately not on the Setup page: set it in `config.json` or with flags
 | Chat (images, saved chats, presets) | Studio → **Chats** | `/v1/chat/completions` (any OpenAI client) | `chat` |
 | `auto` routing by measured skill | model picker → auto | `"model": "auto"`; `python scripts/model_stats.py rank "…"` | `route_prompt` |
 | Check a reply for hallucination risk, 3D view of it | chat → **check** | `POST /api/trace` | `check_reply` |
-| Chat with documents (RAG) | Studio → **Docs** | `python scripts/rag.py` | — |
+| Chat with documents (RAG), including a whole repository folder | Studio → **Docs** (**+ Add a folder**) | `python scripts/rag.py add --folder` | — |
 | MCP tools inside chat | Studio → **Tools** | `~/.omnicortex/mcp.json`, `python scripts/mcp_client.py` | — |
 | Other devices and linked machines | **Connect → Devices** | `/api/pair/*`, `/api/links/*` | — |
 | Computers running LM Studio, Ollama or llama.cpp without OmniCortex (remote hosts): pair, models, load/unload, send and install models | **Remote** | the agent: `omnicortex-remote` ([REMOTE.md](REMOTE.md)); `/api/remote/*` | `remote_hosts`, `remote_call` |
