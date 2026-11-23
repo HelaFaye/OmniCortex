@@ -121,3 +121,51 @@ def test_studio_shows_the_choice(tmp_path):
             next(gen)
         except StopIteration:
             pass
+
+
+PERPLEXITY_FLAKY = r'''#!{py}
+import sys, os, pathlib
+args = sys.argv[1:]
+base = pathlib.Path(args[args.index("--kl-divergence-base") + 1])
+if "--kl-divergence" not in args:
+    base.write_text("base"); sys.exit(0)
+state = pathlib.Path({state!r})
+n = int(state.read_text()) if state.exists() else 0
+state.write_text(str(n + 1))
+mode = {mode!r}
+if mode == "crash-once" and n == 0 or mode == "always":
+    print("kl_divergence: 0.01 seconds per pass - ETA", file=sys.stderr); sys.stderr.flush(); os.abort()
+print("Mean    KLD:   0.012000 ±   0.000100")
+print("Same top p: 97.500 ± 0.400 %")
+if mode == "exit-after-results":
+    sys.exit(3)
+'''
+
+
+def _flaky(tmp_path, mode):
+    tool = tmp_path / f"perp-{mode}"
+    tool.write_text(PERPLEXITY_FLAKY.format(py=sys.executable, state=str(tmp_path / f"n-{mode}"), mode=mode))
+    tool.chmod(0o755)
+    text = tmp_path / "t.txt"
+    text.write_text("x")
+    return str(tool), str(text)
+
+
+def test_kld_survives_one_crash_and_says_so(tmp_path):
+    tool, text = _flaky(tmp_path, "crash-once")
+    r = qs.kld(tool, "ref.gguf", "q.gguf", text, tmp_path, 0, 2)
+    assert r["kld"] == 0.012 and r["same_top"] == 97.5
+    assert len(r["retried_after"]) == 1 and "SIGABRT" in r["retried_after"][0] and "seconds per pass" in r["retried_after"][0]
+
+
+def test_kld_keeps_printed_results_after_an_unclean_exit(tmp_path):
+    tool, text = _flaky(tmp_path, "exit-after-results")
+    r = qs.kld(tool, "ref.gguf", "q.gguf", text, tmp_path, 0, 2)
+    assert r["kld"] == 0.012 and r["exit"] == 3 and "retried_after" not in r
+
+
+def test_kld_failure_names_the_exit(tmp_path):
+    import pytest
+    tool, text = _flaky(tmp_path, "always")
+    with pytest.raises(RuntimeError, match=r"killed by SIGABRT.*; then killed by SIGABRT"):
+        qs.kld(tool, "ref.gguf", "q.gguf", text, tmp_path, 0, 2)

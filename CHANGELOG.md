@@ -34,6 +34,12 @@
 
 ### Fixed
 
+- The KL divergence step (`quant_select.py`, `quant_fidelity.py`):
+  - it keeps llama-perplexity's printed results even when the tool then exits uncleanly;
+  - it retries once after a crash, and records the crash (`retried_after`) in the report;
+  - its error now names the exit status or signal, with the tool's last lines, instead of a progress line.
+
+  CI hit an intermittent llama-perplexity failure on llama.cpp b12653 that didn't reproduce in eight local runs.
 - Lab's *Open in Jobs* buttons open their own job, not the job list.
 
 ### Added (quantization fidelity)
