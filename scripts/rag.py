@@ -12,6 +12,10 @@ model and is often enough for names, identifiers and error messages.
     python scripts/rag.py add  --collection notes docs/*.md
     python scripts/rag.py search --collection notes "how does auto routing pick a model"
     python scripts/rag.py add  --collection papers paper.pdf --embed http://127.0.0.1:8081/v1@nomic-embed
+    python scripts/rag.py add  --collection myrepo --folder ~/src/myrepo      # a whole repository
+
+A folder is walked for text and code files, skipping version control, dependencies, build output and anything
+larger than 1 MB; each passage remembers its path in the folder, so a reply cites `src/app/main.py`, not `main.py`.
 
 Text, Markdown, code, HTML, JSON/CSV are read directly; PDF needs `pypdf`,
 DOCX needs `python-docx`. Chunks are ~1000 characters on paragraph
@@ -55,6 +59,34 @@ def tokens(text: str) -> list[str]:
 
 
 # ---------------------------------------------------------------- reading
+
+SKIP_DIRS = {".git", ".hg", ".svn", "node_modules", "__pycache__", ".venv", "venv", ".tox", ".mypy_cache",
+             ".pytest_cache", "build", "dist", "target", ".gradle", ".idea", ".vscode", ".next", ".cache"}
+FOLDER_EXT = TEXT_EXT | {".html", ".htm", ".pdf", ".docx", ".cmake", ".gradle", ".mk", ".s", ".asm", ".lua",
+                         ".cs", ".m", ".mm", ".zig", ".nim", ".dart", ".vue", ".svelte", ".proto", ".glsl", ".hlsl"}
+FOLDER_NAMES = {"Makefile", "CMakeLists.txt", "Dockerfile", "README", "LICENSE", "Containerfile"}
+FOLDER_MAX = 1024 * 1024
+
+
+def source_name(name: str) -> str:
+    """A file's name as passages cite it: its path inside the folder it came from, without a leading slash,
+    a drive, or any `..`; just the file name if nothing else is left."""
+    parts = [p for p in re.split(r"[\\/]+", str(name)) if p and p not in (".", "..") and not p.endswith(":")]
+    return "/".join(parts)[-200:] or "upload.txt"
+
+
+def folder_files(root: str | Path) -> list[Path]:
+    """The files under root worth indexing: text and code, not version control, dependencies or build output."""
+    root, out = Path(root), []
+    for p in sorted(root.rglob("*")):
+        rel = p.relative_to(root).parts
+        if any(part in SKIP_DIRS or (part.startswith(".") and part not in (".github",)) for part in rel[:-1]):
+            continue
+        if not p.is_file() or p.is_symlink() or p.stat().st_size > FOLDER_MAX:
+            continue
+        if p.suffix.lower() in FOLDER_EXT or p.name in FOLDER_NAMES:
+            out.append(p)
+    return out
 
 def extract(name: str, data: bytes) -> list[tuple[int | None, str]]:
     """[(page or None, text)] from a file's bytes."""
@@ -188,13 +220,18 @@ class Collection:
         return {"name": self.name, "docs": len(self.docs()), "chunks": len(self.chunks),
                 "dense": self.dense is not None, "embed_model": self.meta.get("embed_model")}
 
-    def add(self, name: str, data: bytes, embedder: Embedder | None = None, size: int = 1000) -> dict:
-        doc = hashlib.sha256(data).hexdigest()[:16]
+    def add(self, name: str, data: bytes, embedder: Embedder | None = None, size: int = 1000,
+            source: str | None = None, defer: bool = False) -> dict:
+        """source: how passages cite the file (default: its file name); a folder's files pass their path in it,
+        and adding the same path again replaces it. defer: leave saving and indexing to flush(), for many files."""
+        doc = hashlib.sha256(("path:" + source_name(source)).encode()).hexdigest()[:16] if source else \
+            hashlib.sha256(data).hexdigest()[:16]
         pages = extract(name, data)
+        src = source_name(source) if source else Path(name).name
         new = []
         for page, text in pages:
             for i, piece in enumerate(chunk(text, size)):
-                new.append({"doc": doc, "source": Path(name).name, "page": page, "i": i, "text": piece})
+                new.append({"doc": doc, "source": src, "page": page, "i": i, "text": piece})
         if not new:
             raise ValueError(f"{name}: no text found")
         vecs = None
@@ -216,9 +253,16 @@ class Collection:
                 self.dense = vecs if self.dense is None else np.concatenate([self.dense, vecs])
                 self.meta["embed_model"] = embedder.model
             self.meta["updated"] = time.time()
+            if not defer:
+                self._save()
+                self._index()
+        return {"doc": doc, "source": src, "chunks": len(new), "pages": len(pages)}
+
+    def flush(self) -> None:
+        """Save and index after adds with defer=True."""
+        with self.lock:
             self._save()
             self._index()
-        return {"doc": doc, "source": Path(name).name, "chunks": len(new), "pages": len(pages)}
 
     def remove(self, doc: str) -> int:
         with self.lock:
@@ -318,7 +362,8 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     a_ = sub.add_parser("add")
     a_.add_argument("--collection", required=True)
-    a_.add_argument("files", nargs="+")
+    a_.add_argument("files", nargs="*")
+    a_.add_argument("--folder", help="index every text and code file under this folder (a repository)")
     s_ = sub.add_parser("search")
     s_.add_argument("--collection", required=True)
     s_.add_argument("query")
@@ -330,8 +375,21 @@ def main(argv=None) -> int:
     store = RagStore(a.root, Embedder(a.embed) if a.embed else None)
     if a.cmd == "add":
         c = store.get(a.collection, create=True)
+        if not a.files and not a.folder:
+            p.error("add needs files or --folder")
         for f in a.files:
             print(json.dumps(c.add(f, Path(f).read_bytes(), store.embedder)))
+        if a.folder:
+            root = Path(a.folder).expanduser()
+            files, skipped = folder_files(root), []
+            for f in files:
+                try:
+                    c.add(str(f), f.read_bytes(), store.embedder, source=f.relative_to(root).as_posix(), defer=True)
+                except ValueError as e:
+                    skipped.append(str(e))
+            c.flush()
+            print(json.dumps({"folder": str(root), "files": len(files) - len(skipped), "skipped": skipped[:20],
+                              **c.info()}))
     elif a.cmd == "search":
         for h in store.search(a.collection, a.query, a.k):
             print(f"{h['score']:.4f}  {h['source']}{'' if not h.get('page') else ' p' + str(h['page'])}: "

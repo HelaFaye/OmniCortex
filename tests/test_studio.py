@@ -331,6 +331,22 @@ def _upload(base, coll, name, text):
                                           "data": base64.b64encode(text.encode()).decode()})
 
 
+def test_rag_folder_import(studio_srv, tmp_path):
+    import studio
+    repo = tmp_path / "proj"
+    (repo / "pkg").mkdir(parents=True)
+    (repo / "pkg" / "orbit.py").write_text("def transfer_orbit():\n    return 'hohmann'\n")
+    (repo / ".git").mkdir()
+    (repo / ".git" / "HEAD").write_text("transfer_orbit")
+    code, r = call(studio_srv, "/api/rag/folder", {"collection": "proj", "folder": str(repo)})
+    assert code == 200 and r["files"] == 1 and r["docs"] == 1, r
+    _, hits = call(studio_srv, "/api/rag/search", {"collection": "proj", "query": "transfer_orbit"})
+    assert hits[0]["source"] == "pkg/orbit.py"
+    assert call(studio_srv, "/api/rag/folder", {"collection": "proj", "folder": str(repo / "nope")})[0] == 400
+    assert "/api/rag/folder" not in studio.DEVICE_POSTS      # paired devices cannot read the owner's folders
+    call(studio_srv, "/api/rag/delete", {"collection": "proj"})
+
+
 def test_rag_collections_and_chat_citations(studio_srv):
     code, _ = call(studio_srv, "/api/rag/create", {"collection": "kb"})
     assert code == 200

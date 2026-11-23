@@ -100,7 +100,8 @@ python scripts/doctor.py                     # checks Python, packages, GPUs, ll
 scripts/build_llama_tools.sh --backend vulkan  # llama.cpp + the cett-dump extractor (or cpu, cuda, hip, metal); ~5 min
 ```
 
-Full setup: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md). Hardware notes,
+Full setup: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md). Where to start on a task (ask about a repository,
+measure coding, retrain, deploy): [docs/QUICKSTART.md](docs/QUICKSTART.md). The plan: [docs/ROADMAP.md](docs/ROADMAP.md). Hardware notes,
 including AMD APUs: [docs/HARDWARE.md](docs/HARDWARE.md). OmniCortex supports legacy and modern
 hardware alike; [hardware support profiles](docs/HARDWARE_PROFILES.md) record the right setup per family and purpose,
 including MI50s with the gfx906-tuned [mx-llama.cpp](docs/MX_LLAMA.md) fork.

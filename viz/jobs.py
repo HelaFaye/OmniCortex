@@ -286,6 +286,40 @@ SPECS: dict[str, dict] = {
                    F("style", choices=["off", "auto", "pixel", "cartoon"], default="off", help="pixel art and cartoons: clean upscaling, padding, style prompts"), F("out", req=True)]},
 }
 
+# ---- adapting a model to one repository (docs/REPO_ADAPT.md)
+SPECS.update({
+    "repo_adapt": {
+        "title": "Adapt to a repository: training data from its source", "group": "Retrain",
+        "argv": [S / "repo_adapt.py", "run"],
+        "help": "Scan a repository, have a teacher write questions and answers grounded in its source, keep the "
+                "ones the source supports, and build sft.jsonl (85% repository, 15% general replay), a holdout of "
+                "whole symbols and a provenance manifest. The teacher's key comes from the environment variable "
+                "named below, set where Studio runs; it is never stored. Then Fine-tune with lora (docs/REPO_ADAPT.md).",
+        "fields": [F("repo", req=True, help="the repository's folder"),
+                   F("teacher", help="URL@model of the teacher (OpenAI-compatible)"),
+                   F("judge", help="URL@model of a separate judge (default: the teacher)"),
+                   F("no_judge_model", kind="bool", help="only the cheap checks, no judge model"),
+                   F("key_env", default="OC_TEACHER_KEY", help="environment variable holding the teacher's API key"),
+                   F("core", repeat=True, help="globs of core paths, e.g. src/api/** (default: all)"),
+                   F("per_unit", kind="int", default=3, help="pairs per symbol or document piece"),
+                   F("limit", kind="int", help="ask about at most this many units (a trial run)"),
+                   F("replay", repeat=True, help="general chat-format JSONL to mix in"),
+                   F("replay_share", kind="float", default=0.15),
+                   F("holdout", kind="float", default=0.1, help="share of symbols held out"),
+                   F("lora_r", kind="int", default=16, choices=None, help="the LoRA rank to suggest (16 or 32)"),
+                   F("scan_only", kind="bool", help="scan and stop: see what would be asked about"),
+                   F("out", req=True, help="output folder (an existing one resumes)")]},
+    "repo_adapt_check": {
+        "title": "Adapt to a repository: is the adapter still current?", "group": "Retrain",
+        "argv": [S / "repo_adapt.py", "check"],
+        "help": "Compare the repository's core interfaces now with those the adapter was trained on; list what "
+                "changed. Optionally refuse an adapter larger than its budget. Fails when stale or too large.",
+        "fields": [F("manifest", req=True, help="manifest.json from the adaptation run"),
+                   F("repo", req=True, help="the repository's folder"),
+                   F("adapter", help="the adapter file, for the size check"),
+                   F("max_adapter_mb", kind="float", help="size budget in MB")]},
+})
+
 # ---- interpretability: feature dictionaries, circuits and emotion vectors (docs/FEATURES.md)
 SITE_CHOICES = ["resid", "mlp_in", "mlp_out", "neurons"]
 DTYPES = ["auto", "float32", "bfloat16", "float16"]
@@ -1344,6 +1378,13 @@ pre{background:var(--code);padding:.6rem;border-radius:6px;max-height:60vh;overf
 <header><h1>Studio · Jobs</h1><a href="/">← Studio</a><a href="/setup">Setup</a><a href="/settings">Settings</a><a href="/lab">Lab</a><a href="/review">Review</a><a href="/projects">Projects</a><a href="/workers">Workers</a><a href="/jobs">Jobs</a><a href="/connect">Connect</a><span class="note" id="hint"></span></header>
 <main>
  <section class="card"><h2>New job</h2>
+  <div class="note" id="qs" style="margin:-.2rem 0 .5rem">Not sure which job? <a href="/help/QUICKSTART">Quick start</a>:
+   <a href="/help/QUICKSTART#1-ask-questions-about-a-repository">ask about a repo</a> ·
+   <a href="/help/QUICKSTART#2-fix-or-extend-a-repository">fix or extend one</a> ·
+   <a href="/help/QUICKSTART#3-measure-how-well-a-model-codes">measure coding</a> ·
+   <a href="/help/QUICKSTART#4-improve-what-a-model-gets-wrong">improve weaknesses</a> ·
+   <a href="/help/QUICKSTART#5-adapt-a-model-to-one-repository">adapt to a repo</a> ·
+   <a href="/help/QUICKSTART#6-prepare-a-model-for-deployment">prepare for deployment</a></div>
   <select id="kind"></select><div id="khelp" class="note" style="margin-top:.3rem"></div>
   <div id="profbar" style="margin:.5rem 0 .2rem"></div>
   <form id="form"></form>

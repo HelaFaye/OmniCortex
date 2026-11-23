@@ -2,6 +2,46 @@
 
 ## Unreleased
 
+### Added (quick starts and a plan for the next stages)
+
+- [docs/QUICKSTART.md](docs/QUICKSTART.md): six task-first paths through Studio:
+  - ask about a repository;
+  - fix or extend one;
+  - measure coding ability;
+  - improve weaknesses;
+  - adapt a model to a repository;
+  - prepare for deployment.
+
+  Each step's link opens its job with the form filled in. The guides are linked from the top of Jobs and from the
+  **?** menu, and a test checks every link against the job's real fields.
+- The Docs tab adds a whole folder, such as a repository (**+ Add a folder**; `rag.py add --folder`):
+  - text and code only; version control, dependencies, build output and files over 1 MB are skipped;
+  - each passage cites its path in the folder;
+  - adding the folder again updates it.
+- [docs/ROADMAP.md](docs/ROADMAP.md): the spec of 2026-11-23 in nine phases, each item marked done, partial or
+  planned, with the hardware limits that shape it. The plan starts with adapting a model to a repository and one
+  acceptance gate.
+
+- `scripts/repo_adapt.py` (Jobs → Retrain → *Adapt to a repository*, [docs/REPO_ADAPT.md](docs/REPO_ADAPT.md)): training
+  data that teaches a model one repository:
+  - questions a teacher writes from the source, each citing its lines;
+  - a judge that drops pairs naming things the repository lacks or claims the source doesn't support;
+  - 85% repository pairs with 15% general replay, and a holdout of whole symbols;
+  - a provenance manifest with no keys (the key comes from `OC_TEACHER_KEY`).
+
+  `check` says when the repository's interfaces have changed since the adapter was trained, and whether the adapter
+  is within its size budget.
+
+### Fixed
+
+- The KL divergence step (`quant_select.py`, `quant_fidelity.py`):
+  - it keeps llama-perplexity's printed results even when the tool then exits uncleanly;
+  - it retries once after a crash, and records the crash (`retried_after`) in the report;
+  - its error now names the exit status or signal, with the tool's last lines, instead of a progress line.
+
+  CI hit an intermittent llama-perplexity failure on llama.cpp b12653 that didn't reproduce in eight local runs.
+- Lab's *Open in Jobs* buttons open their own job, not the job list.
+
 ### Added (quantization fidelity)
 
 - `scripts/quant_fidelity.py` (Jobs → *Did a quantization keep what the model knows?*,

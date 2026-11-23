@@ -237,6 +237,7 @@ section.chat{position:relative}
       <b id="collname"></b> <span id="colldense" class="note"></span>
       <input type="file" id="docfile" multiple hidden>
       <button id="adddocs" style="width:100%;margin:.4rem 0">+ Add files (txt, md, code, html, pdf, docx)</button>
+      <button id="adddir" style="width:100%;margin:0 0 .4rem" title="Every text and code file in a folder on Studio's computer, such as a repository; skips .git, dependencies and build output. Adding it again updates it.">+ Add a folder (a repository)</button>
       <div id="docmsg" class="note"></div>
       <div id="docs"></div>
       <label>Try a search</label><input id="ragq" placeholder="query, Enter to search"><div id="raghits" class="note"></div>
@@ -1022,6 +1023,12 @@ async function openColl(name){ curColl=name; $('#collpanel').style.display=''; $
 $('#mkcoll').onclick=async()=>{ const n=$('#newcoll').value.trim(); if(!n) return;
   const r=await post('/api/rag/create',{collection:n}); if(!r.ok){ alert((await r.json()).error); return; } $('#newcoll').value=''; await colls(); openColl(n); };
 $('#adddocs').onclick=()=>$('#docfile').click();
+$('#adddir').onclick=async()=>{ const dir=await nsPickPath({want:'dir',title:'Choose a folder to add (a repository)'}); if(!dir) return;
+  $('#docmsg').textContent='indexing '+dir+'… (a large repository takes a while)'; $('#adddir').disabled=true;
+  try{ const r=await post('/api/rag/folder',{collection:curColl,folder:dir}); const j=await r.json();
+    $('#docmsg').textContent=r.ok?`${j.files} files from ${j.folder}: ${j.chunks} passages in the collection`+(j.skipped.length?`; ${j.skipped.length} skipped (${j.skipped[0]})`:''):j.error; }
+  finally{ $('#adddir').disabled=false; }
+  openColl(curColl); colls(); };
 $('#docfile').onchange=async()=>{ const fs=[...$('#docfile').files]; $('#docfile').value='';
   for(const f of fs){ if(f.size>32e6){ $('#docmsg').textContent=f.name+' is larger than 32 MB'; continue; }
     $('#docmsg').textContent='indexing '+f.name+'…';

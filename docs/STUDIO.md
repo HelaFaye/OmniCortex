@@ -207,7 +207,10 @@ quality and speed curve.
 ## Documents (RAG)
 
 The **Docs** tab holds collections of files (text, Markdown, code, HTML, JSON,
-CSV; PDF with `pypdf`, DOCX with `python-docx`). Pick a collection in the
+CSV; PDF with `pypdf`, DOCX with `python-docx`), or a whole folder such as a
+repository (**+ Add a folder**: version control, dependencies and build output
+are skipped, passages cite each file's path, and adding it again updates it).
+Pick a collection in the
 **docs** selector under the chat and each message retrieves the four best
 passages, adds them as a numbered system message, and asks the model to cite
 them; the passages appear under the reply, expandable, and are saved with the
@@ -230,6 +233,7 @@ to mix in vectors from another. Collections live in `~/.omnicortex/rag`
 
 ```bash
 python scripts/rag.py add --collection notes docs/*.md
+python scripts/rag.py add --collection myrepo --folder ~/src/myrepo     # a whole repository
 python scripts/rag.py search --collection notes "how does auto routing pick a model"
 ```
 

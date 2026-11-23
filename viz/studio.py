@@ -5183,6 +5183,28 @@ class Handler(BaseHTTPRequestHandler):
         import base64
         store = rag_store()
         try:
+            if self.path == "/api/rag/folder":
+                # a folder on Studio's computer (a repository): owner only, like the folder browser
+                if not self._owner_only():
+                    return
+                req = self._read()
+                root = Path(os.path.expanduser(str(req.get("folder", "")))).resolve()
+                if not root.is_dir():
+                    return self._json(400, {"error": f"not a folder: {root}"})
+                files = oc_rag.folder_files(root)
+                if len(files) > 5000:
+                    return self._json(400, {"error": f"{len(files)} files: pick a smaller folder (at most 5000)"})
+                coll = store.get(str(req.get("collection", "")), create=True)
+                emb = rag_embedder() if (coll.dense is not None or not coll.chunks) else None
+                skipped = []
+                for f in files:
+                    try:
+                        coll.add(str(f), f.read_bytes(), emb, source=f.relative_to(root).as_posix(), defer=True)
+                    except (ValueError, OSError) as e:
+                        skipped.append(str(e)[:200])
+                coll.flush()
+                return self._json(200, {"folder": str(root), "files": len(files) - len(skipped),
+                                        "skipped": skipped[:20], **coll.info()})
             if self.path == "/api/rag/upload":
                 req = self._read(48 * 1024 * 1024)
                 data = base64.b64decode(str(req.get("data", "")).split(",", 1)[-1], validate=False)

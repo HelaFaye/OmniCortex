@@ -173,17 +173,48 @@ def kld(tool: str, ref: str, cand: str, text: str, out: Path, ngl: int, chunks: 
         r = subprocess.run([tool, "-m", ref, "-f", text, "--kl-divergence-base", str(base)] + common,
                            capture_output=True, text=True)
         if r.returncode != 0 or not base.exists():
-            raise RuntimeError((r.stderr or r.stdout).strip().splitlines()[-1:] or ["llama-perplexity failed"])
+            base.unlink(missing_ok=True)                 # a half-written base would poison every later quant
+            raise RuntimeError("llama-perplexity could not record the reference: " + exit_reason(r))
     if os.path.abspath(cand) == os.path.abspath(ref):
         return {"kld": 0.0, "same_top": 100.0, "method": "kld"}
-    r = subprocess.run([tool, "-m", cand, "--kl-divergence-base", str(base), "--kl-divergence"] + common,
-                       capture_output=True, text=True)
-    log = r.stdout + r.stderr
+    failures = []
+    for attempt in range(2):          # one retry: an intermittent crash shouldn't end a long run; it is recorded
+        r = subprocess.run([tool, "-m", cand, "--kl-divergence-base", str(base), "--kl-divergence"] + common,
+                           capture_output=True, text=True)
+        res = parse_kld(r.stdout + "\n" + r.stderr)
+        if res is not None:          # the summary was printed: the numbers stand even if the exit was unclean
+            res["method"] = "kld"
+            if r.returncode != 0:
+                res["exit"] = r.returncode
+            if failures:
+                res["retried_after"] = failures
+            return res
+        failures.append(exit_reason(r))
+    raise RuntimeError("llama-perplexity gave no KL divergence: " + "; then ".join(failures))
+
+
+def parse_kld(log: str) -> dict | None:
+    """llama-perplexity's KL summary (Mean KLD, Same top p), or None if it didn't print one."""
     m_k = re.search(r"Mean\s+KLD:\s+(-?[\d.]+)", log)
+    if not m_k:
+        return None
     m_t = re.search(r"Same top p:\s+([\d.]+)", log)
-    if r.returncode != 0 or not m_k:
-        raise RuntimeError(log.strip().splitlines()[-1:] or ["llama-perplexity failed"])
-    return {"kld": float(m_k.group(1)), "same_top": float(m_t.group(1)) if m_t else None, "method": "kld"}
+    return {"kld": float(m_k.group(1)), "same_top": float(m_t.group(1)) if m_t else None}
+
+
+def exit_reason(r) -> str:
+    """How a tool run ended, with the last lines it wrote: enough to tell a crash from a usage error."""
+    import signal
+    code = r.returncode
+    how = f"exit status {code}"
+    if code < 0:
+        try:
+            how = f"killed by {signal.Signals(-code).name}"
+        except ValueError:
+            pass
+    tail = [ln.strip() for ln in (r.stderr or "").strip().splitlines()[-3:] + (r.stdout or "").strip().splitlines()[-2:]
+            if ln.strip()]
+    return how + (": " + " | ".join(tail)[-400:] if tail else "")
 
 
 def answers(server: str, model: str, ngl: int, prompts: list[str], n: int, timeout: float) -> list[str]:

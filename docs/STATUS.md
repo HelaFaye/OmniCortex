@@ -1,16 +1,18 @@
 # Progress and plan
 
-Where OmniCortex stands, what has and hasn't been checked, and what comes next. Updated 2026-11-17.
+Where OmniCortex stands, what has and hasn't been checked, and what comes next. Updated 2026-11-23. The longer plan, phase by phase, is
+[ROADMAP.md](ROADMAP.md).
 
 ## Where things stand
 
-Everything below is on `main`, except quantization fidelity, which is in the pull request after #6. It came in
+Everything below is on `main`, except the quick-start guides, which are in the pull request after #7. It came in
 through these pull requests:
 - **#3** (merged 2026-11-13): the bulk of it, with the hardening of execution permissions, network services,
   remote transfers, tool rules and the tuning worker;
 - **#4**: the audit fixes and the Kivy client's API layer;
 - **#5**: mx-llama.cpp;
-- **#6** (merged 2026-11-16): the Kivy client app, desktop and Android.
+- **#6** (merged 2026-11-16): the Kivy client app, desktop and Android;
+- **#7** (merged 2026-11-17): quantization fidelity.
 
 Each area has its own document.
 
@@ -34,6 +36,8 @@ The **Checked** column says how far each piece has been verified:
 | Proxmox backend ([PROXMOX.md](PROXMOX.md)) | OmniCortex in an LXC container with the host's GPUs; MI50 VBIOS check | Simulated hosts |
 | mx-llama.cpp ([MX_LLAMA.md](MX_LLAMA.md)) | The MI50-tuned llama.cpp fork as the `amd-gfx906-mx` profile; split mode `tensor`, `-tps`, `-lm dio` in Studio | CI; cett-dump and the server activations patch built into the fork and its binaries passed the integration tests (CPU); HIP not on hardware |
 | Quantization fidelity ([QUANT_FIDELITY.md](QUANT_FIDELITY.md)) | Did a quant keep what the model knows: KL and top token, TestQA answers lost, H-neuron drift, truth probe transfer; a verdict per quant | CI (tiny model's Q8_0 and Q4_0); local on Qwen2.5-1.5B (F16 against Q8_0, Q4_K_M, Q2_K; results in the doc) |
+| Adapting a model to a repository ([REPO_ADAPT.md](REPO_ADAPT.md)) | Scan, teacher questions grounded in the source, judge, 85/15 mix with replay, holdout of whole symbols, provenance manifest, staleness by interface fingerprint, adapter size check | CI with a fake teacher; local trial with Qwen2.5-1.5B as teacher and judge (results in the doc); not yet trained or measured on a real adapter |
+| Quick-start guides ([QUICKSTART.md](QUICKSTART.md)) | Six task-first paths, linked from Jobs and the help menu; each step opens its job filled in. The Docs tab adds a whole folder (a repository) | CI (every job link is checked against the job's fields) |
 | CI (`.github/workflows/tests.yml`, `binaries.yml`, `android.yml`) | Tests with cached models and a cached llama.cpp build; binaries for 10 targets; the Android APK, and the client's self-test in an Android 13 emulator | Green except 32-bit Windows (best-effort, llama.cpp's own source) |
 | Kivy client ([MOBILE_CLIENTS.md](MOBILE_CLIENTS.md)) | Python/Kivy app for Studio | `clients/kivy`: pairing by link or QR code with certificate pinning, model choice, streamed chat, the risk strip, the truth probe, the emotion jewel, Fix This Mistake, the review lookup. CI against a fake Studio over TLS; the real app driven on a virtual display against a fake Studio; `/api/emotions` on a tiny real model. CI builds the Android APK. Not yet against a real Studio or on a phone |
 
@@ -91,7 +95,9 @@ None of these can be done in a cloud container. Each turns an "untested" note in
 
 ## Next stage, after merging
 
-In this order unless you reorder it.
+In this order unless you reorder it. The spec of 2026-11-23 adds phases 1 to 9 of [ROADMAP.md](ROADMAP.md); its
+recommended order starts with adapting a model to a repository, then one acceptance gate. These items stay open
+alongside it.
 
 1. **Kivy client interface:**
    - **done:** pairing by link or QR code, chat with model choice and streaming, the reply checks (risk strip,
