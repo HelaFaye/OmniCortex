@@ -95,7 +95,11 @@ SPECS: dict[str, dict] = {
             F("layers", default="all", help="all, a list like 10-17, or plan (the focus layers from the dataset)"),
             F("lora_r", kind="int", default=16), F("epochs", kind="float", default=2),
             F("max_steps", kind="int", default=-1), F("max_length", kind="int", default=2048),
-            F("gradient_checkpointing", kind="bool")]},
+            F("gradient_checkpointing", kind="bool"),
+            F("kl_anchor", kind="float", default=0.0,
+              help="keep close to the base on replay rows: BETA * KL (LoRA/QLoRA; e.g. 0.1)"),
+            F("guard_every", kind="int", default=0, help="check for collapse every N steps; stops a collapsing run"),
+            F("guard_max_kl", kind="float", default=1.0, help="nats per token from the base")]},
     "engine_optimize": {
         "title": "Find the fastest engine settings", "group": "Setup", "argv": [S / "engine_optimizer.py"],
         "help": "Measure tokens/s over threads, batch, flash attention, KV types... and keep the best (docs/ENGINE.md).",

@@ -5,7 +5,7 @@ Where OmniCortex stands, what has and hasn't been checked, and what comes next. 
 
 ## Where things stand
 
-Everything below is on `main`, except the acceptance gate, which is in the pull request after #8. It came in
+Everything below is on `main`, except the acceptance gate and the training guards, which are in the pull request after #8. It came in
 through these pull requests:
 - **#3** (merged 2026-11-13): the bulk of it, with the hardening of execution permissions, network services,
   remote transfers, tool rules and the tuning worker;
@@ -39,6 +39,7 @@ The **Checked** column says how far each piece has been verified:
 | mx-llama.cpp ([MX_LLAMA.md](MX_LLAMA.md)) | The MI50-tuned llama.cpp fork as the `amd-gfx906-mx` profile; split mode `tensor`, `-tps`, `-lm dio` in Studio | CI; cett-dump and the server activations patch built into the fork and its binaries passed the integration tests (CPU); HIP not on hardware |
 | Quantization fidelity ([QUANT_FIDELITY.md](QUANT_FIDELITY.md)) | Did a quant keep what the model knows: KL and top token, TestQA answers lost, H-neuron drift, truth probe transfer; a verdict per quant | CI (tiny model's Q8_0 and Q4_0); local on Qwen2.5-1.5B (F16 against Q8_0, Q4_K_M, Q2_K; results in the doc) |
 | Adapting a model to a repository ([REPO_ADAPT.md](REPO_ADAPT.md)) | Scan, teacher questions grounded in the source, judge, 85/15 mix with replay, holdout of whole symbols, provenance manifest, staleness by interface fingerprint, adapter size check | CI with a fake teacher; local trial with Qwen2.5-1.5B as teacher and judge (results in the doc); not yet trained or measured on a real adapter |
+| Training guards ([RETRAINING.md](RETRAINING.md#guards-stay-close-to-the-base-stop-a-collapsing-run)) | `--kl-anchor` (KL to the base on replay rows, LoRA/QLoRA) and `--guard-every` (stops on collapsing diversity, rising abstention or empty replies, KL drift, NaN loss; exit 5) | CI on a tiny real model (LoRA); not on a real model at scale |
 | Acceptance gate ([ACCEPT_GATE.md](ACCEPT_GATE.md)) | One verdict (accept, review, reject) from the retrain gate, quantization fidelity and the adapter check; default and strict presets (truth probe within 0.02 AUROC) | CI; local on the Qwen2.5-1.5B fidelity report (results in the doc) |
 | Quick-start guides ([QUICKSTART.md](QUICKSTART.md)) | Six task-first paths, linked from Jobs and the help menu; each step opens its job filled in. The Docs tab adds a whole folder (a repository) | CI (every job link is checked against the job's fields) |
 | CI (`.github/workflows/tests.yml`, `binaries.yml`, `android.yml`) | Tests with cached models and a cached llama.cpp build; binaries for 10 targets; the Android APK, and the client's self-test in an Android 13 emulator | Green except 32-bit Windows (best-effort, llama.cpp's own source) |

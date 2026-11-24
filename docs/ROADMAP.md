@@ -113,8 +113,8 @@ report.
 | **H-neuron drift and truth-probe AUROC transfer** | done |
 | **One gate over every report:** retrain, quant fidelity and repository adapter; accept, review or reject | done (`accept_gate.py`, [ACCEPT_GATE.md](ACCEPT_GATE.md)) |
 | **A strict preset:** truth-probe AUROC drop at most 0.02 (the default is 0.05) | done (`--preset strict` in `accept_gate.py` and `quant_fidelity.py`) |
-| **KL anchor during training:** a KL penalty against the base model's outputs on replay data | planned |
-| **Collapse guardrails:** stop training when output diversity, abstention rate or KL to the base moves past a limit | planned |
+| **KL anchor during training:** a KL penalty against the base model's outputs on replay data | done (`finetune.py --kl-anchor`, LoRA and QLoRA; [RETRAINING.md](RETRAINING.md)) |
+| **Collapse guardrails:** stop training when output diversity, abstention rate or KL to the base moves past a limit | done (`finetune.py --guard-every`; also empty replies and a NaN loss; exits 5) |
 | **Mock `llama-cett-dump` and judge fixtures,** so CI runs the whole gate without a model | partial (the integration test builds a tiny model; the mocks are planned) |
 | **Cross-quant regression diff view:** item by item, which answers each quant gained and lost, side by side in Studio | planned |
 
@@ -211,6 +211,12 @@ report.
 | **Sandbox:** anything the scout brings in runs in Podman with `--network=none` | planned |
 | **Overnight orchestrator, promotion gate, systemd timer** | planned |
 | **Installer scripts** for all of the above | planned |
+
+## Engines and models to add
+
+| Item | Status |
+|---|---|
+| **Radiance** (`codeberg.org/StillDeadcode/radiance`): support it, after reading what it is and what it exposes | planned; not yet reviewed, since this environment's network refuses codeberg.org |
 
 ## Order, as the audit recommends
 

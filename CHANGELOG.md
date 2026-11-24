@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Added (training guards)
+
+- `finetune.py --kl-anchor BETA` (LoRA and QLoRA) adds BETA times the KL divergence from the base model on the
+  replay rows' replies, so new material is learned without drifting from what the model already said. The base is
+  the adapter switched off; the term is logged as `kl_anchor`.
+- `finetune.py --guard-every N` checks every N steps for collapse and stops the run, recording why (exit 5), when:
+  - reply diversity falls;
+  - declined or empty replies rise;
+  - KL from the base passes a limit;
+  - the loss is NaN.
+
+  Both guards are in Jobs → Fine-tune and `scripts/train_guards.py`.
+
 ### Added (one acceptance gate)
 
 - `scripts/accept_gate.py` (Jobs → Retrain → *Acceptance gate*, [docs/ACCEPT_GATE.md](docs/ACCEPT_GATE.md)) gives a
