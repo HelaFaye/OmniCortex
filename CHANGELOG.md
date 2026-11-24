@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added (one acceptance gate)
+
+- `scripts/accept_gate.py` (Jobs → Retrain → *Acceptance gate*, [docs/ACCEPT_GATE.md](docs/ACCEPT_GATE.md)) gives a
+  change one verdict, accept, review or reject, from the reports it already has:
+  - the retrain gate;
+  - quantization fidelity, judged again with the preset's limits;
+  - the repository adapter check (current interfaces, size budget, manifest warnings).
+
+  `--require` stops a pipeline from passing by leaving a report out.
+- Limit presets in `quant_fidelity.py` and the gate: `default`, and `strict`, which holds the truth probe within
+  0.02 AUROC and tightens the rest.
+
 ### Added (quick starts and a plan for the next stages)
 
 - [docs/QUICKSTART.md](docs/QUICKSTART.md): six task-first paths through Studio:

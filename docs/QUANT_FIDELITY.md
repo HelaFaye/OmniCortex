@@ -57,7 +57,8 @@ Each quant gets one verdict:
 | risk flags flipped | 5% of texts | `--max-flag-flips` |
 | truth probe AUROC drop | 0.05 | `--max-auc-drop` |
 
-The defaults are a starting point. A small model loses more to the same quant type than a large one, and a
+`--preset strict` tightens them all (the truth probe within 0.02 AUROC; [ACCEPT_GATE.md](ACCEPT_GATE.md) lists
+both presets), and any option above overrides the preset. The defaults are a starting point. A small model loses more to the same quant type than a large one, and a
 task that leans on exact recall (facts, code) loses more than chat.
 
 ## Results

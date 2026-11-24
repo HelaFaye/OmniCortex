@@ -91,6 +91,7 @@ deliberately not on the Setup page: set it in `config.json` or with flags
 | How sure the model was, per token | chat: tick **confidence** | — | — |
 | Logit lens over a reply (Hugging Face models) | Jobs → **Logit lens over a reply** | `python scripts/logit_lens.py` ([CONFIDENCE.md](CONFIDENCE.md)) | `start_job logit_lens` |
 | Compare decoding variants (SLED, adaptive steering) | Jobs → **Decoding lab**, then TestQA and the gate | `python scripts/decode_lab.py` ([DECODING.md](DECODING.md)) | `start_job decode_lab` |
+| One verdict for any change: retrain, quant, adapter; default or strict limits | **Jobs → Retrain → Acceptance gate** | `python scripts/accept_gate.py` ([ACCEPT_GATE.md](ACCEPT_GATE.md)) | `start_job accept_gate` |
 | Keep or reject a retrained model (holdout, per subject, hallucination) | **Jobs → Retrain → Keep or reject a retrain** | `python scripts/retrain_gate.py` | `start_job retrain_gate` |
 | Compare models, item by item; does suppression help | **Jobs → Analysis** | `merge_eval.py`, `compare_models.py` | `start_job …` |
 | Neuron review: which neurons go with wrong answers, by source, subject and time; 3D over time | **Review** | `python scripts/neuron_review.py` | `review_sources`, `review_summary`, `review_label` |

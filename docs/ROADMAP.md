@@ -97,7 +97,8 @@ judge, the mix, the manifest, staleness and the size check, as two jobs. It reus
 
 ## Phase 2: one acceptance gate
 
-**Status: partial.** Two gates exist today:
+**Status: partial.** The gate itself is done (`accept_gate.py`). Training-side guards, the CI mocks and the
+diff view are left. Before it, two gates existed:
 - `retrain_gate.py`: fixed against broken items on the holdout;
 - `quant_fidelity.py`: what a quant kept.
 
@@ -110,7 +111,8 @@ report.
 | **Next-token KL and same top token** against the reference | done (`quant_fidelity.py`) |
 | **TestQA answers lost,** judged by their 95% interval | done |
 | **H-neuron drift and truth-probe AUROC transfer** | done |
-| **A strict preset:** truth-probe AUROC drop at most 0.02 (the default is 0.05) | planned |
+| **One gate over every report:** retrain, quant fidelity and repository adapter; accept, review or reject | done (`accept_gate.py`, [ACCEPT_GATE.md](ACCEPT_GATE.md)) |
+| **A strict preset:** truth-probe AUROC drop at most 0.02 (the default is 0.05) | done (`--preset strict` in `accept_gate.py` and `quant_fidelity.py`) |
 | **KL anchor during training:** a KL penalty against the base model's outputs on replay data | planned |
 | **Collapse guardrails:** stop training when output diversity, abstention rate or KL to the base moves past a limit | planned |
 | **Mock `llama-cett-dump` and judge fixtures,** so CI runs the whole gate without a model | partial (the integration test builds a tiny model; the mocks are planned) |
@@ -215,7 +217,7 @@ report.
 1. Phase 1's scanner, question generator, judge, manifest and expiry tests. *Done.*
 2. Wire them into `finetune.py` and `merge_export.py`, with the 15% replay and the size check. *Done as job
    steps (quick-start path 5); a Studio stale-adapter indicator is left.*
-3. Phase 2's strict preset (AUROC drop at most 0.02).
+3. Phase 2's strict preset (AUROC drop at most 0.02). *Done, with one gate over every report.*
 4. A Studio job for phase 1, and quick-start path 5 completed. *Done.*
 5. Phase 3: the MI50 training path and the capability flags, checked on hardware.
 6. Phase 4: long context, xGMI and telemetry benchmarks.
