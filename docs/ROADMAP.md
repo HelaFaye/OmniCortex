@@ -214,9 +214,44 @@ report.
 
 ## Engines and models to add
 
-| Item | Status |
+### Radiance
+
+[Radiance](https://codeberg.org/StillDeadcode/radiance) is an inference server for AMD GPUs, written in C++ and
+HIP under Apache-2.0. It was reviewed on 2026-11-24, at commit `f1113ee`.
+
+**What it is:**
+- **Models:** language models, plus image, video, speech and music generation, from its own `.rad` containers. A
+  container holds the weights, tokenizer, chat template and any drafter. Its quantizers (IQR, rotated int8) are
+  its own, not GGUF.
+- **APIs:** OpenAI's (chat, completions, Responses, images, audio, video), Anthropic's Messages, and
+  llama-server's native one. Logprobs come with up to 20 alternatives per token (`top_logprobs`, `n_probs`).
+- **Cards:** its kernels target RDNA4 (gfx1200/1201), RDNA3 (gfx11xx) and Strix Halo (gfx1151). A CPU build
+  (AVX-512 and AVX2) serves every model, slowly for large ones. Any other card needs a kernel library written
+  for it, so **the MI50 (gfx906) isn't served on its GPU today**.
+- **LoRA:** serves PEFT adapters (what `finetune.py` writes) beside the base model without merging. A request
+  picks one by model name, and adapters load and unload while serving.
+- **Internals:** no activations are exposed over its API. Hidden states are read internally, for drafters only.
+
+**What OmniCortex can and can't use:**
+
+| Feature | With Radiance |
 |---|---|
-| **Radiance** (`codeberg.org/StillDeadcode/radiance`): support it, after reading what it is and what it exposes | planned; not yet reviewed, since this environment's network refuses codeberg.org |
+| Chat, TestQA, routing, the gate's knowledge count, per-token confidence | yes: they need only its OpenAI-compatible API and logprobs |
+| Repository adapters and Fix This Mistake adapters | yes: it serves `finetune.py`'s PEFT output as it is, with no GGUF conversion |
+| KL divergence for quant fidelity | approximately: from the top 20 logprobs per token, not llama-perplexity's full distribution |
+| H-neurons, the truth probe, emotion vectors, features | no: these need activations, which its API doesn't give; they stay on llama.cpp and PyTorch |
+| MI50 and M10 rigs | CPU only, until someone writes gfx906 kernels for it |
+
+**The plan:**
+
+| Step | Status |
+|---|---|
+| **Reviewed:** what it serves, its cards, its API, LoRA, internals | done |
+| **As a remote endpoint:** document using a running Radiance as `URL@model` in TestQA, the gate and Studio's remote hosts. This needs no code, since its API is OpenAI's; check it against a CPU build with a small model | planned |
+| **As a Studio engine:** start `radiance --config` from a generated YAML, list `.rad` files as models, and map adapter hot-swap onto its `/v1/load_lora_adapter` | planned |
+| **Fidelity from logprobs:** a KL estimate from top-k logprobs, so `.rad` quants can be compared on an endpoint; say in the report that it is an estimate | planned |
+| **Hardware profiles:** RDNA3, RDNA4 and Strix Halo with Radiance as an engine choice; gfx906 marked as unsupported | planned |
+| **Credits** in [CREDITS.md](CREDITS.md) when the first step lands | planned |
 
 ## Order, as the audit recommends
 
