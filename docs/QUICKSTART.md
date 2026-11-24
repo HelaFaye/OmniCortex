@@ -64,7 +64,9 @@ The retraining cycle, in one job or step by step ([RETRAINING.md](RETRAINING.md)
      QLoRA's bitsandbytes doesn't run on ROCm;
   4. [Merge and convert](/jobs#kind=merge&gguf=Q4_K_M) to a GGUF, or to a GGUF LoRA that Studio can switch on
      and off;
-  5. [Keep or reject the retrain](/jobs#kind=retrain_gate): fixed against broken items on the holdout.
+  5. [Keep or reject the retrain](/jobs#kind=retrain_gate): fixed against broken items on the holdout;
+  6. [Acceptance gate](/jobs#kind=accept_gate&preset=default&require=retrain): one verdict from that and, after
+     quantizing, the fidelity report ([ACCEPT_GATE.md](ACCEPT_GATE.md)).
 
 For a single wrong reply in chat, **Fix This Mistake** under the reply keeps the corrected pair, and
 [Fix This Mistake: micro-tune](/jobs#kind=harvest_train) trains on the kept pairs.
@@ -83,6 +85,8 @@ Train a small LoRA that knows the repository, from questions and answers grounde
 4. [Merge and convert](/jobs#kind=merge&lora_gguf=1) to a GGUF LoRA, which Studio switches on per chat.
 5. [Is the adapter still current?](/jobs#kind=repo_adapt_check&max_adapter_mb=200) whenever the repository moves
    on: it lists the interfaces that changed, and checks the adapter's size against a budget.
+6. [Acceptance gate](/jobs#kind=accept_gate&require=adapter&require=retrain) with the adapter's manifest and
+   the retrain gate's report on the holdout, before the adapter is used.
 
 ## 6. Prepare a model for deployment
 
@@ -91,6 +95,8 @@ Train a small LoRA that knows the repository, from questions and answers grounde
 2. **Check what the quant lost:** [Did a quantization keep what the model knows?](/jobs#kind=quant_fidelity&testqa=qa/bank)
    compares it with the original: next-token agreement, TestQA answers lost, H-neuron drift, and whether the truth
    probe still works ([QUANT_FIDELITY.md](QUANT_FIDELITY.md)).
+   Then [the acceptance gate](/jobs#kind=accept_gate&preset=strict&require=fidelity) gives the quant one verdict:
+   accept, review or reject. The strict preset holds the truth probe within 0.02 AUROC.
 3. **Tune the engine:** [Find the fastest engine settings](/jobs#kind=engine_optimize&kv=1) for this card, and
    apply the winner to Studio's settings.
 4. **Match the hardware:** [Hardware: apply a support profile](/jobs#kind=hw_apply) ([HARDWARE_PROFILES.md](HARDWARE_PROFILES.md)).

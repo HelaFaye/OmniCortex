@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### Added (training guards)
+
+- `finetune.py --kl-anchor BETA` (LoRA and QLoRA) adds BETA times the KL divergence from the base model on the
+  replay rows' replies, so new material is learned without drifting from what the model already said. The base is
+  the adapter switched off; the term is logged as `kl_anchor`.
+- `finetune.py --guard-every N` checks every N steps for collapse and stops the run, recording why (exit 5), when:
+  - reply diversity falls;
+  - declined or empty replies rise;
+  - KL from the base passes a limit;
+  - the loss is NaN.
+
+  Both guards are in Jobs → Fine-tune and `scripts/train_guards.py`.
+
+### Added (one acceptance gate)
+
+- `scripts/accept_gate.py` (Jobs → Retrain → *Acceptance gate*, [docs/ACCEPT_GATE.md](docs/ACCEPT_GATE.md)) gives a
+  change one verdict, accept, review or reject, from the reports it already has:
+  - the retrain gate;
+  - quantization fidelity, judged again with the preset's limits;
+  - the repository adapter check (current interfaces, size budget, manifest warnings).
+
+  `--require` stops a pipeline from passing by leaving a report out.
+- Limit presets in `quant_fidelity.py` and the gate: `default`, and `strict`, which holds the truth probe within
+  0.02 AUROC and tightens the rest.
+
 ### Added (quick starts and a plan for the next stages)
 
 - [docs/QUICKSTART.md](docs/QUICKSTART.md): six task-first paths through Studio:

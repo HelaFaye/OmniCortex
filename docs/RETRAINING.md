@@ -216,6 +216,35 @@ python scripts/finetune.py --launch 4 --model ... --method full --fsdp --out run
   recent PyTorch wheels may not include their `sm_XX`; `--check` shows
   whether yours is supported before you start.
 
+### Guards: stay close to the base, stop a collapsing run
+
+Two options keep a run from trading away what the model already did well (`scripts/train_guards.py`):
+
+- **`--kl-anchor BETA`** (LoRA and QLoRA):
+  - **what it adds:** BETA times the KL divergence from the base model's next-token distribution to the tuned
+    model's;
+  - **where:** on the reply tokens of the replay rows (those with `source` replay, anchor or general), so the
+    other rows still teach the new material;
+  - **the base model:** the same weights with the adapter switched off, so nothing is loaded twice;
+  - **what to set:** 0.1 is a reasonable start;
+  - **in the log:** the term appears as `kl_anchor`.
+- **`--guard-every N`:** every N steps, greedy replies to a few replay prompts are compared with the replies
+  before training. The run stops when any of these happens:
+  - **reply diversity** (distinct word pairs) falls below half of its starting value;
+  - **declined or empty replies** rise by more than 30 points;
+  - **KL from the base** passes `--guard-max-kl` (1.0 nats per token by default; LoRA and QLoRA only);
+  - **the loss** becomes NaN.
+
+  When the guard stops a run:
+  - the adapter is still saved;
+  - the reason is recorded in `omnicortex-finetune.json` (`guard`);
+  - DPO is skipped;
+  - `finetune.py` exits with status 5, so a cycle doesn't build on the run.
+
+On a tiny random model the anchor term rose from 0 to 0.03 over six steps at BETA 0.5. The guard stopped a run when
+its replies went empty, and another when KL passed a zero limit (`tests/test_train_guards.py`). Neither has yet been
+run on a real model at scale.
+
 ### Vision-language models
 
 ```bash

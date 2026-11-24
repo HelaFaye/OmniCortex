@@ -44,6 +44,18 @@ sys.path.insert(0, str(HERE))
 
 DEFAULTS = {"max_kld": 0.1, "min_same_top": 85.0, "min_agreement": 0.8, "max_lost": 0.03, "min_cett_cos": 0.95, "max_flag_flips": 0.05,
             "max_auc_drop": 0.05}
+# Limit presets. "strict" is for a model whose own instruments must keep working (the truth probe within 0.02
+# AUROC, from the 2026-11-23 spec) and for small models, which lose more to the same quant type.
+PRESETS = {"default": dict(DEFAULTS),
+           "strict": {"max_kld": 0.05, "min_same_top": 90.0, "min_agreement": 0.9, "max_lost": 0.02,
+                      "min_cett_cos": 0.97, "max_flag_flips": 0.03, "max_auc_drop": 0.02}}
+
+
+def limits(preset: str = "default", **override) -> dict:
+    """A preset's limits, with any given (non-None) values in place of its own."""
+    if preset not in PRESETS:
+        raise ValueError(f"unknown preset {preset!r}: one of {', '.join(PRESETS)}")
+    return {**PRESETS[preset], **{k: v for k, v in override.items() if k in DEFAULTS and v is not None}}
 
 
 def label_of(path: str) -> str:
@@ -326,7 +338,7 @@ def markdown(report: dict) -> str:
 def run(a) -> dict:
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    t = {k: getattr(a, k) for k in DEFAULTS}
+    t = limits(getattr(a, "preset", "default") or "default", **{k: getattr(a, k, None) for k in DEFAULTS})
     rows = {label_of(q): {} for q in a.quant}
 
     for lbl, r in next_token(a, out).items():          # --skip-next-token still reports cached results
@@ -358,7 +370,7 @@ def run(a) -> dict:
 
     for lbl, r in rows.items():
         r["verdict"], r["reasons"] = verdict(r, t)
-    report = {"schema": "omnicortex-quant-fidelity/1", "reference": a.ref, "thresholds": t, "quants": rows}
+    report = {"schema": "omnicortex-quant-fidelity/1", "reference": a.ref, "preset": getattr(a, "preset", "default"), "thresholds": t, "quants": rows}
     (out / "fidelity.json").write_text(json.dumps(report, indent=1))
     (out / "fidelity.md").write_text(markdown(report))
     return report
@@ -394,13 +406,15 @@ def main(argv=None) -> int:
     g.add_argument("--truth-data", help="labelled rows (truth_probe.py data), ideally not the training rows")
     g.add_argument("--truth-n", type=int, default=200)
     g = p.add_argument_group("verdict")
-    g.add_argument("--max-kld", type=float, default=DEFAULTS["max_kld"])
-    g.add_argument("--min-same-top", type=float, default=DEFAULTS["min_same_top"], help="percent")
-    g.add_argument("--min-agreement", type=float, default=DEFAULTS["min_agreement"])
-    g.add_argument("--max-lost", type=float, default=DEFAULTS["max_lost"], help="fraction of TestQA items lost")
-    g.add_argument("--min-cett-cos", type=float, default=DEFAULTS["min_cett_cos"])
-    g.add_argument("--max-flag-flips", type=float, default=DEFAULTS["max_flag_flips"])
-    g.add_argument("--max-auc-drop", type=float, default=DEFAULTS["max_auc_drop"])
+    g.add_argument("--preset", choices=list(PRESETS), default="default",
+                   help="limits: default, or strict (truth-probe AUROC drop at most 0.02); options below override it")
+    g.add_argument("--max-kld", type=float, help=f"default {DEFAULTS['max_kld']}")
+    g.add_argument("--min-same-top", type=float, help=f"percent; default {DEFAULTS['min_same_top']}")
+    g.add_argument("--min-agreement", type=float, help=f"default {DEFAULTS['min_agreement']}")
+    g.add_argument("--max-lost", type=float, help=f"fraction of TestQA items lost; default {DEFAULTS['max_lost']}")
+    g.add_argument("--min-cett-cos", type=float, help=f"default {DEFAULTS['min_cett_cos']}")
+    g.add_argument("--max-flag-flips", type=float, help=f"default {DEFAULTS['max_flag_flips']}")
+    g.add_argument("--max-auc-drop", type=float, help=f"default {DEFAULTS['max_auc_drop']}")
     a = p.parse_args(argv)
     for f in [a.ref, *a.quant]:
         if not Path(f).exists():

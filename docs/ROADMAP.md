@@ -97,7 +97,8 @@ judge, the mix, the manifest, staleness and the size check, as two jobs. It reus
 
 ## Phase 2: one acceptance gate
 
-**Status: partial.** Two gates exist today:
+**Status: partial.** The gate itself is done (`accept_gate.py`). Training-side guards, the CI mocks and the
+diff view are left. Before it, two gates existed:
 - `retrain_gate.py`: fixed against broken items on the holdout;
 - `quant_fidelity.py`: what a quant kept.
 
@@ -110,9 +111,10 @@ report.
 | **Next-token KL and same top token** against the reference | done (`quant_fidelity.py`) |
 | **TestQA answers lost,** judged by their 95% interval | done |
 | **H-neuron drift and truth-probe AUROC transfer** | done |
-| **A strict preset:** truth-probe AUROC drop at most 0.02 (the default is 0.05) | planned |
-| **KL anchor during training:** a KL penalty against the base model's outputs on replay data | planned |
-| **Collapse guardrails:** stop training when output diversity, abstention rate or KL to the base moves past a limit | planned |
+| **One gate over every report:** retrain, quant fidelity and repository adapter; accept, review or reject | done (`accept_gate.py`, [ACCEPT_GATE.md](ACCEPT_GATE.md)) |
+| **A strict preset:** truth-probe AUROC drop at most 0.02 (the default is 0.05) | done (`--preset strict` in `accept_gate.py` and `quant_fidelity.py`) |
+| **KL anchor during training:** a KL penalty against the base model's outputs on replay data | done (`finetune.py --kl-anchor`, LoRA and QLoRA; [RETRAINING.md](RETRAINING.md)) |
+| **Collapse guardrails:** stop training when output diversity, abstention rate or KL to the base moves past a limit | done (`finetune.py --guard-every`; also empty replies and a NaN loss; exits 5) |
 | **Mock `llama-cett-dump` and judge fixtures,** so CI runs the whole gate without a model | partial (the integration test builds a tiny model; the mocks are planned) |
 | **Cross-quant regression diff view:** item by item, which answers each quant gained and lost, side by side in Studio | planned |
 
@@ -210,12 +212,53 @@ report.
 | **Overnight orchestrator, promotion gate, systemd timer** | planned |
 | **Installer scripts** for all of the above | planned |
 
+## Engines and models to add
+
+### Radiance
+
+[Radiance](https://codeberg.org/StillDeadcode/radiance) is an inference server for AMD GPUs, written in C++ and
+HIP under Apache-2.0. It was reviewed on 2026-11-24, at commit `f1113ee`.
+
+**What it is:**
+- **Models:** language models, plus image, video, speech and music generation, from its own `.rad` containers. A
+  container holds the weights, tokenizer, chat template and any drafter. Its quantizers (IQR, rotated int8) are
+  its own, not GGUF.
+- **APIs:** OpenAI's (chat, completions, Responses, images, audio, video), Anthropic's Messages, and
+  llama-server's native one. Logprobs come with up to 20 alternatives per token (`top_logprobs`, `n_probs`).
+- **Cards:** its kernels target RDNA4 (gfx1200/1201), RDNA3 (gfx11xx) and Strix Halo (gfx1151). A CPU build
+  (AVX-512 and AVX2) serves every model, slowly for large ones. Any other card needs a kernel library written
+  for it, so **the MI50 (gfx906) isn't served on its GPU today**.
+- **LoRA:** serves PEFT adapters (what `finetune.py` writes) beside the base model without merging. A request
+  picks one by model name, and adapters load and unload while serving.
+- **Internals:** no activations are exposed over its API. Hidden states are read internally, for drafters only.
+
+**What OmniCortex can and can't use:**
+
+| Feature | With Radiance |
+|---|---|
+| Chat, TestQA, routing, the gate's knowledge count, per-token confidence | yes: they need only its OpenAI-compatible API and logprobs |
+| Repository adapters and Fix This Mistake adapters | yes: it serves `finetune.py`'s PEFT output as it is, with no GGUF conversion |
+| KL divergence for quant fidelity | approximately: from the top 20 logprobs per token, not llama-perplexity's full distribution |
+| H-neurons, the truth probe, emotion vectors, features | no: these need activations, which its API doesn't give; they stay on llama.cpp and PyTorch |
+| MI50 and M10 rigs | CPU only, until someone writes gfx906 kernels for it |
+
+**The plan:**
+
+| Step | Status |
+|---|---|
+| **Reviewed:** what it serves, its cards, its API, LoRA, internals | done |
+| **As a remote endpoint:** document using a running Radiance as `URL@model` in TestQA, the gate and Studio's remote hosts. This needs no code, since its API is OpenAI's; check it against a CPU build with a small model | planned |
+| **As a Studio engine:** start `radiance --config` from a generated YAML, list `.rad` files as models, and map adapter hot-swap onto its `/v1/load_lora_adapter` | planned |
+| **Fidelity from logprobs:** a KL estimate from top-k logprobs, so `.rad` quants can be compared on an endpoint; say in the report that it is an estimate | planned |
+| **Hardware profiles:** RDNA3, RDNA4 and Strix Halo with Radiance as an engine choice; gfx906 marked as unsupported | planned |
+| **Credits** in [CREDITS.md](CREDITS.md) when the first step lands | planned |
+
 ## Order, as the audit recommends
 
 1. Phase 1's scanner, question generator, judge, manifest and expiry tests. *Done.*
 2. Wire them into `finetune.py` and `merge_export.py`, with the 15% replay and the size check. *Done as job
    steps (quick-start path 5); a Studio stale-adapter indicator is left.*
-3. Phase 2's strict preset (AUROC drop at most 0.02).
+3. Phase 2's strict preset (AUROC drop at most 0.02). *Done, with one gate over every report.*
 4. A Studio job for phase 1, and quick-start path 5 completed. *Done.*
 5. Phase 3: the MI50 training path and the capability flags, checked on hardware.
 6. Phase 4: long context, xGMI and telemetry benchmarks.

@@ -58,6 +58,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 def hardware_report() -> dict:
@@ -102,15 +103,17 @@ def load_jsonl(p: Path) -> list[dict]:
     return [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
 
 
-def sft_dataset(path: Path):
-    """Chat records -> conversational prompt/completion, so loss covers only the reply."""
+def sft_dataset(path: Path, anchor: bool = False):
+    """Chat records -> conversational prompt/completion, so loss covers only the reply. anchor: also an `anchor`
+    flag per row (1 for replay rows), for --kl-anchor."""
     from datasets import Dataset
+    import train_guards as TG
     rows = []
     for r in load_jsonl(path):
         msgs = r["messages"]
         if not msgs or msgs[-1]["role"] != "assistant":
             continue
-        rows.append({"prompt": msgs[:-1], "completion": [msgs[-1]]})
+        rows.append({"prompt": msgs[:-1], "completion": [msgs[-1]], **({"anchor": TG.is_anchor(r)} if anchor else {})})
     if not rows:
         raise SystemExit(f"no usable SFT records in {path}")
     return Dataset.from_list(rows)
@@ -308,19 +311,38 @@ def train(a) -> int:
             print(f"  {freeze_outside(model, a.layer_list):,} trainable parameters")
     out = Path(a.out)
     from trl import SFTConfig, SFTTrainer
+    import train_guards as TG
     peft_cfg = lora_config(a, model)
+    adapters = a.method != "full"
+    if a.kl_anchor and (not adapters or a.vision):
+        raise SystemExit("--kl-anchor needs --method lora or qlora (the base model is the adapter switched off), "
+                         "and text data")
     sft_file, dpo_file = ("sft_vision.jsonl", "dpo_vision.jsonl") if a.vision else ("sft.jsonl", "dpo.jsonl")
     extra = {"max_length": None} if a.vision else {}      # truncation would cut image tokens
+    if a.kl_anchor:
+        extra["remove_unused_columns"] = False          # keep each row's anchor flag for the collator
     sft_args = config(SFTConfig, **{**common_args(a, prec, out / "sft-run", model), **extra},
                       completion_only_loss=True)
-    train_ds = sft_vision_dataset(data / sft_file) if a.vision else sft_dataset(data / sft_file)
+    train_ds = sft_vision_dataset(data / sft_file) if a.vision else sft_dataset(data / sft_file, bool(a.kl_anchor))
+    if a.kl_anchor and not sum(train_ds["anchor"]):
+        raise SystemExit("--kl-anchor: no replay rows in the data (source replay, anchor or general) to anchor on")
     if a.vision and a.method != "full":
         for n, prm in model.named_parameters():
             if any(k in n for k in ("vision_tower", "vision_model", "visual.")) or \
                     (a.freeze_projector and any(k in n for k in ("projector", "merger", "connector"))):
                 prm.requires_grad_(False)
-    trainer = SFTTrainer(model=model, args=sft_args, train_dataset=train_ds,
-                         processing_class=tok, peft_config=peft_cfg)
+    cls = TG.anchored_trainer(SFTTrainer, a.kl_anchor) if a.kl_anchor else SFTTrainer
+    trainer = cls(model=model, args=sft_args, train_dataset=train_ds, processing_class=tok, peft_config=peft_cfg)
+    if a.kl_anchor:
+        trainer.data_collator = TG.anchor_collator(trainer.data_collator)
+    guard = None
+    if a.guard_every and not a.vision:
+        rows = load_jsonl(data / sft_file)
+        probes = [r["messages"][:-1] for r in rows if TG.is_anchor(r) and len(r["messages"]) > 1][:a.guard_prompts] \
+            or [r["messages"][:-1] for r in rows if len(r["messages"]) > 1][:a.guard_prompts]
+        guard = TG.CollapseGuard(a.guard_min_diversity, a.guard_max_abstain_rise,
+                                 a.guard_max_kl if adapters else None)
+        trainer.add_callback(TG.guard_callback(guard, probes, tok, a.guard_every, kl=adapters))
     kept = len(trainer.train_dataset)
     if kept == 0:
         raise SystemExit(f"all {len(train_ds)} SFT examples were dropped: with --max-length {a.max_length} the "
@@ -329,6 +351,8 @@ def train(a) -> int:
         print(f"note: {len(train_ds) - kept} of {len(train_ds)} examples had no reply left within --max-length "
               f"{a.max_length} and were dropped")
     trainer.train()
+    if guard and guard.tripped:
+        a.dpo = False                                    # don't build on a collapsing run
     model = trainer.model
     sft_dir = out if not a.dpo else out / "sft"
     model.save_pretrained(sft_dir)
@@ -351,11 +375,16 @@ def train(a) -> int:
     meta = {"base": a.model, "method": a.method, "vision": bool(a.vision), "data": str(data), "dpo": bool(a.dpo),
             "lora": None if a.method == "full" else {"r": a.lora_r, "alpha": a.lora_alpha, "targets": a.lora_targets},
             "layers": a.layer_list,
+            "kl_anchor": a.kl_anchor or None, "guard": guard.report() if guard else None,
             "precision": prec, "hardware": rep,
             # the training curves, so sweeps can compare runs without TensorBoard
             "log": {"sft": trainer.state.log_history, "dpo": dtrainer.state.log_history if a.dpo else None}}
     (out / "omnicortex-finetune.json").write_text(json.dumps(meta, indent=2))
     print(f"wrote {out}")
+    if guard and guard.tripped:
+        print(f"the collapse guard stopped training at step {guard.tripped['step']}: {guard.tripped['why']}; "
+              "the adapter is saved but should not be used", file=sys.stderr)
+        return 5
     return 0
 
 
@@ -394,6 +423,15 @@ def main(argv=None) -> int:
     p.add_argument("--logging-steps", type=int, default=5)
     p.add_argument("--report-to", default="", help="comma list for the trainer, e.g. tensorboard (event files in OUT)")
     p.add_argument("--seed", type=int, default=0)
+    g = p.add_argument_group("guards (scripts/train_guards.py)")
+    g.add_argument("--kl-anchor", type=float, default=0.0, metavar="BETA",
+                   help="add BETA * KL(base || tuned) on the replay rows' replies (LoRA/QLoRA; e.g. 0.1)")
+    g.add_argument("--guard-every", type=int, default=0, metavar="N",
+                   help="check for collapse every N steps (0: off); stops the run and exits 5 if it trips")
+    g.add_argument("--guard-prompts", type=int, default=8, help="probe prompts, from the replay rows")
+    g.add_argument("--guard-min-diversity", type=float, default=0.5, help="of the diversity before training")
+    g.add_argument("--guard-max-abstain-rise", type=float, default=0.3)
+    g.add_argument("--guard-max-kl", type=float, default=1.0, help="nats per token from the base (LoRA/QLoRA)")
     a = p.parse_args(argv)
     if a.check:
         print(json.dumps(hardware_report(), indent=2))
