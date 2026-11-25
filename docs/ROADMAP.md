@@ -252,6 +252,14 @@ HIP under Apache-2.0. It was reviewed on 2026-11-24, at commit `f1113ee`.
 | **Fidelity from logprobs:** a KL estimate from top-k logprobs, so `.rad` quants can be compared on an endpoint; say in the report that it is an estimate | planned |
 | **Hardware profiles:** RDNA3, RDNA4 and Strix Halo with Radiance as an engine choice; gfx906 marked as unsupported | planned |
 | **Credits** in [CREDITS.md](CREDITS.md) when the first step lands | planned |
+| **Activations, added by us** (a patch set, like `llama-tools/` for llama.cpp, offered upstream): a tap after each MLP block's `silu_mul` (the `ffn` buffer, CETT's input) copied out for chosen layers and served the way our llama.cpp server-activations patch does; quantised-activation blocks (w8a8, fp8) dequantised in the tap. Developed on its CPU backend, which runs the same graph. Building blocks it already has: `kld-record`/`kld-ref` (full-vocabulary KL and top-1 agreement, for quant fidelity), `calib-corpus` (per-linear input statistics, not per token), a debug buffer probe (first row only), and control vectors in project mode on one architecture (steering needs an add mode) | planned |
+| **MI50 kernels for Radiance** | later; [COMPATIBILITY.md](COMPATIBILITY.md) says plainly it isn't served on gfx906 |
+
+## More automated tests in CI
+
+Asked for on 2026-11-25. Every GPU cell in [COMPATIBILITY.md](COMPATIBILITY.md) is unverified until a test runs it,
+so this is planned as its own phase: widen what CI runs (the binaries it already builds, the Studio pages in a
+browser, the Android client), and add hardware runners where available. Status: planned.
 
 ## Order, as the audit recommends
 
