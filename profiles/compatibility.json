@@ -1,0 +1,170 @@
+{
+ "schema": "omnicortex-compat/1",
+ "reviewed": "2026-11-24",
+ "statuses": {
+  "verified": "run on this hardware by OmniCortex's tests or a recorded trial; the evidence says which",
+  "expected": "should work from the engine's or library's own support, but not run here yet",
+  "partial": "works with a limit the note states",
+  "unsupported": "does not work; the note says why",
+  "unknown": "not known either way",
+  "n/a": "does not apply to this hardware"
+ },
+ "features": {
+  "llama_cpp": "llama.cpp: serve GGUF models",
+  "mx_llama": "mx-llama.cpp: the gfx906-tuned llama.cpp fork",
+  "radiance": "Radiance: serve .rad models",
+  "pytorch": "PyTorch: Hugging Face models (H-neurons, emotions, features, logit lens)",
+  "cett_dump": "H-neuron activations from a GGUF (llama-cett-dump)",
+  "truth_probe": "truth probe on a GGUF (needs llama-cett-dump)",
+  "lora": "LoRA training (finetune.py)",
+  "qlora": "QLoRA training (4-bit base, bitsandbytes)",
+  "bf16": "bfloat16 arithmetic",
+  "quant_fidelity": "quantization fidelity's KL count (llama-perplexity)"
+ },
+ "profiles": {
+  "cpu-x86": {
+   "llama_cpp": {"status": "verified", "evidence": "CI builds llama.cpp on x86-64 and runs tests/test_llamacpp_integration.py on every push"},
+   "mx_llama": {"status": "n/a", "note": "the fork exists for gfx906; its CPU build passed the integration tests here, which checks the patches, not the fork's purpose"},
+   "radiance": {"status": "expected", "note": "its host backend (libavx: AVX-512 and AVX2) serves every model it ships; slowly for 27B and up; not run here yet"},
+   "pytorch": {"status": "verified", "evidence": "CI runs the PyTorch tests on CPU wheels"},
+   "cett_dump": {"status": "verified", "evidence": "CI (tests/test_llamacpp_integration.py)"},
+   "truth_probe": {"status": "verified", "evidence": "CI, and Qwen2.5 0.5B and 1.5B on a CPU (docs/TRUTH_PROBE.md)"},
+   "lora": {"status": "verified", "evidence": "CI trains a tiny model (tests/test_retrain.py, tests/test_train_guards.py)"},
+   "qlora": {"status": "unsupported", "note": "bitsandbytes' 4-bit kernels need a CUDA GPU; finetune.py says so"},
+   "bf16": {"status": "partial", "note": "CPUs with AVX-512 BF16 or AMX run it; others emulate it slowly. Training on a CPU uses float32"},
+   "quant_fidelity": {"status": "verified", "evidence": "CI (tiny model) and Qwen2.5-1.5B on a CPU (docs/QUANT_FIDELITY.md)"}
+  },
+  "arm-board": {
+   "llama_cpp": {"status": "expected", "note": "CI builds the arm64 and armv7 binaries but runs no tests on them"},
+   "mx_llama": {"status": "n/a"},
+   "radiance": {"status": "unsupported", "note": "its production host kernels (libavx) are x86 only; on ARM only the reference kernels remain, which it refuses to serve with"},
+   "pytorch": {"status": "partial", "note": "64-bit ARM has CPU wheels; 32-bit ARM has none"},
+   "cett_dump": {"status": "expected", "note": "builds wherever llama.cpp does"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "partial", "note": "on the CPU, small models only; none on 32-bit ARM"},
+   "qlora": {"status": "unsupported", "note": "needs CUDA"},
+   "bf16": {"status": "partial", "note": "ARMv8.6 and newer cores (and some v8.2 with the BF16 extension) only"},
+   "quant_fidelity": {"status": "expected"}
+  },
+  "amd-gfx906-arm": {
+   "llama_cpp": {"status": "expected", "note": "Vulkan (RADV); HIP needs ROCm built from source for gfx906 on aarch64 (the mi50-arm guide)"},
+   "mx_llama": {"status": "expected", "note": "needs ROCm built from source on aarch64; see amd-gfx906-mx"},
+   "radiance": {"status": "unsupported", "note": "no gfx906 kernel library, and no ARM host kernels"},
+   "pytorch": {"status": "partial", "note": "on the ARM CPU only: there are no PyTorch ROCm wheels for aarch64"},
+   "cett_dump": {"status": "expected", "note": "builds with the same backend as llama.cpp; not run on this card here"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "partial", "note": "on the ARM CPU, small models only"},
+   "qlora": {"status": "unsupported", "note": "bitsandbytes doesn't run on gfx906"},
+   "bf16": {"status": "unsupported", "note": "gfx906 has no bfloat16 arithmetic; fp16 has a smaller range (the roadmap's fp16 range check)"},
+   "quant_fidelity": {"status": "expected"}
+  },
+  "amd-gfx906-mx": {
+   "llama_cpp": {"status": "expected", "note": "upstream llama.cpp with HIP for gfx906 also works; this profile builds the fork instead"},
+   "mx_llama": {"status": "partial", "note": "built here and its binaries passed the integration tests on the CPU; HIP on a real MI50 not run here yet (docs/MX_LLAMA.md)"},
+   "radiance": {"status": "unsupported", "note": "no gfx906 kernel library; an x86 host can run its CPU backend instead"},
+   "pytorch": {"status": "partial", "note": "recent ROCm releases have dropped gfx906; use a ROCm wheel that still includes it, or the CPU"},
+   "cett_dump": {"status": "partial", "note": "built into the fork and passed the integration tests on the CPU; not on the card here"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "partial", "note": "FP16 LoRA where a gfx906 PyTorch build exists; a 27B FP16 base (about 54 GB) doesn't fit one 32 GB card (docs/ROADMAP.md, phase 3)"},
+   "qlora": {"status": "unsupported", "note": "bitsandbytes doesn't run on gfx906; finetune.py refuses QLoRA on ROCm"},
+   "bf16": {"status": "unsupported", "note": "gfx906 has no bfloat16 arithmetic"},
+   "quant_fidelity": {"status": "expected"}
+  },
+  "amd-legacy-gcn": {
+   "llama_cpp": {"status": "expected", "note": "Vulkan; ROCm has dropped or deprecated these chips"},
+   "mx_llama": {"status": "n/a", "note": "gfx906 only; see amd-gfx906-mx"},
+   "radiance": {"status": "unsupported", "note": "no kernel library for GCN; an x86 host can run its CPU backend instead"},
+   "pytorch": {"status": "partial", "note": "CPU wheels"},
+   "cett_dump": {"status": "expected"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "partial", "note": "on the CPU"},
+   "qlora": {"status": "unsupported", "note": "needs CUDA"},
+   "bf16": {"status": "unsupported", "note": "no bfloat16 arithmetic on GCN"},
+   "quant_fidelity": {"status": "expected"}
+  },
+  "amd-rocm": {
+   "llama_cpp": {"status": "expected", "note": "HIP or Vulkan"},
+   "mx_llama": {"status": "n/a"},
+   "radiance": {"status": "partial", "note": "RDNA4 (gfx1200, gfx1201), RDNA3 (gfx11xx) and Strix Halo (gfx1151) have kernel libraries; RDNA2 and CDNA don't. Not run here yet"},
+   "pytorch": {"status": "expected", "note": "ROCm wheels"},
+   "cett_dump": {"status": "expected"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "expected"},
+   "qlora": {"status": "unsupported", "note": "finetune.py refuses QLoRA on ROCm"},
+   "bf16": {"status": "partial", "note": "RDNA3 and CDNA2 or newer; not RDNA2"},
+   "quant_fidelity": {"status": "expected"}
+  },
+  "nvidia-modern-sm75": {
+   "llama_cpp": {"status": "expected", "note": "CUDA; CI builds the CUDA binaries but runs no GPU tests"},
+   "mx_llama": {"status": "n/a"},
+   "radiance": {"status": "unsupported", "note": "AMD GPUs only; an x86 host can run its CPU backend instead"},
+   "pytorch": {"status": "expected"},
+   "cett_dump": {"status": "expected"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "expected"},
+   "qlora": {"status": "expected", "note": "bitsandbytes on CUDA"},
+   "bf16": {"status": "partial", "note": "Ampere (compute 8.0) and newer; Turing has none"},
+   "quant_fidelity": {"status": "expected"}
+  },
+  "nvidia-legacy-sm50-70": {
+   "llama_cpp": {"status": "expected", "note": "CUDA 12.x; CUDA 13 can't build for these cards"},
+   "mx_llama": {"status": "n/a"},
+   "radiance": {"status": "unsupported", "note": "AMD GPUs only"},
+   "pytorch": {"status": "expected", "note": "the CUDA 12.6 wheels, the last with kernels for compute 5.0 to 6.1"},
+   "cett_dump": {"status": "expected"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "expected", "note": "in float32"},
+   "qlora": {"status": "unknown", "note": "this profile doesn't use it; bitsandbytes' support for these cards depends on its version"},
+   "bf16": {"status": "unsupported", "note": "no bfloat16 arithmetic before Ampere"},
+   "quant_fidelity": {"status": "expected"}
+  },
+  "nvidia-maxwell-arm": {
+   "llama_cpp": {"status": "expected", "note": "CUDA 12.9 for arm64 servers (sbsa), the last that builds for Maxwell; the m10-arm guide"},
+   "mx_llama": {"status": "n/a"},
+   "radiance": {"status": "unsupported", "note": "AMD GPUs only, and no ARM host kernels"},
+   "pytorch": {"status": "partial", "note": "on the ARM CPU only: PyTorch's aarch64 CUDA wheels don't target Maxwell"},
+   "cett_dump": {"status": "expected"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "partial", "note": "on the ARM CPU, small models only"},
+   "qlora": {"status": "unsupported", "note": "no CUDA PyTorch for this combination"},
+   "bf16": {"status": "unsupported", "note": "no bfloat16 arithmetic on Maxwell"},
+   "quant_fidelity": {"status": "expected"}
+  },
+  "apple-silicon": {
+   "llama_cpp": {"status": "expected", "note": "Metal; CI builds the macOS binaries but runs no tests on them"},
+   "mx_llama": {"status": "n/a"},
+   "radiance": {"status": "unsupported", "note": "AMD GPUs and x86 hosts only"},
+   "pytorch": {"status": "expected", "note": "MPS"},
+   "cett_dump": {"status": "expected"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "expected", "note": "in float16 on MPS"},
+   "qlora": {"status": "unsupported", "note": "needs CUDA"},
+   "bf16": {"status": "partial", "note": "M2 and newer; not M1"},
+   "quant_fidelity": {"status": "expected"}
+  },
+  "intel-gpu": {
+   "llama_cpp": {"status": "expected", "note": "SYCL or Vulkan"},
+   "mx_llama": {"status": "n/a"},
+   "radiance": {"status": "unsupported", "note": "AMD GPUs only; an x86 host can run its CPU backend instead"},
+   "pytorch": {"status": "expected", "note": "XPU wheels"},
+   "cett_dump": {"status": "expected"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "expected"},
+   "qlora": {"status": "unsupported", "note": "needs CUDA"},
+   "bf16": {"status": "expected"},
+   "quant_fidelity": {"status": "expected"}
+  },
+  "shared-igpu": {
+   "llama_cpp": {"status": "expected", "note": "Vulkan, within the memory the BIOS gives the GPU"},
+   "mx_llama": {"status": "n/a"},
+   "radiance": {"status": "partial", "note": "Strix Halo (gfx1151) only; on other x86 machines its CPU backend"},
+   "pytorch": {"status": "partial", "note": "CPU wheels"},
+   "cett_dump": {"status": "expected"},
+   "truth_probe": {"status": "expected"},
+   "lora": {"status": "partial", "note": "on the CPU"},
+   "qlora": {"status": "unsupported", "note": "needs CUDA"},
+   "bf16": {"status": "partial", "note": "depends on the chip"},
+   "quant_fidelity": {"status": "expected"}
+  }
+ }
+}

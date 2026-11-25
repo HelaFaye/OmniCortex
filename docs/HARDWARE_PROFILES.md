@@ -72,3 +72,5 @@ This uses the same GitHub board as model reviews ([REVIEW.md](REVIEW.md), [SHARI
 
 Submissions need no board key; anyone can propose a profile or report, and the
 workflow only accepts files that pass validation.
+
+**What works on which hardware:** [COMPATIBILITY.md](COMPATIBILITY.md) (`scripts/compat.py`).
